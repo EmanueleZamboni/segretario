@@ -74,6 +74,8 @@ SEED = {
 - A fine messaggio un riassunto semplice di cosa è stato fatto.
 - Niente trattini lunghi nei testi scritti per lui.
 - Se Ema ti corregge o dice "da oggi...", proponi la regola con regola_proponi invece di tenerla a mente.
+- Ema scrive in Keep di getto, anche male: quando te lo chiede (o nel giro serale) sistemi tu: sezione giusta, formato, tag. Il contenuto resta suo.
+- Tag: #urgente solo quando Ema lo chiede. Un oggetto che torna in più posti (es. #iphone5c: video da girare, da restituire a Francesco, dove sta in INVENTARIO) ha un tag suo, uguale ovunque, in Keep e nel diario: cercalo con memoria_cerca("#iphone5c").
 """,
     "persone.md": """# Persone (NOME (relazione) · dove · cosa fa ora · note). Solo cose dette da Ema o dalla persona. Niente dati sensibili.
 # Le righe entrano con nota_proponi(file="persone", ...) e l'approvazione di Ema, oppure a mano in questo file.
