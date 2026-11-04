@@ -34,14 +34,15 @@ if [ ! -f "$ENVF" ]; then
   say ".env written (network $NET, host $DOMAIN)"
 fi
 
-# 3. Avvio (o aggiornamento) del container.
+# 3. Avvio (o aggiornamento) del container. Se fallisce si va avanti lo stesso (cron e rapporto),
+#    così il prossimo push può rimediare da solo e il motivo resta leggibile.
+FAILED=0
 if (cd "$HERE" && $DOCKER compose up -d --build >/tmp/segretario-up.log 2>&1); then
   say "container up ($(cd "$HERE" && $DOCKER compose ps --format '{{.Name}} {{.Status}}' 2>/dev/null | tr '\n' ';'))"
 else
+  FAILED=1
   say "docker compose up FAILED: $(tail -n 3 /tmp/segretario-up.log | tr '\n' ' ')"
-  exit 1
 fi
-rm -f /tmp/segretario-up.log
 
 # 4. Aggiornamento automatico ogni 10 minuti, come Postino.
 LINE="*/10 * * * * $HERE/scripts/auto-update.sh >> $HOME/segretario-update.log 2>&1"
@@ -60,3 +61,7 @@ if [ -n "$SECRET" ]; then
 else
   say "ready. Connector URL: cd $HERE && docker compose exec segretario cat /data/connector-url"
 fi
+
+# 6. Stato leggibile senza terminale (STATUS.txt e Postino > Impostazioni > Claude).
+bash "$HERE/scripts/report.sh" 2>&1 | tail -n 2
+exit "$FAILED"

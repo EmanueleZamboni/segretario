@@ -18,6 +18,8 @@ echo "$(date -u +%FT%TZ) updating ${LOCAL:0:7} -> ${REMOTE:0:7}"
 git -C "$REPO" merge -q --ff-only "origin/$BRANCH"
 cd "$REPO"
 DOCKER="docker"; docker info >/dev/null 2>&1 || DOCKER="sudo -n docker"
-$DOCKER compose up -d --build
+$DOCKER compose up -d --build || echo "$(date -u +%FT%TZ) compose up failed (install.sh will report)"
 $DOCKER image prune -f >/dev/null 2>&1 || true
+chmod +x "$REPO"/scripts/*.sh 2>/dev/null
+bash "$REPO/scripts/install.sh" || true
 echo "$(date -u +%FT%TZ) now on ${REMOTE:0:7}"
