@@ -56,8 +56,8 @@ SECRET="$(grep -E '^SEGRETARIO_SECRET=' "$ENVF" | cut -d= -f2-)"
 if [ -n "$SECRET" ]; then
   URL="https://$DOMAIN/segretario/$SECRET/mcp"
   (umask 077; printf 'Connettore Claude (segreto, non condividere):\n%s\nCruscotto:\nhttps://%s/segretario/%s/cruscotto\n' "$URL" "$DOMAIN" "$SECRET" > "$HERE/CONNECTOR_URL.txt")
-  say "connettore Claude, da aggiungere su claude.ai > Connettori (e poi cancellare questa mail, l'indirizzo è un segreto): $URL"
-  say "cruscotto: https://$DOMAIN/segretario/$SECRET/cruscotto"
+  # L'URL non va mai su stdout: finirebbe nel rapporto che Postino manda per email e nel log del cron.
+  say "connettore Claude pronto: URL in $HERE/CONNECTOR_URL.txt (segreto, non va in nessuna mail)"
 else
   say "ready. Connector URL: cd $HERE && docker compose exec segretario cat /data/connector-url"
 fi

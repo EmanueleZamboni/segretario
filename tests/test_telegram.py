@@ -49,11 +49,13 @@ def main():
     hooks = dict(server.make_bot("x").hooks)  # gli stessi hook del server vero
     hooks["fire"] = lambda text: fired.append(text) or "https://claude.ai/code/session_test"
     hooks["transcribe"] = lambda data, name: "ricordami di comprare la tahina"
-    bot = FakeTelegram("TOKEN", DATA, hooks, chat_id="", daily_cap=50)
+    bot = FakeTelegram("TOKEN", DATA, hooks, chat_id="", daily_cap=50, pair_code="abc123")
 
-    # 1. prima del /start tutto è ignorato; il primo /start fissa il chat id
+    # 1. prima del /start tutto è ignorato; serve "/start <codice>", il primo giusto fissa il chat id
     assert bot.handle(msg(999, "ciao")) == "ignorato" and sent(bot) == []
-    assert bot.handle(msg(42, "/start")) == "collegato" and bot.chat_id == 42
+    assert bot.handle(msg(999, "/start")) == "ignorato" and sent(bot) == [], "senza codice: nessuna risposta"
+    assert bot.handle(msg(999, "/start zzz")) == "ignorato" and sent(bot) == []
+    assert bot.handle(msg(42, "/start ABC123")) == "collegato" and bot.chat_id == 42
     # 2. un altro utente è ignorato anche dopo
     assert bot.handle(msg(999, "/start")) == "ignorato"
     assert bot.handle(msg(999, "ciao")) == "ignorato"
@@ -81,18 +83,24 @@ def main():
     assert "Rispondi sempre in italiano su Telegram" in server.memoria_leggi("regole")
     cq_bad = {"update_id": 3, "callback_query": {"id": "cq2", "from": {"id": 999}, "data": data}}
     assert bot.handle(cq_bad) == "ignorato"
-    # 7. notify e limite giornaliero
+    # 7. notify e limite giornaliero (le risposte ai comandi non contano)
+    before = sum(bot.state["sent"].values())
     r = server.notify("Brief di prova")
     assert r["inviato"] and (DATA / "notify.log").exists()
+    assert sum(bot.state["sent"].values()) == before + 1, "solo notify conta"
+    bot.handle(msg(42, "/regole"))
+    assert sum(bot.state["sent"].values()) == before + 1, "le risposte ai comandi non contano"
     bot.state["sent"] = {next(iter(bot.state["sent"])): 50}
     try:
         server.notify("uno di troppo")
         raise SystemExit("il limite giornaliero non ha funzionato")
     except RuntimeError as err:
         assert "limite" in str(err)
-    # 8. stato persistito e riletto
+    # 8. stato persistito e riletto; stop ferma il polling
     bot2 = FakeTelegram("TOKEN", DATA, hooks)
     assert bot2.chat_id == 42
+    bot2.stop()
+    assert bot2._stop.is_set()
     print("TELEGRAM OK")
 
 

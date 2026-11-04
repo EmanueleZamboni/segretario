@@ -33,7 +33,8 @@ def text(result) -> str:
     return "\n".join(c.text for c in result.content if getattr(c, "text", None))
 
 
-async def run(url: str, data: Path) -> None:
+async def run(url: str, data: Path, secret: str) -> None:
+    codice = secret[:6]
     async with streamablehttp_client(url) as (read, write, _):
         async with ClientSession(read, write) as s:
             init = await s.initialize()
@@ -65,14 +66,18 @@ async def run(url: str, data: Path) -> None:
             assert pid in text(r)
             r = await s.call_tool("memoria_leggi", {"nome": "regole"})
             assert "Obsidian" not in text(r), "la proposta non deve entrare prima dell'approvazione"
-            r = await s.call_tool("proposta_decidi", {"id": pid, "approva": True})
+            r = await s.call_tool("proposta_decidi", {"id": pid, "approva": True, "codice": "sbagliato"})
+            assert r.isError, "senza il codice giusto non si approva"
+            r = await s.call_tool("proposta_decidi", {"id": pid, "approva": True, "codice": codice})
             assert not r.isError, text(r)
             r = await s.call_tool("memoria_leggi", {"nome": "regole"})
             assert "Non proporre mai Obsidian" in text(r)
             r = await s.call_tool("nota_proponi", {"file": "persone", "testo": "Pablo · gli spedisce un lettore"})
             assert not r.isError, text(r)
-            r = await s.call_tool("proposta_decidi", {"id": (r.structuredContent or json.loads(text(r)))["id"], "approva": False})
+            r = await s.call_tool("proposta_decidi", {"id": (r.structuredContent or json.loads(text(r)))["id"], "approva": False, "codice": codice})
             assert "scartata" in text(r)
+            r = await s.call_tool("materiale_aggiungi", {"progetto": "Segretario", "titolo": "x", "link": "https://evil' onmouseover='1"})
+            assert r.isError, "un link con apici non deve entrare"
 
             r = await s.call_tool("sessione_segna", {"nome": "EASY RAVE 2", "dove_sono": "footer pass pronto, non applicato",
                                                      "prossimo_passo": "applicare il footer", "domanda_per_ema": "ok il footer blu?",
@@ -167,10 +172,12 @@ def main() -> None:
         except urllib.error.HTTPError as e:
             assert e.code in (404, 405), e.code
         print("percorso sbagliato: 404 ok")
-        asyncio.run(run(f"http://127.0.0.1:{PORT}/{secret}/mcp", data))
+        asyncio.run(run(f"http://127.0.0.1:{PORT}/{secret}/mcp", data, secret))
         with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/{secret}/cruscotto", timeout=5) as r:
             html = r.read().decode("utf-8")
+            csp = r.headers.get("Content-Security-Policy", "")
         assert r.status == 200 and "Progetti Claude" in html and "EASY RAVE" in html and "ASPETTA TE" in html, html[:300]
+        assert "default-src 'none'" in csp and "&#x27;" not in html.split("<style>")[0], "CSP e escaping"
         assert "Video Match" not in html, "un video non è un progetto Claude: non va sul cruscotto"
         with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/{secret}/cruscotto?tutti=1", timeout=5) as r:
             html_all = r.read().decode("utf-8")

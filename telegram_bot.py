@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -29,6 +30,14 @@ log = logging.getLogger("segretario.telegram")
 API = "https://api.telegram.org"
 MAX_MSG = 4000
 MAX_VOICE_SECONDS = 300
+_URL_RE = re.compile(r"https?://\S+")
+
+
+def _clean(err: Exception) -> str:
+    """Testo di un errore senza URL dentro: gli URL di Telegram contengono il token del bot."""
+    if isinstance(err, httpx.HTTPStatusError):
+        return f"HTTP {err.response.status_code}"
+    return _URL_RE.sub("<url>", str(err))[:200]
 
 
 def transcribe_bytes(data: bytes, filename: str = "voice.ogg") -> str:
@@ -74,16 +83,21 @@ def fire_routine(text: str) -> str:
 
 class Telegram:
     def __init__(self, token: str, data_dir: Path, hooks: dict[str, Callable], chat_id: str = "",
-                 daily_cap: int = 60):
+                 daily_cap: int = 60, pair_code: str = ""):
         self.token = token
         self.data_dir = data_dir
         self.hooks = hooks
         self.daily_cap = daily_cap
+        self.pair_code = (pair_code or "").strip().lower()  # per collegarsi serve "/start <codice>"
         self.state_file = data_dir / "telegram_state.json"
         self.state: dict = {"chat_id": int(chat_id) if chat_id.strip() else None, "offset": 0, "sent": {}}
         self.lock = threading.Lock()
-        self.client = httpx.Client(timeout=70)
+        self._stop = threading.Event()
+        self.client = httpx.Client(timeout=httpx.Timeout(20.0, read=75.0))
         self._load()
+
+    def stop(self) -> None:
+        self._stop.set()
 
     # ------------------------------------------------------------ stato
 
@@ -122,17 +136,19 @@ class Telegram:
         r.raise_for_status()
         return r.content
 
-    def send(self, text: str, buttons: list[list[tuple[str, str]]] | None = None) -> int:
-        """Manda un messaggio a Ema (solo a lui). buttons: righe di (etichetta, callback_data)."""
+    def send(self, text: str, buttons: list[list[tuple[str, str]]] | None = None, conta: bool = True) -> int:
+        """Manda un messaggio a Ema (solo a lui). buttons: righe di (etichetta, callback_data).
+        conta=False per le risposte ai suoi comandi, che non consumano il limite giornaliero."""
         if self.chat_id is None:
-            raise RuntimeError("Telegram: nessun chat id ancora: Ema deve mandare /start al bot")
-        today = time.strftime("%Y-%m-%d")
-        with self.lock:
-            n = int(self.state["sent"].get(today, 0))
-            if n >= self.daily_cap:
-                raise RuntimeError(f"Telegram: raggiunto il limite di {self.daily_cap} messaggi oggi")
-            self.state["sent"] = {today: n + 1}
-            self._save()
+            raise RuntimeError("Telegram: nessun chat id ancora: Ema deve mandare /start <codice> al bot")
+        if conta:
+            today = time.strftime("%Y-%m-%d")
+            with self.lock:
+                n = int(self.state["sent"].get(today, 0))
+                if n >= self.daily_cap:
+                    raise RuntimeError(f"Telegram: raggiunto il limite di {self.daily_cap} messaggi oggi")
+                self.state["sent"] = {today: n + 1}
+                self._save()
         text = (text or "").strip() or "(vuoto)"
         chunks = [text[i:i + MAX_MSG] for i in range(0, len(text), MAX_MSG)]
         mid = 0
@@ -150,7 +166,7 @@ class Telegram:
 
     def run_forever(self) -> None:
         log.info("Telegram: polling avviato (chat id %s)", "impostato" if self.chat_id else "in attesa di /start")
-        while True:
+        while not self._stop.is_set():
             try:
                 updates = self.api("getUpdates", offset=self.state["offset"], timeout=50,
                                    allowed_updates=["message", "callback_query"])
@@ -162,8 +178,9 @@ class Telegram:
                         log.warning("Telegram: update %s fallito: %s", u.get("update_id"), err)
                     self._save()
             except Exception as err:
-                log.warning("Telegram: polling: %s", err)
-                time.sleep(5)
+                log.warning("Telegram: polling: %s", _clean(err))
+                self._stop.wait(5)
+        log.info("Telegram: polling fermato")
 
     # ------------------------------------------------------------ gestione
 
@@ -178,10 +195,16 @@ class Telegram:
         chat = (m.get("chat") or {}).get("id")
         text = (m.get("text") or "").strip()
         if self.chat_id is None:
-            if text == "/start" and chat == from_id:
+            parts = text.split()
+            if parts and parts[0].lower().split("@")[0] == "/start" and chat == from_id:
+                given = parts[1].strip().lower() if len(parts) > 1 else ""
+                if self.pair_code and given != self.pair_code:
+                    # niente risposta a chi non ha il codice: non deve sapere che il bot esiste
+                    log.info("Telegram: /start senza codice valido da %s", from_id)
+                    return "ignorato"
                 self.state["chat_id"] = chat
                 self._save()
-                self.send("Ciao Ema. Da ora parlo solo con te. Scrivimi o mandami un vocale; /aiuto per i comandi.")
+                self.send("Ciao Ema. Da ora parlo solo con te. Scrivimi o mandami un vocale; /aiuto per i comandi.", conta=False)
                 return "collegato"
             log.info("Telegram: ignorato %s prima del /start", from_id)
             return "ignorato"
@@ -202,44 +225,44 @@ class Telegram:
         simple = {"/oggi": "diario", "/regole": "regole", "/coda": "coda", "/sessioni": "sessioni",
                   "/progetti": "progetti", "/stato": "stato"}
         if cmd == "/start":
-            self.send("Ci sono.")
+            self.send("Ci sono.", conta=False)
         elif cmd == "/aiuto":
             self.send("Scrivimi o mandami un vocale: lo passo a Claude e ti rispondo qui.\n"
-                      "/oggi diario di oggi e ieri · /regole · /coda proposte in attesa · /sessioni · /progetti · /stato")
+                      "/oggi diario di oggi e ieri · /regole · /coda proposte in attesa · /sessioni · /progetti · /stato", conta=False)
         elif cmd in simple and simple[cmd] in self.hooks:
-            self.send(str(self.hooks[simple[cmd]]()))
+            self.send(str(self.hooks[simple[cmd]]()), conta=False)
         else:
-            self.send("Comando che non conosco. /aiuto")
+            self.send("Comando che non conosco. /aiuto", conta=False)
         return "comando"
 
     def _text(self, text: str) -> str:
         fire = self.hooks.get("fire")
         if fire is None:
-            self.send("Ricevuto, ma il collegamento a Claude non è ancora configurato (ROUTINE_FIRE_URL).")
+            self.send("Ricevuto, ma il collegamento a Claude non è ancora configurato (ROUTINE_FIRE_URL).", conta=False)
             return "senza-cervello"
         try:
             fire(f"Messaggio di Ema dal telefono (Telegram, {time.strftime('%d/%m/%Y %H:%M')}): {text}")
-            self.send("Ricevuto, ci penso.")
+            self.send("Ricevuto, ci penso.", conta=False)
             return "inoltrato"
         except Exception as err:
-            self.send(f"Non sono riuscito a passarlo a Claude: {err}")
+            self.send(f"Non sono riuscito a passarlo a Claude: {_clean(err)}", conta=False)
             return "errore"
 
     def _voice(self, m: dict) -> str:
         tr = self.hooks.get("transcribe")
         if tr is None:
-            self.send("Vocale ricevuto, ma la trascrizione non è configurata (GROQ_API_KEY o OPENAI_API_KEY).")
+            self.send("Vocale ricevuto, ma la trascrizione non è configurata (GROQ_API_KEY o OPENAI_API_KEY).", conta=False)
             return "senza-trascrizione"
         v = m.get("voice") or m.get("audio")
         if int(v.get("duration", 0)) > MAX_VOICE_SECONDS:
-            self.send("Vocale troppo lungo: massimo 5 minuti.")
+            self.send("Vocale troppo lungo: massimo 5 minuti.", conta=False)
             return "troppo-lungo"
         try:
             text = tr(self.download(v["file_id"]), "voice.ogg")
         except Exception as err:
-            self.send(f"Non sono riuscito a trascrivere il vocale: {err}")
+            self.send(f"Non sono riuscito a trascrivere il vocale: {_clean(err)}", conta=False)
             return "errore"
-        self.send(f"Ho capito: {text}")
+        self.send(f"Ho capito: {text}", conta=False)
         return self._text(text)
 
     def _callback(self, cq: dict) -> str:

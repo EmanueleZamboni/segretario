@@ -35,7 +35,7 @@ Così ogni chat parte già con le regole, senza tool call e senza dipendere dall
 | `regola_proponi(testo, motivo)` | propone una regola nuova (in coda, non attiva) |
 | `nota_proponi(file, testo, motivo)` | propone una riga per persone (in coda) |
 | `proposte_lista()` | le proposte in attesa |
-| `proposta_decidi(id, approva)` | applica la decisione di Ema: scrive nel file o scarta. Solo su sua richiesta esplicita |
+| `proposta_decidi(id, approva, codice)` | applica la decisione di Ema: scrive nel file o scarta. Serve il codice di approvazione (in cima al cruscotto), che solo Ema conosce; senza codice si usano i bottoni Telegram |
 | `sessione_segna(nome, dove_sono, prossimo_passo, domanda_per_ema, stato, progetto)` | dove è arrivata una sessione (in corso, aspetta Ema, finita) |
 | `sessioni_lista(solo_aperte)` | tutte le sessioni, prima quelle che aspettano Ema |
 | `sessione_chiudi(nome)` | segna una sessione come finita |
@@ -63,14 +63,14 @@ del telefono. Stessi dati in JSON su `.../cruscotto.json` (per un futuro cruscot
 
 1. Su Telegram apri BotFather, `/newbot`, scegli un nome: ti dà il token.
 2. Sulla VM: metti il token in `~/segretario/.env` (`TELEGRAM_BOT_TOKEN=...`), poi `cd ~/segretario && sudo docker compose up -d`.
-3. Scrivi `/start` al bot: il primo che lo fa diventa l'unico utente ammesso (chat id salvato in `/data/telegram_state.json`).
+3. Scrivi al bot `/start <codice>`, dove il codice sono le prime 6 lettere del segreto (è anche in cima al cruscotto, "codice approvazioni"). Chi manda `/start` senza il codice giusto non riceve risposta. Il primo che indovina diventa l'unico utente (chat id in `/data/telegram_state.json`).
 4. Da quel momento `notify` arriva sul telefono, le regole proposte hanno i bottoni Aggiungi / Scarta, e i comandi
    `/oggi /regole /coda /sessioni /progetti /stato` rispondono.
 5. Per i vocali: `GROQ_API_KEY` (console.groq.com, gratis per questi volumi) o `OPENAI_API_KEY` in `.env`.
 6. Per far rispondere Claude ai messaggi dal telefono: crea il task cloud "Segretario on demand" (vedi
    `docs/task_cloud.md`) con trigger API, e metti `ROUTINE_FIRE_URL` e `ROUTINE_FIRE_TOKEN` in `.env`.
 
-Limite: `NOTIFY_DAILY_CAP` messaggi al giorno (60). Nessuna porta aperta: il bot usa il long polling verso Telegram.
+Limite: `NOTIFY_DAILY_CAP` messaggi al giorno (60) per `notify` e le proposte; le risposte ai comandi non contano. Nessuna porta aperta: il bot usa il long polling verso Telegram. I vocali vengono trascritti da Groq o OpenAI: l'audio esce dal server verso quel servizio, poi viene scartato.
 
 ## Come gira sulla VM
 
@@ -90,8 +90,11 @@ Limite: `NOTIFY_DAILY_CAP` messaggi al giorno (60). Nessuna porta aperta: il bot
   Va incollato una volta su claude.ai > Impostazioni > Connettori > Aggiungi connettore personalizzato,
   nome "Segretario", nessun accesso (il segreto è nell'URL). Da quel momento vale su telefono, PC,
   Claude Code (`/mcp` nella sessione) e task schedulati.
-- Rotazione del segreto: `docker compose exec segretario rm /data/secret`, `docker compose restart`,
-  nuovo URL, connettore da registrare di nuovo.
+- Il segreto: l'admin task di Postino (`keep-mcp/ops/run.sh` nel repo Various) lo deriva da quello di Keep (sha256, a senso
+  unico) e lo scrive in `.env` come `SEGRETARIO_SECRET`. Per usarne uno tuo: in `.env` metti `SEGRETARIO_SECRET=<tuo>` e
+  `SEGRETARIO_SECRET_SOURCE=manual`, poi `docker compose up -d`; nuovo URL, connettore da registrare di nuovo.
+- Il segreto non finisce mai su stdout, nei log o nelle mail: solo in `.env`, `CONNECTOR_URL.txt`, `STATUS.txt` (tutti
+  ignorati da git) e nel file `keep-url` che Postino serve per 24 ore.
 - Backup: la memoria è un repo git nel volume. Con `MEMORIA_GIT_REMOTE` in `.env` (URL con deploy key o token)
   ogni commit viene anche spinto su un remoto privato. Finché non è impostato, il volume è l'unica copia:
   `docker run --rm -v segretario_segretario_data:/data -v ~/segretario-backup:/out alpine tar czf /out/memoria.tgz /data/memoria`.
