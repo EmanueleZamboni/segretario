@@ -14,7 +14,8 @@ volume Docker della VM e non entrano mai in questo repo.
 |---|---|
 | `regole.md` | le regole di comportamento di Ema, una per riga. Entrano **solo** con la sua approvazione |
 | `persone.md` | chi è chi (relazione, dove, cosa fa). Niente dati sensibili. Parte vuoto: si riempie con `nota_proponi` |
-| `progetti.md` | un blocco per progetto: stato, prossimo passo, dove sta il lavoro |
+| `progetti.json`, `progetti.md` | i progetti: nome, alias, tipo, stato, dove siamo, prossimo passo, materiali (link). `progetti.md` è generato |
+| `progetti/<progetto>/*.md` | i documenti salvati di ogni progetto (script, scalette, note), versionati |
 | `diario/AAAA-MM-GG.md` | una riga per ogni cosa decisa o fatta, da qualunque chat |
 | `sessioni.json` | dove è arrivata ogni sessione Claude, cosa aspetta da Ema |
 | `proposte.json`, `regole_in_coda.md` | regole e note proposte da Claude, in attesa di Ema |
@@ -30,14 +31,20 @@ Così ogni chat parte già con le regole, senza tool call e senza dipendere dall
 |---|---|
 | `memoria_leggi(nome, giorno, ultimi_giorni)` | legge regole, persone, progetti, diario (oggi, ieri, un giorno, ultimi N), coda o richieste |
 | `memoria_cerca(testo)` | cerca una parola in tutta la memoria, ritorna file e riga |
-| `diario_scrivi(testo, origine)` | aggiunge una riga al diario di oggi |
+| `diario_scrivi(testo, origine, progetto)` | aggiunge una riga al diario di oggi, con il progetto a cui si riferisce |
 | `regola_proponi(testo, motivo)` | propone una regola nuova (in coda, non attiva) |
-| `nota_proponi(file, testo, motivo)` | propone una riga per persone o progetti (in coda) |
+| `nota_proponi(file, testo, motivo)` | propone una riga per persone (in coda) |
 | `proposte_lista()` | le proposte in attesa |
 | `proposta_decidi(id, approva)` | applica la decisione di Ema: scrive nel file o scarta. Solo su sua richiesta esplicita |
 | `sessione_segna(nome, dove_sono, prossimo_passo, domanda_per_ema, stato, progetto)` | dove è arrivata una sessione (in corso, aspetta Ema, finita) |
 | `sessioni_lista(solo_aperte)` | tutte le sessioni, prima quelle che aspettano Ema |
 | `sessione_chiudi(nome)` | segna una sessione come finita |
+| `progetto_segna(nome, dove_sono, prossimo_passo, stato, tipo, descrizione, alias)` | crea o aggiorna un progetto (video, app, lavoro, vita); gli alias servono a ritrovarlo con qualunque nome |
+| `progetto_leggi(nome)` | tutto il contesto di un progetto trovato per nome o alias: stato, materiali, documenti, righe del diario, sessioni |
+| `progetti_lista(solo_aperti)` | i progetti, prima quelli che aspettano Ema |
+| `materiale_aggiungi(progetto, titolo, link, nota)` | un link (Google Doc, Drive, file, pagina, repo) attaccato al progetto |
+| `documento_salva(progetto, nome, testo)` | salva il testo di un documento (es. lo script a questo punto); ogni salvataggio è una versione git |
+| `documento_leggi(progetto, nome, versioni_indietro)` | rilegge un documento salvato, anche una versione precedente |
 | `richiesta_scrivi(testo, contesto)` | Ema chiede un cambiamento al Segretario: lo costruisce la sessione Claude Code "BUILDING SEGRETARIO" |
 | `richiesta_chiudi(id, esito, stato)` | la sessione che ha costruito segna cosa è cambiato (fatta, scartata, rimandata) |
 | `stato()` | numeri e ultimo commit, serve ai test e al cruscotto |

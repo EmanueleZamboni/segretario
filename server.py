@@ -43,7 +43,10 @@ TZ = ZoneInfo(os.environ.get("SEGRETARIO_TZ", "Europe/Rome"))
 GIT_REMOTE = os.environ.get("MEMORIA_GIT_REMOTE", "").strip()
 
 FILES = {"regole": "regole.md", "persone": "persone.md", "progetti": "progetti.md"}
+PROPOSABLE = ("regole", "persone")  # progetti.md è generato da progetti.json (progetto_segna)
 MAX_TEXT = 4_000
+MAX_DOC = 400_000  # uno script o un documento intero, in caratteri
+STATI_PROGETTO = ("in corso", "aspetta Ema", "in pausa", "finito")
 MAX_RULES_IN_INSTRUCTIONS = 60
 MAX_SESSIONS = 100
 
@@ -70,13 +73,17 @@ SEED = {
     "persone.md": """# Persone (NOME (relazione) · dove · cosa fa ora · note). Solo cose dette da Ema o dalla persona. Niente dati sensibili.
 # Le righe entrano con nota_proponi(file="persone", ...) e l'approvazione di Ema, oppure a mano in questo file.
 """,
-    "progetti.md": """# Progetti (un blocco per progetto: stato, prossimo passo, dove sta il lavoro)
-# Le righe entrano con nota_proponi(file="progetti", ...) e l'approvazione di Ema, oppure a mano in questo file.
+}
 
-## Segretario
-- Stato: online (novembre 2026). Memoria condivisa e coordinamento sessioni; Telegram e task cloud da fare.
-- Dove: repo EmanueleZamboni/segretario; note di progetto nella cartella Claude Things, 26_11_03 Segretario
-""",
+SEED_PROGETTI = {
+    "segretario": {
+        "nome": "Segretario", "alias": ["secretario", "segretaria", "building segretario"], "tipo": "codice",
+        "stato": "in corso", "descrizione": "La memoria condivisa e il coordinatore di tutte le chat Claude di Ema.",
+        "dove_sono": "Online: memoria, sessioni, progetti, richieste. Telegram e task cloud da fare.",
+        "prossimo_passo": "Task cloud del mattino e canale di consegna (Telegram).",
+        "materiali": [{"titolo": "Repo", "link": "https://github.com/EmanueleZamboni/segretario", "nota": "", "quando": "2026-11-04"}],
+        "documenti": [], "creato": "2026-11-04", "aggiornato": "2026-11-04 00:00",
+    },
 }
 
 
@@ -118,6 +125,9 @@ def ensure_data() -> str:
         path = MEMORIA / name
         if not path.exists():
             path.write_text(empty, encoding="utf-8")
+    (MEMORIA / "progetti").mkdir(exist_ok=True)
+    if not (MEMORIA / "progetti.json").exists():
+        _save_progetti(dict(SEED_PROGETTI))
     if not (MEMORIA / ".git").is_dir():
         git("init", "-q", "-b", "main")
     commit("avvio: file iniziali")
@@ -197,6 +207,64 @@ def _save_richieste(items: list[dict]) -> None:
     (MEMORIA / "richieste.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _slug(name: str) -> str:
+    s = name.lower()
+    s = (s.replace("à", "a").replace("è", "e").replace("é", "e").replace("ì", "i").replace("ò", "o").replace("ù", "u"))
+    return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+
+
+def _progetti() -> dict:
+    return json.loads(_read("progetti.json") or "{}")
+
+
+def _save_progetti(items: dict) -> None:
+    (MEMORIA / "progetti.json").write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+    lines = ["# Progetti (generato da progetti.json: usa progetto_segna, materiale_aggiungi, documento_salva)", ""]
+    order = {"aspetta Ema": 0, "in corso": 1, "in pausa": 2, "finito": 3}
+    for p in sorted(items.values(), key=lambda p: (order.get(p["stato"], 9), p["nome"].lower())):
+        lines.append(f"## {p['nome']}  [{p['tipo'] or '-'}] [{p['stato']}]")
+        if p.get("alias"):
+            lines.append(f"- Alias: {', '.join(p['alias'])}")
+        if p.get("descrizione"):
+            lines.append(f"- Cos'è: {p['descrizione']}")
+        if p.get("dove_sono"):
+            lines.append(f"- Dove siamo: {p['dove_sono']}")
+        if p.get("prossimo_passo"):
+            lines.append(f"- Prossimo passo: {p['prossimo_passo']}")
+        for m in p.get("materiali", []):
+            nota = f" ({m['nota']})" if m.get("nota") else ""
+            lines.append(f"- Materiale: {m['titolo']}: {m['link']}{nota}")
+        for d in p.get("documenti", []):
+            lines.append(f"- Documento salvato: {d}")
+        lines.append(f"- Aggiornato: {p['aggiornato']}")
+        lines.append("")
+    (MEMORIA / "progetti.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _find_progetto(items: dict, nome: str) -> str:
+    """Trova lo slug di un progetto da nome, alias o pezzo di nome. Errore se ambiguo."""
+    q = _slug(_one_line(nome, "progetto", 80))
+    if q in items:
+        return q
+    exact = [k for k, p in items.items() if q in {_slug(a) for a in [p["nome"], *p.get("alias", [])]}]
+    if len(exact) == 1:
+        return exact[0]
+    partial = [k for k, p in items.items()
+               if any(q in _slug(a) or _slug(a) in q for a in [p["nome"], *p.get("alias", [])] if _slug(a))]
+    if len(partial) == 1:
+        return partial[0]
+    if len(partial) > 1:
+        raise ValueError("progetto ambiguo, intendi: " + ", ".join(items[k]["nome"] for k in partial))
+    raise ValueError(f"progetto '{nome}' non trovato: usa progetti_lista o crealo con progetto_segna")
+
+
+def _doc_name(nome: str) -> str:
+    n = _slug(nome)
+    if not n:
+        raise ValueError("nome documento vuoto")
+    return n[:80] + ".md"
+
+
 def _sessioni() -> dict:
     return json.loads(_read("sessioni.json") or "{}")
 
@@ -206,8 +274,8 @@ def _save_sessioni(items: dict) -> None:
 
 
 def _propose(file: str, testo: str, motivo: str) -> dict:
-    if file not in FILES:
-        raise ValueError("file: usa regole, persone o progetti")
+    if file not in PROPOSABLE:
+        raise ValueError("file: usa regole o persone (i progetti si aggiornano con progetto_segna)")
     item = {
         "id": "p" + uuid.uuid4().hex[:6],
         "file": file,
@@ -243,9 +311,13 @@ FIXED = (
     "Sei collegato al SEGRETARIO di Ema (Emanuele Zamboni, Bologna): la memoria condivisa tra tutte le sue chat Claude "
     "(app Claude, Claude Code, task schedulati). Oggi è {data}, ore {ora} (Europe/Rome): usa questa data, non supporre.\n"
     "\nREGOLE DI EMA (memoria/regole.md, valgono sempre):\n{regole}\n"
-    "\nCOME USARE LA MEMORIA: a inizio lavoro leggi memoria_leggi(\"diario\") per sapere cosa è successo oggi e ieri; "
-    "se lavori su un progetto o una sessione lunga, chiama sessione_segna a fine turno (dove sei arrivato, prossimo passo, "
-    "cosa aspetti da Ema); ogni cosa decisa o fatta va in diario_scrivi, una riga. Se Ema ti corregge o dice \"da oggi...\", "
+    "\nCOME USARE LA MEMORIA: a inizio lavoro leggi memoria_leggi(\"diario\") per sapere cosa è successo oggi e ieri. "
+    "Quando Ema nomina un progetto (un video, un'app, una cosa della vita: es. \"il video Video Match\"), chiama "
+    "progetto_leggi(nome) prima di rispondere: lì ci sono stato, materiali (link ai documenti) e bozze salvate, e il "
+    "lavoro continua in quel contesto. Un lavoro nuovo (es. lo script di un video) si registra con progetto_segna, i link "
+    "con materiale_aggiungi, il testo con documento_salva (una bozza per nome, git tiene le versioni). "
+    "Se lavori su un progetto o una sessione lunga, chiama sessione_segna a fine turno (dove sei arrivato, prossimo passo, "
+    "cosa aspetti da Ema); ogni cosa decisa o fatta va in diario_scrivi, una riga, con il progetto. Se Ema ti corregge o dice \"da oggi...\", "
     "chiama regola_proponi: una regola entra solo quando Ema la approva con proposta_decidi, che chiami solo su sua richiesta "
     "esplicita in chat. Se Ema vuole cambiare o migliorare il Segretario stesso (nuovi tool, comportamenti, collegamenti), "
     "scrivi la richiesta con richiesta_scrivi: la costruisce la sessione Claude Code \"BUILDING SEGRETARIO\", che poi segna "
@@ -326,7 +398,9 @@ def memoria_cerca(testo: str, max_risultati: int = 20) -> list[dict]:
     limit = max(1, min(max_risultati, 100))
     hits: list[dict] = []
     with lock:
-        files = [MEMORIA / f for f in FILES.values()] + sorted((MEMORIA / "diario").glob("*.md"), reverse=True)
+        files = ([MEMORIA / f for f in FILES.values()]
+                 + sorted((MEMORIA / "progetti").glob("*/*.md"))
+                 + sorted((MEMORIA / "diario").glob("*.md"), reverse=True))
         for path in files:
             if not path.exists():
                 continue
@@ -339,18 +413,178 @@ def memoria_cerca(testo: str, max_risultati: int = 20) -> list[dict]:
 
 
 @mcp.tool()
-def diario_scrivi(testo: str, origine: str = "chat") -> dict:
+def diario_scrivi(testo: str, origine: str = "chat", progetto: str = "") -> dict:
     """Aggiunge una riga al diario di oggi: cosa è stato deciso o fatto (una frase, con nomi e date).
-    origine: chat, claude-code, brief, telegram. Scrivi solo fatti, mai 'fatto' per cose non fatte."""
+    origine: chat, claude-code, brief, telegram. progetto: il nome del progetto a cui si riferisce, se c'è.
+    Scrivi solo fatti, mai 'fatto' per cose non fatte."""
     riga = _one_line(testo, "testo", 500)
     tag = re.sub(r"[^a-z0-9-]", "", (origine or "chat").lower())[:20] or "chat"
     t = now()
     with lock:
+        prog = ""
+        if progetto.strip():
+            prog = " #" + _find_progetto(_progetti(), progetto)
         path = _diario_path(t)
         existing = path.read_text(encoding="utf-8") if path.exists() else ""
-        path.write_text(existing + f"- {t:%H:%M} [{tag}] {riga}\n", encoding="utf-8")
+        line = f"- {t:%H:%M} [{tag}]{prog} {riga}"
+        path.write_text(existing + line + "\n", encoding="utf-8")
         commit(f"diario {t:%Y-%m-%d}: {riga[:60]}")
-    return {"giorno": f"{t:%Y-%m-%d}", "riga": f"{t:%H:%M} [{tag}] {riga}"}
+    return {"giorno": f"{t:%Y-%m-%d}", "riga": line[2:]}
+
+
+# ---------------------------------------------------------------- progetti
+
+@mcp.tool()
+def progetto_segna(
+    nome: str,
+    dove_sono: str = "",
+    prossimo_passo: str = "",
+    stato: str = "",
+    tipo: str = "",
+    descrizione: str = "",
+    alias: str = "",
+) -> dict:
+    """Crea o aggiorna un progetto (video, app, lavoro, cosa della vita): solo i campi passati vengono cambiati.
+    nome: come lo chiama Ema (es. "Video Match"). alias: altri modi di chiamarlo, separati da virgola.
+    tipo: video | codice | lavoro | vita | altro. stato: in corso | aspetta Ema | in pausa | finito.
+    dove_sono: a che punto è, una frase. prossimo_passo: la prossima cosa da fare."""
+    nome = _one_line(nome, "nome", 80)
+    with lock:
+        items = _progetti()
+        try:
+            key = _find_progetto(items, nome)
+        except ValueError:
+            key = _slug(nome)
+            if not key:
+                raise ValueError("nome progetto vuoto")
+            items[key] = {"nome": nome, "alias": [], "tipo": "", "stato": "in corso", "descrizione": "",
+                          "dove_sono": "", "prossimo_passo": "", "materiali": [], "documenti": [],
+                          "creato": now().strftime("%Y-%m-%d"), "aggiornato": ""}
+        p = items[key]
+        if stato.strip():
+            st = stato.strip().lower()
+            st = "aspetta Ema" if st == "aspetta ema" else st
+            if st not in STATI_PROGETTO:
+                raise ValueError("stato: in corso | aspetta Ema | in pausa | finito")
+            p["stato"] = st
+        if tipo.strip():
+            p["tipo"] = _one_line(tipo, "tipo", 20).lower()
+        if descrizione.strip():
+            p["descrizione"] = _one_line(descrizione, "descrizione", 300)
+        if dove_sono.strip():
+            p["dove_sono"] = _one_line(dove_sono, "dove_sono", 500)
+        if prossimo_passo.strip():
+            p["prossimo_passo"] = _one_line(prossimo_passo, "prossimo_passo", 300)
+        if alias.strip():
+            new = [a.strip() for a in alias.split(",") if a.strip()]
+            p["alias"] = sorted({*p.get("alias", []), *new}, key=str.lower)[:20]
+        p["aggiornato"] = now().strftime("%Y-%m-%d %H:%M")
+        _save_progetti(items)
+        commit(f"progetto {p['nome']}: {p['stato']}")
+    return {"id": key, **p}
+
+
+@mcp.tool()
+def progetto_leggi(nome: str, giorni_diario: int = 30) -> dict:
+    """Tutto il contesto di un progetto, cercato per nome o alias: stato, dove siamo, prossimo passo, materiali
+    (link), documenti salvati (nomi), le righe del diario che lo riguardano e le sessioni Claude collegate.
+    Chiamalo quando Ema nomina un progetto, prima di rispondere."""
+    with lock:
+        items = _progetti()
+        key = _find_progetto(items, nome)
+        p = items[key]
+        names = [p["nome"], *p.get("alias", [])]
+        needles = {n.lower() for n in names} | {"#" + key}
+        diario = []
+        for i in range(max(1, min(giorni_diario, 365)) - 1, -1, -1):
+            d = now() - timedelta(days=i)
+            text = _read(f"diario/{d:%Y-%m-%d}.md")
+            for line in text.splitlines():
+                low = line.lower()
+                if any(n in low for n in needles):
+                    diario.append(f"{d:%Y-%m-%d} {line[2:] if line.startswith('- ') else line}")
+        sessioni = [s for s in _sessioni().values()
+                    if _slug(s.get("progetto", "")) == key or s.get("progetto", "").lower() in needles]
+        docs = []
+        for d in p.get("documenti", []):
+            f = MEMORIA / "progetti" / key / d
+            docs.append({"nome": d, "caratteri": len(f.read_text(encoding="utf-8")) if f.exists() else 0})
+    return {"id": key, **p, "documenti": docs, "diario": diario[-40:], "sessioni": sessioni}
+
+
+@mcp.tool()
+def progetti_lista(solo_aperti: bool = True) -> list[dict]:
+    """I progetti con stato, dove siamo e prossimo passo; prima quelli che aspettano Ema."""
+    with lock:
+        items = _progetti()
+    order = {"aspetta Ema": 0, "in corso": 1, "in pausa": 2, "finito": 3}
+    out = [{"id": k, "nome": p["nome"], "tipo": p["tipo"], "stato": p["stato"], "dove_sono": p["dove_sono"],
+            "prossimo_passo": p["prossimo_passo"], "aggiornato": p["aggiornato"]} for k, p in items.items()]
+    if solo_aperti:
+        out = [p for p in out if p["stato"] != "finito"]
+    out.sort(key=lambda p: (order.get(p["stato"], 9), p["nome"].lower()))
+    return out
+
+
+@mcp.tool()
+def materiale_aggiungi(progetto: str, titolo: str, link: str, nota: str = "") -> dict:
+    """Aggiunge a un progetto un link a un materiale: Google Doc dello script, cartella Drive, file sul PC,
+    pagina web, repo. link: URL, ID di un Google Doc o percorso. Non copia il contenuto: per quello documento_salva."""
+    with lock:
+        items = _progetti()
+        key = _find_progetto(items, progetto)
+        m = {"titolo": _one_line(titolo, "titolo", 100), "link": _one_line(link, "link", 500),
+             "nota": _one_line(nota, "nota", 200) if nota.strip() else "", "quando": now().strftime("%Y-%m-%d")}
+        mats = [x for x in items[key].setdefault("materiali", []) if x["link"] != m["link"]]
+        mats.append(m)
+        items[key]["materiali"] = mats[-50:]
+        items[key]["aggiornato"] = now().strftime("%Y-%m-%d %H:%M")
+        _save_progetti(items)
+        commit(f"progetto {items[key]['nome']}: materiale {m['titolo'][:40]}")
+    return {"progetto": items[key]["nome"], **m}
+
+
+@mcp.tool()
+def documento_salva(progetto: str, nome: str, testo: str) -> dict:
+    """Salva (o sovrascrive) il testo di un documento di un progetto, es. lo script del video a questo punto.
+    nome: es. "script", "scaletta", "note". Ogni salvataggio è una versione in git. Max 400.000 caratteri."""
+    if not testo or not testo.strip():
+        raise ValueError("testo vuoto")
+    if len(testo) > MAX_DOC:
+        raise ValueError(f"testo troppo lungo (max {MAX_DOC} caratteri)")
+    fname = _doc_name(nome)
+    with lock:
+        items = _progetti()
+        key = _find_progetto(items, progetto)
+        folder = MEMORIA / "progetti" / key
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / fname
+        nuovo = not path.exists()
+        path.write_text(testo.replace("\r\n", "\n"), encoding="utf-8")
+        docs = items[key].setdefault("documenti", [])
+        if fname not in docs:
+            docs.append(fname)
+        items[key]["aggiornato"] = now().strftime("%Y-%m-%d %H:%M")
+        _save_progetti(items)
+        commit(f"progetto {items[key]['nome']}: documento {fname} {'creato' if nuovo else 'aggiornato'}")
+        versioni = len(git("log", "--format=%h", "--", str(path.relative_to(MEMORIA)).replace("\\", "/")).split())
+    return {"progetto": items[key]["nome"], "documento": fname, "caratteri": len(testo), "versioni": versioni}
+
+
+@mcp.tool()
+def documento_leggi(progetto: str, nome: str, versioni_indietro: int = 0) -> str:
+    """Legge un documento salvato di un progetto (es. lo script). versioni_indietro > 0 legge una versione precedente."""
+    fname = _doc_name(nome)
+    with lock:
+        items = _progetti()
+        key = _find_progetto(items, progetto)
+        rel = f"progetti/{key}/{fname}"
+        path = MEMORIA / rel
+        if not path.exists():
+            raise ValueError(f"documento non trovato; quelli salvati: {', '.join(items[key].get('documenti', [])) or 'nessuno'}")
+        if versioni_indietro > 0:
+            return git("show", f"HEAD~{int(versioni_indietro)}:{rel}")
+        return path.read_text(encoding="utf-8")
 
 
 @mcp.tool()
@@ -464,6 +698,17 @@ def sessione_segna(
         "aggiornato": now().strftime("%Y-%m-%d %H:%M"),
     }
     with lock:
+        if entry["progetto"]:
+            progs = _progetti()
+            try:
+                entry["progetto"] = progs[_find_progetto(progs, entry["progetto"])]["nome"]
+            except ValueError:
+                key = _slug(entry["progetto"])
+                progs[key] = {"nome": entry["progetto"], "alias": [], "tipo": "", "stato": "in corso", "descrizione": "",
+                              "dove_sono": entry["dove_sono"], "prossimo_passo": entry["prossimo_passo"],
+                              "materiali": [], "documenti": [], "creato": now().strftime("%Y-%m-%d"),
+                              "aggiornato": now().strftime("%Y-%m-%d %H:%M")}
+                _save_progetti(progs)
         items = _sessioni()
         if nome not in items and len(items) >= MAX_SESSIONS:
             oldest = min(items, key=lambda k: items[k]["aggiornato"])
@@ -519,6 +764,7 @@ def stato() -> dict:
         "regole": len(regole),
         "proposte_in_attesa": len(aperte),
         "richieste_aperte": sum(1 for r in _richieste() if r["stato"] == "aperta"),
+        "progetti_aperti": sum(1 for p in _progetti().values() if p.get("stato") != "finito"),
         "sessioni_aperte": sum(1 for s in sess if s.get("stato") != "finita"),
         "sessioni_che_aspettano_ema": sum(1 for s in sess if s.get("stato") == "aspetta Ema"),
         "diario_oggi_righe": len(_read(f"diario/{t:%Y-%m-%d}.md").splitlines()),

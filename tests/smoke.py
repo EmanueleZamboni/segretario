@@ -43,7 +43,8 @@ async def run(url: str, data: Path) -> None:
             tools = {t.name for t in (await s.list_tools()).tools}
             want = {"memoria_leggi", "memoria_cerca", "diario_scrivi", "regola_proponi", "nota_proponi",
                     "proposte_lista", "proposta_decidi", "sessione_segna", "sessioni_lista", "sessione_chiudi", "stato",
-                    "richiesta_scrivi", "richiesta_chiudi"}
+                    "richiesta_scrivi", "richiesta_chiudi", "progetto_segna", "progetto_leggi", "progetti_lista",
+                    "materiale_aggiungi", "documento_salva", "documento_leggi"}
             assert want <= tools, want - tools
             print("tool:", len(tools))
 
@@ -85,6 +86,44 @@ async def run(url: str, data: Path) -> None:
             r = await s.call_tool("sessioni_lista", {})
             assert "STOSTUDIO" not in text(r)
 
+            # progetti: registrazione, alias, materiali, documenti, contesto
+            r = await s.call_tool("progetto_segna", {"nome": "Video Match", "tipo": "video", "alias": "video match video, videomatch",
+                                                     "descrizione": "Video YouTube sulle generazioni di console", "dove_sono": "script a metà",
+                                                     "prossimo_passo": "finire la parte PS2", "stato": "in corso"})
+            assert not r.isError, text(r)
+            r = await s.call_tool("materiale_aggiungi", {"progetto": "videomatch", "titolo": "Script (Google Doc)",
+                                                         "link": "https://docs.google.com/document/d/ABC123/edit", "nota": "bozza"})
+            assert not r.isError, text(r)
+            script = "# Video Match\n\nINTRO\nQuando ero piccolo la PS2...\n" * 20
+            r = await s.call_tool("documento_salva", {"progetto": "Video Match", "nome": "script", "testo": script})
+            assert not r.isError, text(r)
+            r = await s.call_tool("documento_salva", {"progetto": "Video Match", "nome": "script", "testo": script + "\nOUTRO\n"})
+            d = r.structuredContent or json.loads(text(r))
+            assert d["versioni"] == 2 and d["documento"] == "script.md", d
+            r = await s.call_tool("documento_leggi", {"progetto": "il video match", "nome": "script"})
+            assert "OUTRO" in text(r)
+            r = await s.call_tool("documento_leggi", {"progetto": "video match", "nome": "script", "versioni_indietro": 1})
+            assert "OUTRO" not in text(r) and "PS2" in text(r)
+            r = await s.call_tool("diario_scrivi", {"testo": "scritta la parte PS2 dello script", "origine": "chat", "progetto": "video match"})
+            assert "#video-match" in text(r), text(r)
+            r = await s.call_tool("sessione_segna", {"nome": "Script Video Match", "dove_sono": "parte PS2 scritta",
+                                                     "progetto": "Video Match", "stato": "in corso"})
+            assert not r.isError, text(r)
+            r = await s.call_tool("progetto_leggi", {"nome": "video match video"})
+            p = r.structuredContent or json.loads(text(r))
+            assert p["id"] == "video-match" and p["materiali"][0]["link"].startswith("https://docs.google.com") \
+                and p["documenti"][0]["nome"] == "script.md" and any("PS2" in l for l in p["diario"]) \
+                and p["sessioni"][0]["nome"] == "Script Video Match", p
+            r = await s.call_tool("memoria_cerca", {"testo": "quando ero piccolo"})
+            assert "progetti/video-match/script.md" in text(r), text(r)
+            r = await s.call_tool("memoria_leggi", {"nome": "progetti"})
+            assert "## Video Match" in text(r) and "Script (Google Doc)" in text(r), text(r)
+            r = await s.call_tool("progetti_lista", {})
+            assert "Video Match" in text(r) and "Segretario" in text(r)
+            r = await s.call_tool("nota_proponi", {"file": "progetti", "testo": "x"})
+            assert r.isError, "progetti non si propone più"
+            print("progetti ok")
+
             r = await s.call_tool("richiesta_scrivi", {"testo": "voglio un tool che legga la mia agenda", "contesto": "detto in vocale il 4/11"})
             assert not r.isError, text(r)
             rid = (r.structuredContent or json.loads(text(r)))["id"]
@@ -107,7 +146,7 @@ async def run(url: str, data: Path) -> None:
 
     log = subprocess.run(["git", "log", "--oneline"], cwd=data / "memoria", capture_output=True, text=True).stdout
     commits = log.strip().splitlines()
-    assert len(commits) >= 9, commits
+    assert len(commits) >= 15, commits
     print("commit git:", len(commits))
     assert (data / "connector-url").read_text().startswith("https://127.0.0.1/segretario/")
     print("connector-url ok")
