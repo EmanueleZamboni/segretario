@@ -23,8 +23,10 @@ OUT="$HERE/STATUS.txt"
   crontab -l 2>/dev/null | grep -c segretario
   echo "== chiavi in .env (solo nomi)"
   grep -oE '^[A-Z_]+=' "$HERE/.env" 2>/dev/null | tr -d '=' | tr '\n' ' '; echo
+  echo "== connettore (dal container: /data/connector-url)"
+  (cd "$HERE" && $DOCKER compose exec -T segretario cat /data/connector-url 2>&1 | tail -n 3)
   if [ -f "$HERE/CONNECTOR_URL.txt" ]; then
-    echo "== connettore"
+    echo "== connettore (da .env)"
     cat "$HERE/CONNECTOR_URL.txt"
   fi
 } > "$OUT" 2>&1
