@@ -460,7 +460,8 @@ def progetto_segna(
 ) -> dict:
     """Crea o aggiorna un progetto (video, app, lavoro, cosa della vita): solo i campi passati vengono cambiati.
     nome: come lo chiama Ema (es. "Video Match"). alias: altri modi di chiamarlo, separati da virgola.
-    tipo: video | codice | lavoro | vita | altro. stato: in corso | aspetta Ema | in pausa | finito.
+    tipo: codice (progetti costruiti con Claude: app, siti, tool; solo questi vanno sul cruscotto) | video | lavoro | vita | altro.
+    stato: in corso | aspetta Ema | in pausa | finito.
     dove_sono: a che punto è, una frase. prossimo_passo: la prossima cosa da fare."""
     nome = _one_line(nome, "nome", 80)
     with lock:
@@ -718,7 +719,7 @@ def sessione_segna(
                 entry["progetto"] = progs[_find_progetto(progs, entry["progetto"])]["nome"]
             except ValueError:
                 key = _slug(entry["progetto"])
-                progs[key] = {"nome": entry["progetto"], "alias": [], "tipo": "", "stato": "in corso", "descrizione": "",
+                progs[key] = {"nome": entry["progetto"], "alias": [], "tipo": "codice", "stato": "in corso", "descrizione": "",
                               "dove_sono": entry["dove_sono"], "prossimo_passo": entry["prossimo_passo"],
                               "materiali": [], "documenti": [], "creato": now().strftime("%Y-%m-%d"),
                               "aggiornato": now().strftime("%Y-%m-%d %H:%M")}
@@ -844,10 +845,15 @@ bot = make_bot(TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
 
 # ---------------------------------------------------------------- cruscotto
 
-def cruscotto_dati() -> dict:
-    """I dati del cruscotto: progetti con le loro sessioni, sessioni senza progetto, code aperte."""
+TIPI_CLAUDE = ("codice",)  # il cruscotto mostra solo i progetti costruiti con Claude; le cose della vita restano in memoria
+
+
+def cruscotto_dati(tutti: bool = False) -> dict:
+    """I dati del cruscotto: progetti Claude (tipo codice) con le loro sessioni, sessioni senza progetto, code aperte.
+    Con tutti=True anche video, lavoro e vita."""
     with lock:
-        progs = _progetti()
+        all_progs = _progetti()
+        progs = all_progs if tutti else {k: p for k, p in all_progs.items() if p.get("tipo") in TIPI_CLAUDE}
         sess = list(_sessioni().values())
         aperte = [p for p in _proposte() if p["stato"] == "in attesa"]
         richieste = [r for r in _richieste() if r["stato"] == "aperta"]
@@ -857,7 +863,11 @@ def cruscotto_dati() -> dict:
         if s.get("stato") == "finita":
             continue
         k = _slug(s.get("progetto", ""))
-        (by_key[k] if k in by_key else orphans).append({**s, "da": _age(s.get("aggiornato", ""))})
+        row = {**s, "da": _age(s.get("aggiornato", ""))}
+        if k in by_key:
+            by_key[k].append(row)
+        elif k not in all_progs:  # una sessione di un progetto nascosto (video, vita) non va mostrata
+            orphans.append(row)
     order = {"aspetta Ema": 0, "in corso": 1, "in pausa": 2, "finito": 3}
     cards = []
     for k, p in progs.items():
@@ -870,7 +880,7 @@ def cruscotto_dati() -> dict:
         })
     cards.sort(key=lambda c: (0 if c["aspetta"] else order.get(c["stato"], 9), c["nome"].lower()))
     t = now()
-    return {"adesso": f"{t:%d/%m/%Y %H:%M}", "progetti": cards, "sessioni_senza_progetto": orphans,
+    return {"adesso": f"{t:%d/%m/%Y %H:%M}", "tutti": tutti, "progetti": cards, "sessioni_senza_progetto": orphans,
             "proposte_in_attesa": len(aperte), "richieste_aperte": len(richieste)}
 
 
@@ -897,14 +907,16 @@ a{color:inherit}.empty{color:var(--soft);padding:24px;text-align:center}
 """
 
 
-def cruscotto_html() -> str:
-    d = cruscotto_dati()
+def cruscotto_html(tutti: bool = False) -> str:
+    d = cruscotto_dati(tutti)
+    titolo = "Tutti i progetti" if tutti else "Progetti Claude"
+    switch = "<a href='?'>solo progetti Claude</a>" if tutti else "<a href='?tutti=1'>tutti i progetti</a>"
     parts = [f"<!doctype html><html lang='it'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
              f"<meta http-equiv='refresh' content='60'><title>Cruscotto</title><style>{CRUSCOTTO_CSS}</style></head><body>",
-             f"<h1>Cruscotto dei progetti</h1><div class='sub'>{_esc(d['adesso'])} · aggiornamento ogni minuto · "
-             f"{d['proposte_in_attesa']} proposte e {d['richieste_aperte']} richieste aperte</div>"]
+             f"<h1>{titolo}</h1><div class='sub'>{_esc(d['adesso'])} · aggiornamento ogni minuto · "
+             f"{d['proposte_in_attesa']} proposte e {d['richieste_aperte']} richieste aperte · {switch}</div>"]
     if not d["progetti"]:
-        parts.append("<div class='empty'>Nessun progetto ancora: una chat lo registra con progetto_segna.</div>")
+        parts.append("<div class='empty'>Nessun progetto Claude ancora: una sessione lo registra con sessione_segna o progetto_segna(tipo=\"codice\").</div>")
     parts.append("<div class='grid'>")
     for c in d["progetti"]:
         cls = "wait" if c["aspetta"] else {"in pausa": "pause", "finito": "done"}.get(c["stato"], "")
@@ -952,13 +964,17 @@ async def health(_request):
     return JSONResponse({"ok": True, "name": "segretario"})
 
 
-async def cruscotto_page(_request):
+def _tutti(request) -> bool:
+    return request.query_params.get("tutti", "") not in ("", "0", "no")
+
+
+async def cruscotto_page(request):
     from starlette.responses import HTMLResponse
-    return HTMLResponse(cruscotto_html(), headers={"Cache-Control": "no-store"})
+    return HTMLResponse(cruscotto_html(_tutti(request)), headers={"Cache-Control": "no-store"})
 
 
-async def cruscotto_json(_request):
-    return JSONResponse(cruscotto_dati(), headers={"Cache-Control": "no-store"})
+async def cruscotto_json(request):
+    return JSONResponse(cruscotto_dati(_tutti(request)), headers={"Cache-Control": "no-store"})
 
 
 inner.add_route("/health", health, methods=["GET"])
