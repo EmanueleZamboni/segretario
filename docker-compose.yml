@@ -15,6 +15,7 @@ services:
     environment:
       - SEGRETARIO_PUBLIC_HOST=${SEGRETARIO_PUBLIC_HOST:-postino.emazamboni.com}
       - SEGRETARIO_PUBLIC_PREFIX=/segretario
+      - SEGRETARIO_SECRET=${SEGRETARIO_SECRET:-}
       - MEMORIA_GIT_REMOTE=${MEMORIA_GIT_REMOTE:-}
       # Consegna al telefono (opzionali: senza, il Segretario funziona lo stesso, senza notify)
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}

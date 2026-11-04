@@ -842,7 +842,40 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
     return telegram_bot.Telegram(token, DATA, hooks, chat_id=TELEGRAM_CHAT_ID, daily_cap=NOTIFY_DAILY_CAP)
 
 
-bot = make_bot(TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
+CONFIG_KEYS = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GROQ_API_KEY", "OPENAI_API_KEY", "ROUTINE_FIRE_URL", "ROUTINE_FIRE_TOKEN")
+
+
+def load_config() -> dict:
+    """Impostazioni messe a runtime (POST /<segreto>/config), salvate in /data/config.json, 0600.
+    Servono a configurare Telegram e le chiavi senza entrare nella VM; l'ambiente ha la precedenza."""
+    try:
+        saved = json.loads((DATA / "config.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        saved = {}
+    for k in CONFIG_KEYS:
+        if saved.get(k) and not os.environ.get(k, "").strip():
+            os.environ[k] = str(saved[k]).strip()
+    return saved
+
+
+def apply_config() -> None:
+    """(Ri)avvia il bot Telegram se ora c'è un token. Chiamato all'avvio e dopo ogni POST /config."""
+    global bot, TELEGRAM_TOKEN
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    if token and (bot is None or bot.token != token):
+        TELEGRAM_TOKEN = token
+        bot = make_bot(token)
+        if started:
+            bot.start()
+    elif bot is not None:
+        # chiavi nuove (trascrizione, fire): aggiorna gli hook del bot che gira
+        bot.hooks = make_bot(bot.token).hooks
+
+
+started = False
+bot = None
+load_config()
+apply_config()
 
 
 # ---------------------------------------------------------------- cruscotto
@@ -979,7 +1012,43 @@ async def cruscotto_json(request):
     return JSONResponse(cruscotto_dati(_tutti(request)), headers={"Cache-Control": "no-store"})
 
 
+async def config_endpoint(request):
+    """POST /<segreto>/config {"TELEGRAM_BOT_TOKEN": "..."}: salva le chiavi (solo quelle note) e le applica subito.
+    GET: dice quali sono impostate, mai i valori. Protetto dal segreto nel percorso come tutto il resto."""
+    if request.method == "GET":
+        return JSONResponse({k: bool(os.environ.get(k, "").strip()) for k in CONFIG_KEYS})
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"errore": "JSON non valido"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"errore": "serve un oggetto JSON"}, status_code=400)
+    with lock:
+        try:
+            saved = json.loads((DATA / "config.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            saved = {}
+        changed = []
+        for k, v in body.items():
+            if k not in CONFIG_KEYS:
+                continue
+            v = str(v or "").strip()
+            if v:
+                saved[k] = v
+                os.environ[k] = v
+            else:
+                saved.pop(k, None)
+                os.environ.pop(k, None)
+            changed.append(k)
+        path = DATA / "config.json"
+        path.write_text(json.dumps(saved), encoding="utf-8")
+        os.chmod(path, 0o600)
+    apply_config()
+    return JSONResponse({"impostate": changed, "stato": {k: bool(os.environ.get(k, "").strip()) for k in CONFIG_KEYS}})
+
+
 inner.add_route("/health", health, methods=["GET"])
+inner.add_route(f"/{secret}/config", config_endpoint, methods=["GET", "POST"])
 inner.add_route(f"/{secret}/cruscotto", cruscotto_page, methods=["GET"])
 inner.add_route(f"/{secret}/cruscotto.json", cruscotto_json, methods=["GET"])
 
@@ -997,6 +1066,7 @@ async def app(scope, receive, send):
 
 if __name__ == "__main__":
     print(f"Segretario pronto: memoria in {MEMORIA}, URL del connettore in {DATA / 'connector-url'}", flush=True)
+    started = True
     if bot is not None:
         bot.start()
     else:

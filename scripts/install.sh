@@ -20,10 +20,11 @@ DOMAIN="$(grep -E '^POSTINO_DOMAIN=' "$HOME/various/postino/.env" 2>/dev/null | 
 DOMAIN="${DOMAIN:-postino.emazamboni.com}"
 
 ENVF="$HERE/.env"
+SECRET="$(head -c 48 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' | cut -c1-43)"
 if [ ! -f "$ENVF" ]; then
   umask 077
   {
-    printf 'CADDY_NETWORK=%s\nSEGRETARIO_PUBLIC_HOST=%s\nMEMORIA_GIT_REMOTE=\n' "$NET" "$DOMAIN"
+    printf 'CADDY_NETWORK=%s\nSEGRETARIO_PUBLIC_HOST=%s\nSEGRETARIO_SECRET=%s\nMEMORIA_GIT_REMOTE=\n' "$NET" "$DOMAIN" "$SECRET"
     printf '# Consegna al telefono: token da BotFather; il chat id si fissa da solo al primo /start\n'
     printf 'TELEGRAM_BOT_TOKEN=\nTELEGRAM_CHAT_ID=\nNOTIFY_DAILY_CAP=60\n'
     printf '# Vocali -> testo (Groq gratis per questi volumi; OpenAI come riserva)\nGROQ_API_KEY=\nOPENAI_API_KEY=\n'
@@ -49,4 +50,13 @@ if ! crontab -l 2>/dev/null | grep -qF "$HERE/scripts/auto-update.sh"; then
 fi
 chmod +x "$HERE/scripts/auto-update.sh" "$HERE/scripts/install.sh" 2>/dev/null
 
-say "ready. Connector URL: cd $HERE && docker compose exec segretario cat /data/connector-url"
+# 5. L'URL del connettore: nel rapporto del server (che Postino manda per email a Ema) e in un file locale.
+SECRET="$(grep -E '^SEGRETARIO_SECRET=' "$ENVF" | cut -d= -f2-)"
+if [ -n "$SECRET" ]; then
+  URL="https://$DOMAIN/segretario/$SECRET/mcp"
+  (umask 077; printf 'Connettore Claude (segreto, non condividere):\n%s\nCruscotto:\nhttps://%s/segretario/%s/cruscotto\n' "$URL" "$DOMAIN" "$SECRET" > "$HERE/CONNECTOR_URL.txt")
+  say "connettore Claude, da aggiungere su claude.ai > Connettori (e poi cancellare questa mail, l'indirizzo è un segreto): $URL"
+  say "cruscotto: https://$DOMAIN/segretario/$SECRET/cruscotto"
+else
+  say "ready. Connector URL: cd $HERE && docker compose exec segretario cat /data/connector-url"
+fi
