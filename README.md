@@ -103,6 +103,7 @@ Limite: `NOTIFY_DAILY_CAP` messaggi al giorno (60) per `notify` e le proposte; l
 
 `CADDY_NETWORK` (postino_default), `SEGRETARIO_PUBLIC_HOST` (postino.emazamboni.com), `MEMORIA_GIT_REMOTE`,
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `NOTIFY_DAILY_CAP`, `GROQ_API_KEY`, `OPENAI_API_KEY`, `ROUTINE_FIRE_URL`, `ROUTINE_FIRE_TOKEN`.
+`LINKS_API_URL` (Worker del link manager) e `LINKS_STATS_KEY` (la sua chiave Bearer) accendono i tool Instagram.
 Nel container: `SEGRETARIO_PUBLIC_PREFIX` (/segretario), `SEGRETARIO_EXTRA_HOSTS` (per i test),
 `SEGRETARIO_SECRET` (per imporre un segreto), `SEGRETARIO_TZ` (Europe/Rome), `PORT` (8766), `BIND`.
 
