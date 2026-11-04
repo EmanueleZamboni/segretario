@@ -1,0 +1,43 @@
+# Segretario: la memoria condivisa per Claude. Un container sulla rete del Caddy di Postino, che lo
+# raggiunge come "segretario:8766" (handle_path /segretario/* nel Caddyfile di Postino).
+# Nessuna porta pubblicata. I dati (memoria git, segreto, URL del connettore) stanno nel volume.
+#   URL del connettore:   docker compose exec segretario cat /data/connector-url
+#   storia della memoria: docker compose exec segretario git -C /data/memoria log --oneline
+services:
+  segretario:
+    build: .
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - SEGRETARIO_PUBLIC_HOST=${SEGRETARIO_PUBLIC_HOST:-postino.emazamboni.com}
+      - SEGRETARIO_PUBLIC_PREFIX=/segretario
+      - MEMORIA_GIT_REMOTE=${MEMORIA_GIT_REMOTE:-}
+    volumes:
+      - segretario_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    expose:
+      - "8766"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8766/health',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# La rete di Caddy (progetto compose "postino" => "postino_default"). install.sh la rileva e la scrive in .env.
+networks:
+  default:
+    name: ${CADDY_NETWORK:-postino_default}
+    external: true
+
+volumes:
+  segretario_data:
