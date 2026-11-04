@@ -22,7 +22,14 @@ DOMAIN="${DOMAIN:-postino.emazamboni.com}"
 ENVF="$HERE/.env"
 if [ ! -f "$ENVF" ]; then
   umask 077
-  printf 'CADDY_NETWORK=%s\nSEGRETARIO_PUBLIC_HOST=%s\nMEMORIA_GIT_REMOTE=\n' "$NET" "$DOMAIN" > "$ENVF"
+  {
+    printf 'CADDY_NETWORK=%s\nSEGRETARIO_PUBLIC_HOST=%s\nMEMORIA_GIT_REMOTE=\n' "$NET" "$DOMAIN"
+    printf '# Consegna al telefono: token da BotFather; il chat id si fissa da solo al primo /start\n'
+    printf 'TELEGRAM_BOT_TOKEN=\nTELEGRAM_CHAT_ID=\nNOTIFY_DAILY_CAP=60\n'
+    printf '# Vocali -> testo (Groq gratis per questi volumi; OpenAI come riserva)\nGROQ_API_KEY=\nOPENAI_API_KEY=\n'
+    printf '# Messaggi dal telefono -> task cloud: URL /fire e token dal dialogo del task su claude.ai/code/routines\n'
+    printf 'ROUTINE_FIRE_URL=\nROUTINE_FIRE_TOKEN=\n'
+  } > "$ENVF"
   say ".env written (network $NET, host $DOMAIN)"
 fi
 

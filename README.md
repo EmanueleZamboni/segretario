@@ -47,9 +47,30 @@ Così ogni chat parte già con le regole, senza tool call e senza dipendere dall
 | `documento_leggi(progetto, nome, versioni_indietro)` | rilegge un documento salvato, anche una versione precedente |
 | `richiesta_scrivi(testo, contesto)` | Ema chiede un cambiamento al Segretario: lo costruisce la sessione Claude Code "BUILDING SEGRETARIO" |
 | `richiesta_chiudi(id, esito, stato)` | la sessione che ha costruito segna cosa è cambiato (fatta, scartata, rimandata) |
+| `notify(testo)` | manda un messaggio a Ema su Telegram (solo a lui); è così che i task cloud consegnano il brief |
 | `stato()` | numeri e ultimo commit, serve ai test e al cruscotto |
 
 Nessun tool cancella o riscrive. Ogni scrittura è un commit git nella cartella `memoria`.
+
+## Cruscotto
+
+`https://postino.emazamboni.com/segretario/<segreto>/cruscotto` (l'URL è nel file `connector-url`): una scheda
+per progetto, gialla con "ASPETTA TE" e la domanda aperta quando serve Ema, verde con la barra in movimento
+quando una sessione ci sta lavorando, grigia in pausa. Si aggiorna da sola ogni minuto. Da mettere nella home
+del telefono. Stessi dati in JSON su `.../cruscotto.json` (per un futuro cruscotto nell'app desktop).
+
+## Telegram (consegna al telefono, opzionale)
+
+1. Su Telegram apri BotFather, `/newbot`, scegli un nome: ti dà il token.
+2. Sulla VM: metti il token in `~/segretario/.env` (`TELEGRAM_BOT_TOKEN=...`), poi `cd ~/segretario && sudo docker compose up -d`.
+3. Scrivi `/start` al bot: il primo che lo fa diventa l'unico utente ammesso (chat id salvato in `/data/telegram_state.json`).
+4. Da quel momento `notify` arriva sul telefono, le regole proposte hanno i bottoni Aggiungi / Scarta, e i comandi
+   `/oggi /regole /coda /sessioni /progetti /stato` rispondono.
+5. Per i vocali: `GROQ_API_KEY` (console.groq.com, gratis per questi volumi) o `OPENAI_API_KEY` in `.env`.
+6. Per far rispondere Claude ai messaggi dal telefono: crea il task cloud "Segretario on demand" (vedi
+   `docs/task_cloud.md`) con trigger API, e metti `ROUTINE_FIRE_URL` e `ROUTINE_FIRE_TOKEN` in `.env`.
+
+Limite: `NOTIFY_DAILY_CAP` messaggi al giorno (60). Nessuna porta aperta: il bot usa il long polling verso Telegram.
 
 ## Come gira sulla VM
 
@@ -77,18 +98,24 @@ Nessun tool cancella o riscrive. Ogni scrittura è un commit git nella cartella 
 
 ## Variabili (`.env`, tutte opzionali)
 
-`CADDY_NETWORK` (postino_default), `SEGRETARIO_PUBLIC_HOST` (postino.emazamboni.com), `MEMORIA_GIT_REMOTE`.
+`CADDY_NETWORK` (postino_default), `SEGRETARIO_PUBLIC_HOST` (postino.emazamboni.com), `MEMORIA_GIT_REMOTE`,
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `NOTIFY_DAILY_CAP`, `GROQ_API_KEY`, `OPENAI_API_KEY`, `ROUTINE_FIRE_URL`, `ROUTINE_FIRE_TOKEN`.
 Nel container: `SEGRETARIO_PUBLIC_PREFIX` (/segretario), `SEGRETARIO_EXTRA_HOSTS` (per i test),
 `SEGRETARIO_SECRET` (per imporre un segreto), `SEGRETARIO_TZ` (Europe/Rome), `PORT` (8766), `BIND`.
 
 ## Prova in locale
 
     python -m venv venv && venv/bin/pip install -r requirements.txt
-    python tests/smoke.py
+    python tests/smoke.py          # server vero su una cartella temporanea, ogni tool con il client MCP ufficiale, cruscotto
+    python tests/test_telegram.py  # logica Telegram con l'API finta: un solo utente, comandi, bottoni, inoltro
 
-Avvia il server su una cartella temporanea e prova ogni tool con il client MCP ufficiale.
+`tests/dev_server.cmd` avvia un server di sviluppo su questo PC e `tests/dev_seed.py` lo riempie di esempi per guardare il cruscotto.
 
-## Cosa non fa ancora
+## Documenti
 
-Non manda messaggi a Ema (Telegram, fase successiva) e non legge Keep, email o calendario: quelli
-restano nei loro connettori. Note di progetto: `Desktop\Claude Things\26_11_03 Segretario`.
+- `docs/task_cloud.md`: i tre task cloud (brief del mattino, domani, on demand) pronti da incollare su claude.ai/code/routines.
+- `docs/istruzioni_progetto_secretary.md`: le istruzioni per il progetto "Secretary" dell'app Claude.
+
+## Cosa non fa
+
+Non legge Keep, email o calendario: quelli restano nei loro connettori, e sono i task cloud e le chat a metterli insieme. Note di progetto: `Desktop\Claude Things\26_11_03 Segretario`.

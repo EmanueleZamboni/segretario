@@ -168,6 +168,13 @@ def main() -> None:
             assert e.code in (404, 405), e.code
         print("percorso sbagliato: 404 ok")
         asyncio.run(run(f"http://127.0.0.1:{PORT}/{secret}/mcp", data))
+        with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/{secret}/cruscotto", timeout=5) as r:
+            html = r.read().decode("utf-8")
+        assert r.status == 200 and "Cruscotto" in html and "Video Match" in html and "ASPETTA TE" in html, html[:300]
+        with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/{secret}/cruscotto.json", timeout=5) as r:
+            j = json.loads(r.read().decode("utf-8"))
+        assert any(c["nome"] == "EASY RAVE" and c["aspetta"] for c in j["progetti"]), j["progetti"]
+        print("cruscotto ok")
         print("SMOKE OK")
     finally:
         proc.terminate()

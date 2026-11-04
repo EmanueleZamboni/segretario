@@ -32,6 +32,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
+import telegram_bot
+
 DATA = Path(os.environ.get("SEGRETARIO_DATA", "/data"))
 MEMORIA = DATA / "memoria"
 PUBLIC_HOST = os.environ.get("SEGRETARIO_PUBLIC_HOST", "postino.emazamboni.com")
@@ -41,6 +43,9 @@ PORT = int(os.environ.get("PORT", "8766"))
 BIND = os.environ.get("BIND", "127.0.0.1")
 TZ = ZoneInfo(os.environ.get("SEGRETARIO_TZ", "Europe/Rome"))
 GIT_REMOTE = os.environ.get("MEMORIA_GIT_REMOTE", "").strip()
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+NOTIFY_DAILY_CAP = int(os.environ.get("NOTIFY_DAILY_CAP", "60"))
 
 FILES = {"regole": "regole.md", "persone": "persone.md", "progetti": "progetti.md"}
 PROPOSABLE = ("regole", "persone")  # progetti.md è generato da progetti.json (progetto_segna)
@@ -141,7 +146,9 @@ def ensure_data() -> str:
         secret_file.write_text(secret, encoding="utf-8")
         os.chmod(secret_file, 0o600)
     url_file = DATA / "connector-url"
-    url_file.write_text(f"https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/mcp\n", encoding="utf-8")
+    url_file.write_text(
+        f"https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/mcp\n"
+        f"cruscotto: https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/cruscotto\n", encoding="utf-8")
     os.chmod(url_file, 0o600)
     return secret
 
@@ -289,6 +296,13 @@ def _propose(file: str, testo: str, motivo: str) -> dict:
         items.append(item)
         _save_proposte(items)
         commit(f"proposta {item['id']} per {file}")
+    if bot is not None and bot.chat_id is not None:
+        kind = "regola" if file == "regole" else "nota"
+        try:
+            bot.send(f"Nuova {kind} proposta ({file}):\n{item['testo']}" + (f"\nMotivo: {item['motivo']}" if item["motivo"] else ""),
+                     buttons=[[("Aggiungi", f"{kind}:{item['id']}:si"), ("Scarta", f"{kind}:{item['id']}:no")]])
+        except Exception as err:  # la proposta resta in coda anche senza Telegram
+            print("telegram:", err, flush=True)
     return {**item, "nota": "In attesa di Ema. Non è ancora una regola: non applicarla finché non la approva."}
 
 
@@ -748,6 +762,20 @@ def sessione_chiudi(nome: str) -> dict:
 
 
 @mcp.tool()
+def notify(testo: str) -> dict:
+    """Manda un messaggio a Ema sul suo telefono (Telegram). Solo a lui, mai ad altri: non accetta destinatari.
+    Usalo per consegnare il brief del mattino, la nota 'domani', una risposta a un suo messaggio dal telefono,
+    o un avviso che aspetta una sua decisione. Breve, italiano, niente saluti."""
+    if bot is None:
+        raise RuntimeError("Telegram non configurato sul server (TELEGRAM_BOT_TOKEN)")
+    mid = bot.send(_check(testo, "testo", 12_000))
+    t = now()
+    with lock:
+        (DATA / "notify.log").open("a", encoding="utf-8").write(f"{t:%Y-%m-%d %H:%M} message_id={mid} len={len(testo)}\n")
+    return {"inviato": True, "message_id": mid, "quando": f"{t:%Y-%m-%d %H:%M}"}
+
+
+@mcp.tool()
 def stato() -> dict:
     """Stato del Segretario: data e ora, numero di regole, proposte in attesa, sessioni aperte, ultimo commit."""
     with lock:
@@ -770,7 +798,149 @@ def stato() -> dict:
         "diario_oggi_righe": len(_read(f"diario/{t:%Y-%m-%d}.md").splitlines()),
         "ultimo_commit": ultimo,
         "remoto_git": bool(GIT_REMOTE),
+        "telegram": "non configurato" if bot is None else ("collegato" if bot.chat_id else "in attesa di /start"),
+        "cervello_on_demand": bool(os.environ.get("ROUTINE_FIRE_URL", "").strip()),
+        "trascrizione": bool(os.environ.get("GROQ_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip()),
     }
+
+
+# ---------------------------------------------------------------- Telegram (opzionale)
+
+def _fmt_sessioni() -> str:
+    rows = sessioni_lista(True)
+    if not rows:
+        return "Nessuna sessione aperta."
+    return "\n".join(f"{'!' if s['stato'] == 'aspetta Ema' else '·'} {s['nome']} ({s['stato']}, {s['da']}): {s['dove_sono']}"
+                     + (f"\n  ? {s['domanda_per_ema']}" if s.get("domanda_per_ema") else "") for s in rows)
+
+
+def _fmt_progetti() -> str:
+    rows = progetti_lista(True)
+    if not rows:
+        return "Nessun progetto."
+    return "\n".join(f"{'!' if p['stato'] == 'aspetta Ema' else '·'} {p['nome']} ({p['stato']}): {p['dove_sono'] or '-'}"
+                     + (f" -> {p['prossimo_passo']}" if p.get("prossimo_passo") else "") for p in rows)
+
+
+def make_bot(token: str) -> "telegram_bot.Telegram":
+    hooks = {
+        "diario": lambda: memoria_leggi("diario"),
+        "regole": lambda: memoria_leggi("regole"),
+        "coda": lambda: memoria_leggi("coda"),
+        "sessioni": _fmt_sessioni,
+        "progetti": _fmt_progetti,
+        "stato": lambda: json.dumps(stato(), ensure_ascii=False, indent=1),
+        "decidi": proposta_decidi,
+    }
+    if os.environ.get("ROUTINE_FIRE_URL", "").strip():
+        hooks["fire"] = telegram_bot.fire_routine
+    if os.environ.get("GROQ_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip():
+        hooks["transcribe"] = telegram_bot.transcribe_bytes
+    return telegram_bot.Telegram(token, DATA, hooks, chat_id=TELEGRAM_CHAT_ID, daily_cap=NOTIFY_DAILY_CAP)
+
+
+bot = make_bot(TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
+
+
+# ---------------------------------------------------------------- cruscotto
+
+def cruscotto_dati() -> dict:
+    """I dati del cruscotto: progetti con le loro sessioni, sessioni senza progetto, code aperte."""
+    with lock:
+        progs = _progetti()
+        sess = list(_sessioni().values())
+        aperte = [p for p in _proposte() if p["stato"] == "in attesa"]
+        richieste = [r for r in _richieste() if r["stato"] == "aperta"]
+    by_key: dict[str, list] = {k: [] for k in progs}
+    orphans = []
+    for s in sess:
+        if s.get("stato") == "finita":
+            continue
+        k = _slug(s.get("progetto", ""))
+        (by_key[k] if k in by_key else orphans).append({**s, "da": _age(s.get("aggiornato", ""))})
+    order = {"aspetta Ema": 0, "in corso": 1, "in pausa": 2, "finito": 3}
+    cards = []
+    for k, p in progs.items():
+        waiting = p["stato"] == "aspetta Ema" or any(s["stato"] == "aspetta Ema" for s in by_key[k])
+        cards.append({
+            "id": k, "nome": p["nome"], "tipo": p["tipo"], "stato": p["stato"], "aspetta": waiting,
+            "dove_sono": p["dove_sono"], "prossimo_passo": p["prossimo_passo"], "aggiornato": p["aggiornato"],
+            "da": _age(p["aggiornato"]) if p["aggiornato"] else "", "materiali": p.get("materiali", []),
+            "sessioni": sorted(by_key[k], key=lambda s: order.get(s["stato"], 9)),
+        })
+    cards.sort(key=lambda c: (0 if c["aspetta"] else order.get(c["stato"], 9), c["nome"].lower()))
+    t = now()
+    return {"adesso": f"{t:%d/%m/%Y %H:%M}", "progetti": cards, "sessioni_senza_progetto": orphans,
+            "proposte_in_attesa": len(aperte), "richieste_aperte": len(richieste)}
+
+
+def _esc(s: str) -> str:
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+CRUSCOTTO_CSS = """
+:root{--bg:#f4f3ef;--card:#fff;--ink:#1a1a1a;--soft:#6b6b6b;--line:#e3e1da;--ok:#2e8b57;--wait:#f2b705;--pause:#9a9a9a;--done:#c9c9c9}
+@media(prefers-color-scheme:dark){:root{--bg:#141414;--card:#1f1f1f;--ink:#f2f2f2;--soft:#a3a3a3;--line:#2c2c2c;--done:#3a3a3a}}
+*{box-sizing:border-box}body{margin:0;padding:16px;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--soft);font-size:14px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;border-top:8px solid var(--ok)}
+.card.wait{border-top-color:var(--wait);box-shadow:0 0 0 2px var(--wait) inset}.card.pause{border-top-color:var(--pause)}.card.done{border-top-color:var(--done);opacity:.6}
+.name{font-size:19px;font-weight:700;margin:0 0 2px}.meta{color:var(--soft);font-size:13px;margin-bottom:8px}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);margin-right:6px}
+.tag.wait{background:var(--wait);color:#1a1a1a;border-color:var(--wait);font-weight:700}
+p{margin:6px 0}.q{background:rgba(242,183,5,.18);border-radius:8px;padding:8px;font-weight:600}
+.sess{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;font-size:14px}.sess b{font-weight:600}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:8px 0 2px}.bar i{display:block;height:100%;width:40%;background:var(--ok);animation:run 1.6s linear infinite}
+@keyframes run{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+a{color:inherit}.empty{color:var(--soft);padding:24px;text-align:center}
+"""
+
+
+def cruscotto_html() -> str:
+    d = cruscotto_dati()
+    parts = [f"<!doctype html><html lang='it'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+             f"<meta http-equiv='refresh' content='60'><title>Cruscotto</title><style>{CRUSCOTTO_CSS}</style></head><body>",
+             f"<h1>Cruscotto dei progetti</h1><div class='sub'>{_esc(d['adesso'])} · aggiornamento ogni minuto · "
+             f"{d['proposte_in_attesa']} proposte e {d['richieste_aperte']} richieste aperte</div>"]
+    if not d["progetti"]:
+        parts.append("<div class='empty'>Nessun progetto ancora: una chat lo registra con progetto_segna.</div>")
+    parts.append("<div class='grid'>")
+    for c in d["progetti"]:
+        cls = "wait" if c["aspetta"] else {"in pausa": "pause", "finito": "done"}.get(c["stato"], "")
+        parts.append(f"<div class='card {cls}'><div class='name'>{_esc(c['nome'])}</div>")
+        tag = "<span class='tag wait'>ASPETTA TE</span>" if c["aspetta"] else f"<span class='tag'>{_esc(c['stato'])}</span>"
+        tipo = f"<span class='tag'>{_esc(c['tipo'])}</span>" if c["tipo"] else ""
+        parts.append(f"<div class='meta'>{tag}{tipo}{_esc(c['da'])}</div>")
+        if c["stato"] == "in corso" and any(s["stato"] == "in corso" for s in c["sessioni"]):
+            parts.append("<div class='bar'><i></i></div>")
+        if c["dove_sono"]:
+            parts.append(f"<p>{_esc(c['dove_sono'])}</p>")
+        if c["prossimo_passo"]:
+            parts.append(f"<p><b>Prossimo:</b> {_esc(c['prossimo_passo'])}</p>")
+        for s in c["sessioni"]:
+            parts.append(f"<div class='sess'><b>{_esc(s['nome'])}</b> · {_esc(s['stato'])} · {_esc(s['da'])}<br>{_esc(s['dove_sono'])}")
+            if s.get("domanda_per_ema"):
+                parts.append(f"<div class='q'>{_esc(s['domanda_per_ema'])}</div>")
+            parts.append("</div>")
+        if c["materiali"]:
+            links = " · ".join(f"<a href='{_esc(m['link'])}' target='_blank' rel='noopener'>{_esc(m['titolo'])}</a>"
+                               for m in c["materiali"][-4:] if m["link"].startswith("http"))
+            if links:
+                parts.append(f"<p class='meta'>{links}</p>")
+        parts.append("</div>")
+    parts.append("</div>")
+    if d["sessioni_senza_progetto"]:
+        parts.append("<h1 style='margin-top:20px'>Sessioni senza progetto</h1><div class='grid'>")
+        for s in d["sessioni_senza_progetto"]:
+            cls = "wait" if s["stato"] == "aspetta Ema" else ""
+            parts.append(f"<div class='card {cls}'><div class='name'>{_esc(s['nome'])}</div><div class='meta'>{_esc(s['stato'])} · {_esc(s['da'])}</div><p>{_esc(s['dove_sono'])}</p>")
+            if s.get("domanda_per_ema"):
+                parts.append(f"<div class='q'>{_esc(s['domanda_per_ema'])}</div>")
+            parts.append("</div>")
+        parts.append("</div>")
+    parts.append("</body></html>")
+    return "".join(parts)
 
 
 # ---------------------------------------------------------------- app ASGI
@@ -782,7 +952,18 @@ async def health(_request):
     return JSONResponse({"ok": True, "name": "segretario"})
 
 
+async def cruscotto_page(_request):
+    from starlette.responses import HTMLResponse
+    return HTMLResponse(cruscotto_html(), headers={"Cache-Control": "no-store"})
+
+
+async def cruscotto_json(_request):
+    return JSONResponse(cruscotto_dati(), headers={"Cache-Control": "no-store"})
+
+
 inner.add_route("/health", health, methods=["GET"])
+inner.add_route(f"/{secret}/cruscotto", cruscotto_page, methods=["GET"])
+inner.add_route(f"/{secret}/cruscotto.json", cruscotto_json, methods=["GET"])
 
 
 async def app(scope, receive, send):
@@ -798,6 +979,10 @@ async def app(scope, receive, send):
 
 if __name__ == "__main__":
     print(f"Segretario pronto: memoria in {MEMORIA}, URL del connettore in {DATA / 'connector-url'}", flush=True)
+    if bot is not None:
+        bot.start()
+    else:
+        print("Telegram: non configurato (TELEGRAM_BOT_TOKEN vuoto): nessuna consegna al telefono", flush=True)
     uvicorn.run(
         app,
         host=BIND,

@@ -16,6 +16,16 @@ services:
       - SEGRETARIO_PUBLIC_HOST=${SEGRETARIO_PUBLIC_HOST:-postino.emazamboni.com}
       - SEGRETARIO_PUBLIC_PREFIX=/segretario
       - MEMORIA_GIT_REMOTE=${MEMORIA_GIT_REMOTE:-}
+      # Consegna al telefono (opzionali: senza, il Segretario funziona lo stesso, senza notify)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - NOTIFY_DAILY_CAP=${NOTIFY_DAILY_CAP:-60}
+      # Vocali Telegram -> testo (Groq prima, OpenAI come riserva)
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Messaggi di Ema -> task cloud "Segretario on demand" (URL /fire e token dal dialogo del task)
+      - ROUTINE_FIRE_URL=${ROUTINE_FIRE_URL:-}
+      - ROUTINE_FIRE_TOKEN=${ROUTINE_FIRE_TOKEN:-}
     volumes:
       - segretario_data:/data
     read_only: true
