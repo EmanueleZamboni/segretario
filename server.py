@@ -1426,11 +1426,106 @@ def _tutti(request) -> bool:
     return request.query_params.get("tutti", "") not in ("", "0", "no")
 
 
-CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self' https://claude.ai https://*.claude.ai"
+CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'self' https://claude.ai https://*.claude.ai"
+
+
+# ---------------------------------------------------------------- secondo fattore: codice su Telegram
+# Il segreto nell'URL resta la chiave; in più, la prima volta che un browser apre cruscotto o manager il server
+# manda un codice di 6 cifre su Telegram e lo chiede una volta: poi quel browser resta fidato 90 giorni (cookie).
+# Senza Telegram collegato il controllo non può esistere e la pagina si apre con il solo segreto.
+DEVICE_COOKIE = "seg_dispositivo"
+DEVICE_DAYS = 90
+_otp: dict = {"codice": "", "scade": 0.0, "tentativi": 0, "inviato": 0.0}
+
+
+def _devices() -> dict:
+    try:
+        return json.loads((DATA / "dispositivi.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _device_ok(request) -> bool:
+    tok = request.cookies.get(DEVICE_COOKIE, "")
+    if not tok:
+        return False
+    d = _devices().get(tok)
+    return bool(d) and time.time() - float(d.get("dal", 0)) < DEVICE_DAYS * 86400
+
+
+def _otp_possibile() -> bool:
+    return bot is not None and bot.chat_id is not None
+
+
+def _otp_manda() -> str | None:
+    """Manda (o rimanda, non più di una volta al minuto) il codice su Telegram. Ritorna un messaggio per la pagina."""
+    nowt = time.time()
+    if _otp["codice"] and nowt < _otp["scade"] and nowt - _otp["inviato"] < 60:
+        return None
+    _otp.update(codice=f"{secrets.randbelow(10**6):06d}", scade=nowt + 600, tentativi=0, inviato=nowt)
+    try:
+        bot.send(f"Codice per aprire il manager/cruscotto del Segretario: <b>{_otp['codice']}</b>\nVale 10 minuti. Se non sei stato tu, ignora.", conta=False, html=True)
+    except Exception as err:  # noqa: BLE001
+        log.warning("otp: %s", err)
+        return "Non riesco a mandare il codice su Telegram adesso."
+    return None
+
+
+def _otp_verifica(codice: str) -> bool:
+    nowt = time.time()
+    if not _otp["codice"] or nowt > _otp["scade"] or _otp["tentativi"] >= 5:
+        return False
+    _otp["tentativi"] += 1
+    if secrets.compare_digest(codice.strip(), _otp["codice"]):
+        _otp.update(codice="", scade=0.0)
+        return True
+    return False
+
+
+def _otp_html(msg: str = "") -> str:
+    return ("<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            f"<meta name=\"robots\" content=\"noindex\"><title>Segretario · codice</title><style>{MANAGER_CSS}</style></head><body><main>"
+            "<h1>Segretario</h1><p class=\"sub\">Ti ho mandato un codice di 6 cifre su Telegram. Scrivilo qui: questo browser resta fidato per 90 giorni.</p>"
+            + (f'<div class="err">{_esc(msg)}</div>' if msg else "")
+            + '<div class="card"><form method="post" class="row"><input type="text" name="codice" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="123456" aria-label="codice" autofocus>'
+            '<button type="submit" name="azione" value="verifica">Entra</button><button type="submit" name="azione" value="rimanda" class="quiet">Rimanda il codice</button></form></div>'
+            "</main></body></html>")
+
+
+async def _gate(request):
+    """None se il browser è fidato (o Telegram manca); altrimenti la risposta con la pagina del codice."""
+    from starlette.responses import HTMLResponse, RedirectResponse
+    if not _otp_possibile() or _device_ok(request):
+        return None
+    msg = ""
+    if request.method == "POST":
+        form = await request.form()
+        azione = str(form.get("azione", ""))
+        if azione == "verifica":
+            if _otp_verifica(str(form.get("codice", ""))):
+                tok = secrets.token_urlsafe(32)
+                with lock:
+                    devs = {k: v for k, v in _devices().items() if time.time() - float(v.get("dal", 0)) < DEVICE_DAYS * 86400}
+                    devs[tok] = {"dal": time.time(), "ua": str(request.headers.get("user-agent", ""))[:120]}
+                    _write_json(DATA / "dispositivi.json", devs)
+                r = RedirectResponse(f"{PUBLIC_PREFIX}{request.url.path}", status_code=303)  # Caddy toglie il prefisso: il browser lo rivuole
+                r.set_cookie(DEVICE_COOKIE, tok, max_age=DEVICE_DAYS * 86400, httponly=True, secure=PUBLIC_HOST != "127.0.0.1",
+                             samesite="lax", path=f"{PUBLIC_PREFIX}/{secret}")
+                return r
+            msg = "Codice sbagliato o scaduto."
+        elif azione == "rimanda":
+            _otp.update(codice="", scade=0.0)
+    err = _otp_manda()
+    return HTMLResponse(_otp_html(err or msg), status_code=401, headers={
+        "Cache-Control": "no-store", "Content-Security-Policy": MANAGER_CSP, "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff"})
 
 
 async def cruscotto_page(request):
     from starlette.responses import HTMLResponse
+    gate = await _gate(request)
+    if gate is not None:
+        return gate
     return HTMLResponse(cruscotto_html(_tutti(request)), headers={
         "Cache-Control": "no-store", "Content-Security-Policy": CSP, "Referrer-Policy": "no-referrer",
         "X-Content-Type-Options": "nosniff"})
@@ -1597,8 +1692,11 @@ MANAGER_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; bas
 
 async def manager_page(request):
     from starlette.responses import HTMLResponse
+    gate = await _gate(request)
+    if gate is not None:
+        return gate
     ok = err = ""
-    if request.method == "POST":
+    if request.method == "POST" and "chiave" in (await request.form()):
         form = await request.form()
         key = str(form.get("chiave", ""))
         value = "" if str(form.get("azione", "")) == "cancella" else str(form.get("valore", ""))
@@ -1616,7 +1714,7 @@ async def manager_page(request):
 
 inner.add_route("/health", health, methods=["GET"])
 inner.add_route(f"/{secret}/config", config_endpoint, methods=["GET", "POST"])
-inner.add_route(f"/{secret}/cruscotto", cruscotto_page, methods=["GET"])
+inner.add_route(f"/{secret}/cruscotto", cruscotto_page, methods=["GET", "POST"])
 inner.add_route(f"/{secret}/manager", manager_page, methods=["GET", "POST"])
 inner.add_route(f"/{secret}/trascrivi", trascrivi_endpoint, methods=["POST"])
 inner.add_route(f"/{secret}/cruscotto.json", cruscotto_json, methods=["GET"])
