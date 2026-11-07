@@ -41,9 +41,9 @@ test('/stato shows "Non collegato" with a Collega button, no external assets, st
   const html = await res.text();
   assert.match(html, /Non collegato/);
   assert.match(html, /action="link"/);
-  assert.match(html, /Vocali in testo<\/th><td>attiva/);
+  assert.match(html, /Vocali in testo<\/span><span class="v">attiva/);
   assert.doesNotMatch(html, /<script/);
-  assert.doesNotMatch(html, /https?:\/\//);
+  assert.doesNotMatch(html, /(src|stylesheet[^>]*href)=["']https?:/); // link al hub ok, risorse esterne no
   assert.doesNotMatch(html, /http-equiv="refresh"/);
   assert.ok(!html.includes(TOKEN), 'the token is not written into the page');
 });

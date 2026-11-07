@@ -39,6 +39,7 @@ from starlette.responses import JSONResponse
 import brief as brief_mod
 import fonti
 import keep
+import pagine
 import telegram_bot
 
 DATA = Path(os.environ.get("SEGRETARIO_DATA", "/data"))
@@ -1362,73 +1363,14 @@ def _safe_link(link: str) -> str:
     return link if LINK_RE.fullmatch(link or "") else ""
 
 
-CRUSCOTTO_CSS = """
-:root{--bg:#f4f3ef;--card:#fff;--ink:#1a1a1a;--soft:#6b6b6b;--line:#e3e1da;--ok:#2e8b57;--wait:#f2b705;--pause:#9a9a9a;--done:#c9c9c9}
-@media(prefers-color-scheme:dark){:root{--bg:#141414;--card:#1f1f1f;--ink:#f2f2f2;--soft:#a3a3a3;--line:#2c2c2c;--done:#3a3a3a}}
-*{box-sizing:border-box}body{margin:0;padding:16px;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif}
-h1{font-size:20px;margin:0 0 4px}.sub{color:var(--soft);font-size:14px;margin-bottom:16px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;border-top:8px solid var(--ok)}
-.card.wait{border-top-color:var(--wait);box-shadow:0 0 0 2px var(--wait) inset}.card.pause{border-top-color:var(--pause)}.card.done{border-top-color:var(--done);opacity:.6}
-.name{font-size:19px;font-weight:700;margin:0 0 2px}.meta{color:var(--soft);font-size:13px;margin-bottom:8px}
-.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);margin-right:6px}
-.tag.wait{background:var(--wait);color:#1a1a1a;border-color:var(--wait);font-weight:700}
-p{margin:6px 0}.q{background:rgba(242,183,5,.18);border-radius:8px;padding:8px;font-weight:600}
-.sess{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;font-size:14px}.sess b{font-weight:600}
-.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:8px 0 2px}.bar i{display:block;height:100%;width:40%;background:var(--ok);animation:run 1.6s linear infinite}
-@keyframes run{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
-a{color:inherit}.empty{color:var(--soft);padding:24px;text-align:center}
-"""
-
-
 def cruscotto_html(tutti: bool = False) -> str:
     d = cruscotto_dati(tutti)
-    titolo = "Tutti i progetti" if tutti else "Progetti Claude"
-    switch = "<a href='?'>solo progetti Claude</a>" if tutti else "<a href='?tutti=1'>tutti i progetti</a>"
-    parts = [f"<!doctype html><html lang='it'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-             f"<meta name='referrer' content='no-referrer'><meta http-equiv='refresh' content='60'><title>Cruscotto</title>"
-             f"<style>{CRUSCOTTO_CSS}</style></head><body>",
-             f"<h1>{titolo}</h1><div class='sub'>{_esc(d['adesso'])} · aggiornamento ogni minuto · "
-             f"{d['proposte_in_attesa']} proposte e {d['richieste_aperte']} richieste aperte · {switch} · "
-             f"codice approvazioni: <b>{_esc(secret[:6])}</b></div>"]
-    if not d["progetti"]:
-        parts.append("<div class='empty'>Nessun progetto Claude ancora: una sessione lo registra con sessione_segna o progetto_segna(tipo=\"codice\").</div>")
-    parts.append("<div class='grid'>")
     for c in d["progetti"]:
-        cls = "wait" if c["aspetta"] else {"in pausa": "pause", "finito": "done"}.get(c["stato"], "")
-        parts.append(f"<div class='card {cls}'><div class='name'>{_esc(c['nome'])}</div>")
-        tag = "<span class='tag wait'>ASPETTA TE</span>" if c["aspetta"] else f"<span class='tag'>{_esc(c['stato'])}</span>"
-        tipo = f"<span class='tag'>{_esc(c['tipo'])}</span>" if c["tipo"] else ""
-        parts.append(f"<div class='meta'>{tag}{tipo}{_esc(c['da'])}</div>")
-        if c["stato"] == "in corso" and any(s["stato"] == "in corso" for s in c["sessioni"]):
-            parts.append("<div class='bar'><i></i></div>")
-        if c["dove_sono"]:
-            parts.append(f"<p>{_esc(c['dove_sono'])}</p>")
-        if c["prossimo_passo"]:
-            parts.append(f"<p><b>Prossimo:</b> {_esc(c['prossimo_passo'])}</p>")
-        for s in c["sessioni"]:
-            parts.append(f"<div class='sess'><b>{_esc(s['nome'])}</b> · {_esc(s['stato'])} · {_esc(s['da'])}<br>{_esc(s['dove_sono'])}")
-            if s.get("domanda_per_ema"):
-                parts.append(f"<div class='q'>{_esc(s['domanda_per_ema'])}</div>")
-            parts.append("</div>")
-        if c["materiali"]:
-            links = " · ".join(f"<a href='{_esc(_safe_link(m['link']))}' target='_blank' rel='noopener noreferrer'>{_esc(m['titolo'])}</a>"
-                               for m in c["materiali"][-4:] if _safe_link(m["link"]))
-            if links:
-                parts.append(f"<p class='meta'>{links}</p>")
-        parts.append("</div>")
-    parts.append("</div>")
-    if d["sessioni_senza_progetto"]:
-        parts.append("<h1 style='margin-top:20px'>Sessioni senza progetto</h1><div class='grid'>")
-        for s in d["sessioni_senza_progetto"]:
-            cls = "wait" if s["stato"] == "aspetta Ema" else ""
-            parts.append(f"<div class='card {cls}'><div class='name'>{_esc(s['nome'])}</div><div class='meta'>{_esc(s['stato'])} · {_esc(s['da'])}</div><p>{_esc(s['dove_sono'])}</p>")
-            if s.get("domanda_per_ema"):
-                parts.append(f"<div class='q'>{_esc(s['domanda_per_ema'])}</div>")
-            parts.append("</div>")
-        parts.append("</div>")
-    parts.append("</body></html>")
-    return "".join(parts)
+        if c.get("materiali"):
+            c["materiali_html"] = " · ".join(
+                f"<a href='{_esc(_safe_link(m['link']))}' target='_blank' rel='noopener noreferrer'>{_esc(m['titolo'])}</a>"
+                for m in c["materiali"][-4:] if _safe_link(m["link"]))
+    return pagine.dashboard(d, tutti, secret[:6])
 
 
 # ---------------------------------------------------------------- app ASGI
@@ -1501,13 +1443,7 @@ def _otp_verifica(codice: str) -> bool:
 
 
 def _otp_html(msg: str = "") -> str:
-    return ("<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            f"<meta name=\"robots\" content=\"noindex\"><title>Segretario · codice</title><style>{MANAGER_CSS}</style></head><body><main>"
-            "<h1>Segretario</h1><p class=\"sub\">Ti ho mandato un codice di 6 cifre su Telegram. Scrivilo qui: questo browser resta fidato per sempre (o quasi: i browser ricordano al massimo 400 giorni).</p>"
-            + (f'<div class="err">{_esc(msg)}</div>' if msg else "")
-            + '<div class="card"><form method="post" class="row"><input type="text" name="codice" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="123456" aria-label="codice" autofocus>'
-            '<button type="submit" name="azione" value="verifica">Entra</button><button type="submit" name="azione" value="rimanda" class="quiet">Rimanda il codice</button></form></div>'
-            "</main></body></html>")
+    return pagine.codice(msg)
 
 
 async def _gate(request):
@@ -1641,37 +1577,21 @@ async def trascrivi_endpoint(request):
 
 # ---------------------------------------------------------------- manager (le chiavi, senza terminale)
 MANAGER_KEYS = [
-    # (chiave, etichetta, spiegazione, tipo)
-    ("GROQ_API_KEY", "Chiave Groq", "Vocali in testo (WhatsApp, Instagram, Telegram). Gratis: console.groq.com > API Keys. Inizia con gsk_", "password"),
-    ("BRIEF_ORA", "Brief del mattino", "Ora del riepilogo su Telegram, es. 07:30. Vuoto = spento", "text"),
-    ("CALENDAR_ICS_URL", "Calendari (iCal segreti)", "Per gli eventi nel brief: un indirizzo per riga, tutti i calendari che vuoi (personale, lavoro, Stostudio...). Dove si trova: Google Calendar sul PC > ingranaggio > Settings > il calendario a sinistra > Integrate calendar > 'Secret address in iCal format'. Salva sostituisce la lista con quello che vedi qui", "textarea"),
-    ("POSTINO_DB", "Database di Postino (email nel brief)", "Percorso dentro il container, lo scrive il server: /postino/postino.db. Vuoto = niente email nel brief", "text"),
-    ("TELEGRAM_BOT_TOKEN", "Token del bot Telegram", "Da BotFather. Dopo averlo messo, scrivi /start <codice> al bot", "password"),
-    ("LINKS_STATS_KEY", "Chiave del link manager", "La riga di STATS-KEY.txt del repo links: accende i DM Instagram", "password"),
-    ("LINKS_API_URL", "URL del link manager", "Di solito https://links-tracker.ezamboni96.workers.dev", "text"),
-    ("TELEGRAM_PROPOSTE", "Proposte su Telegram", "1 = le regole proposte arrivano sul telefono con i bottoni. Vuoto = no (si approvano in chat)", "text"),
-    ("OPENAI_API_KEY", "Chiave OpenAI", "Riserva per la trascrizione se Groq non c'è", "password"),
-    ("ROUTINE_FIRE_URL", "URL /fire del task on demand", "Da claude.ai (task con trigger API): i messaggi Telegram vanno a Claude", "text"),
-    ("ROUTINE_FIRE_TOKEN", "Token del task on demand", "Dallo stesso dialogo", "password"),
-    ("KEEP_MCP_URL", "URL di Keep (interno)", "Lo scrive il server da solo; cambialo solo se sai cosa fai", "text"),
-    ("KEEP_MCP_HOST", "Host di Keep", "postino.emazamboni.com", "text"),
+    # (chiave, etichetta, spiegazione, tipo, sezione, icona)
+    ("GROQ_API_KEY", "Vocali in testo", "Trasforma in testo i vocali di WhatsApp, Instagram e Telegram. Serve una chiave gratuita di Groq (il servizio che fa la trascrizione): console.groq.com > API Keys > Create API Key, inizia con gsk_", "password", "Riepilogo e vocali", "mic"),
+    ("BRIEF_ORA", "Riepilogo del mattino", "L'ora del messaggio su Telegram, es. 07:30. Vuoto = spento", "text", "Riepilogo e vocali", "sunrise"),
+    ("CALENDAR_ICS_URL", "Calendari", "Gli eventi del giorno nel riepilogo: un indirizzo per riga, tutti i calendari che vuoi. Dove si trova: Google Calendar sul PC > ingranaggio > Settings > il calendario a sinistra > Integrate calendar > Secret address in iCal format. Salva sostituisce la lista con quello che vedi qui", "textarea", "Riepilogo e vocali", "calendar"),
+    ("POSTINO_DB", "Email nel riepilogo", "Le email importanti non lette, prese da Postino. Lo imposta il server da solo (/postino/postino.db). Vuoto = niente email nel riepilogo", "text", "Riepilogo e vocali", "mail"),
+    ("TELEGRAM_BOT_TOKEN", "Bot Telegram", "Il token del bot, da BotFather. Dopo averlo messo, scrivi /start e il codice al bot", "password", "Telegram", "telegram"),
+    ("TELEGRAM_PROPOSTE", "Regole proposte sul telefono", "1 = ogni regola proposta arriva su Telegram con i bottoni. Vuoto = no: le approvi in chat con il codice", "text", "Telegram", "telegram"),
+    ("LINKS_STATS_KEY", "Instagram", "Accende i messaggi Instagram: la chiave del tuo link manager (il contenuto del file STATS-KEY.txt nel repo links)", "password", "Instagram e link manager", "instagram"),
+    ("LINKS_API_URL", "Indirizzo del link manager", "Di solito https://links-tracker.ezamboni96.workers.dev", "text", "Instagram e link manager", "link"),
+    ("OPENAI_API_KEY", "Vocali: riserva OpenAI", "Usata solo se la chiave Groq manca", "password", "Avanzate", "mic"),
+    ("ROUTINE_FIRE_URL", "Messaggi Telegram a Claude: indirizzo", "L'indirizzo /fire del task \"on demand\" su claude.ai: i messaggi che scrivi al bot vanno a Claude", "text", "Avanzate", "chat"),
+    ("ROUTINE_FIRE_TOKEN", "Messaggi Telegram a Claude: token", "Dallo stesso dialogo del task", "password", "Avanzate", "chat"),
+    ("KEEP_MCP_URL", "Keep: indirizzo interno", "Lo scrive il server da solo; cambialo solo se sai cosa fai", "text", "Avanzate", "sticky"),
+    ("KEEP_MCP_HOST", "Keep: host", "postino.emazamboni.com", "text", "Avanzate", "sticky"),
 ]
-
-MANAGER_CSS = """
-:root{color-scheme:light dark;--bg:#f6f5f0;--card:#fff;--ink:#1d1d1b;--mut:#6b6a63;--ok:#2e7d32;--no:#b26a00;--line:#e3e1d8;--acc:#1f5fbf}
-@media(prefers-color-scheme:dark){:root{--bg:#161614;--card:#222220;--ink:#efede6;--mut:#a09e95;--line:#34332f;--acc:#7fb0ff}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
-main{max-width:720px;margin:0 auto}h1{font-size:22px;margin:8px 0 2px}p.sub{color:var(--mut);margin:0 0 18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 12px}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.k{font-weight:600}.tag{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
-.on{color:var(--ok);border-color:var(--ok)}.off{color:var(--no);border-color:var(--no)}.hint{color:var(--mut);font-size:14px;margin:4px 0 8px}
-input[type=text],input[type=password]{flex:1 1 220px;min-width:0;font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)}
-button{font:inherit;padding:9px 14px;border-radius:10px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
-button.quiet{background:transparent;color:var(--acc)}.ok{background:#e8f5e9;color:#1b5e20;border-radius:10px;padding:10px 12px;margin-bottom:12px}
-.err{background:#fff3e0;color:#7a4100;border-radius:10px;padding:10px 12px;margin-bottom:12px}.stato{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:15px}
-@media(max-width:480px){.stato{grid-template-columns:1fr}}a{color:var(--acc)}
-"""
-
 
 def _wa_url() -> str:
     tok = os.environ.get("WHATSAPP_TOKEN", "").strip()
@@ -1680,39 +1600,24 @@ def _wa_url() -> str:
 
 def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
     st = stato()
-    base = f"https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}"
-    rows = []
-    for key, label, hint, kind in MANAGER_KEYS:
+    sezioni: dict[str, tuple[str, list[dict]]] = {}
+    for key, label, hint, kind, sezione, icona in MANAGER_KEYS:
         is_set = bool(os.environ.get(key, "").strip())
-        shown = _esc(os.environ.get(key, "")) if kind in ("text", "textarea") and is_set else ""
+        shown = ""
         if kind == "textarea" and key == "CALENDAR_ICS_URL":
             shown = _esc("\n".join(fonti.calendari(os.environ.get(key, ""))))
-        rows.append(
-            f'<div class="card"><div class="row"><span class="k">{_esc(label)}</span>'
-            f'<span class="tag {"on" if is_set else "off"}">{"impostata" if is_set else "non impostata"}</span></div>'
-            f'<div class="hint">{_esc(hint)}</div>'
-            f'<form method="post" class="row"><input type="hidden" name="chiave" value="{key}">'
-            + (f'<textarea name="valore" rows="4" placeholder="un indirizzo per riga" style="flex:1 1 220px;min-width:0;font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)">{shown}</textarea>'
-               if kind == "textarea" else
-               f'<input type="{kind}" name="valore" value="{shown}" placeholder="{"lascia vuoto e premi Cancella per togliere" if is_set else "incolla qui"}" autocomplete="off">')
-            +             f'<button type="submit" name="azione" value="salva">Salva</button>'
-            + (f'<button type="submit" name="azione" value="cancella" class="quiet">Cancella</button>' if is_set else "")
-            + "</form></div>")
-    stato_rows = [
-        ("Telegram", st["telegram"]), ("Brief del mattino", st["brief_ora"]),
-        ("Trascrizione vocali", "attiva" if st["trascrizione"] else "spenta"), ("Instagram DM", "attivi" if st["instagram"] else "spenti"),
-        ("Keep (per il brief)", "collegato" if st["keep"] else "non collegato"), ("Regole", st["regole"]),
+        elif kind == "text" and is_set:
+            shown = _esc(os.environ.get(key, ""))
+        sezioni.setdefault(sezione, (icona, []))[1].append({
+            "key": key, "label": label, "hint": hint, "kind": kind, "is_set": is_set, "shown": shown, "icona": icona,
+            "placeholder": "un indirizzo per riga" if kind == "textarea" else ("lascia vuoto e premi Togli per cancellare" if is_set else "incolla qui")})
+    stato_righe = [
+        ("Telegram", st["telegram"]), ("Riepilogo del mattino", st["brief_ora"]),
+        ("Vocali in testo", "attivi" if st["trascrizione"] else "spenti"), ("Instagram", "attivo" if st["instagram"] else "spento"),
+        ("Keep (per il riepilogo)", "collegato" if st["keep"] else "non collegato"), ("Regole", st["regole"]),
         ("Proposte in attesa", st["proposte_in_attesa"]), ("Richieste aperte", st["richieste_aperte"]),
     ]
-    return ("<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            f"<meta name=\"robots\" content=\"noindex\"><title>Segretario · manager</title><style>{MANAGER_CSS}</style></head><body><main>"
-            "<h1>Segretario · manager</h1><p class=\"sub\">Le chiavi e gli interruttori del Segretario. I valori non escono mai da qui.</p>"
-            + (f'<div class="ok">{_esc(msg_ok)}</div>' if msg_ok else "") + (f'<div class="err">{_esc(msg_err)}</div>' if msg_err else "")
-            + '<div class="card"><div class="stato">' + "".join(f"<div><span class=\"k\">{_esc(a)}</span>: {_esc(str(b))}</div>" for a, b in stato_rows) + "</div>"
-            + f'<div class="hint" style="margin-top:8px">Cruscotto: <a href="{base}/cruscotto">{base}/cruscotto</a> · codice di approvazione: {secret[:6]}</div>'
-            + (f'<div class="hint">WhatsApp (stato, QR per collegare il telefono): <a href="{_wa_url()}/stato">{_wa_url()}/stato</a></div>' if _wa_url() else "")
-            + "</div>"
-            + "".join(rows) + "</main></body></html>")
+    return pagine.impostazioni([(sez, ic, righe) for sez, (ic, righe) in sezioni.items()], stato_righe, msg_ok, msg_err)
 
 
 # ---------------------------------------------------------------- hub: tutto in una pagina
@@ -1721,20 +1626,20 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
 # relativi (manager, cruscotto, whatsapp) così funzionano in tutti e due i modi.
 HUB_FISSI = [
     ("Segretario", [
-        ("Manager", "manager", "Chiavi e interruttori: vocali, calendari, brief, Telegram, link manager"),
-        ("Cruscotto", "cruscotto", "I progetti Claude: gialli quando aspettano te"),
-        ("WhatsApp", "whatsapp", "Stato del collegamento e QR per il telefono"),
-        ("Progetto Secretary", "https://claude.ai/project/01a19e2e-2434-76f8-b630-c7fb371b6d25", "La chat del Segretario su claude.ai"),
+        ("Impostazioni", "manager", "Chiavi e interruttori", "settings", "acc"),
+        ("Claude Dashboard", "cruscotto", "I progetti Claude, gialli quando aspettano te", "dashboard", "acc"),
+        ("WhatsApp", "whatsapp", "Stato del telefono e QR", "whatsapp", "wa"),
+        ("Secretary", "https://claude.ai/project/01a19e2e-2434-76f8-b630-c7fb371b6d25", "La chat del Segretario", "chat", "acc"),
     ]),
     ("Posta e social", [
-        ("Postino", "https://postino.emazamboni.com", "Le tue email, tutte le caselle"),
-        ("Link manager", "https://links.emazamboni.com/admin/", "Link, DM Instagram, post su TikTok/YouTube/Instagram, analytics"),
-        ("Pagina link", "https://emazamboni.com/links", "La pagina pubblica con i prodotti"),
+        ("Postino", "https://postino.emazamboni.com", "Tutte le tue caselle", "postino", ""),
+        ("Link manager", "https://links.emazamboni.com/admin/", "Link, DM Instagram, post e analytics", "links", ""),
+        ("Pagina link", "https://emazamboni.com/links", "La pagina pubblica dei prodotti", "link", "acc"),
     ]),
     ("Le mie app", [
-        ("EASY RAVE", "https://easyrave.com", "Groovebox nel browser"),
-        ("EASY REMOTE", "https://easy-remote.pages.dev", "Gioca al PC da telefono e Mac"),
-        ("Stostudio", "https://stostudio.it", "Il sito dello studio"),
+        ("EASY RAVE", "https://easyrave.com", "Groovebox nel browser", "easyrave", ""),
+        ("EASY REMOTE", "https://easy-remote.pages.dev", "Il PC da telefono e Mac", "gamepad", "acc"),
+        ("Stostudio", "https://stostudio.it", "Il sito dello studio", "stostudio", ""),
     ]),
 ]
 
@@ -1776,39 +1681,14 @@ def hub_link_togli(nome: str) -> dict:
     return {"tolto": n}
 
 
-HUB_CSS = MANAGER_CSS + """
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-a.tile{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 12px;text-decoration:none;color:var(--ink);min-height:96px}
-a.tile:active{transform:scale(.98)}a.tile .n{font-weight:700;font-size:17px;display:block;margin-bottom:4px}a.tile .d{color:var(--mut);font-size:13px;line-height:1.3}
-h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:18px 0 8px}
-.code{display:inline-block;font:700 22px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:3px;padding:8px 12px;border:1px dashed var(--line);border-radius:10px}
-"""
-
-
 def hub_html() -> str:
     with lock:
         extra = _hub_extra()
     st = stato()  # fuori dal lock: stato() lo prende da solo
-    groups: dict[str, list[tuple[str, str, str]]] = {g: list(items) for g, items in HUB_FISSI}
+    groups: dict[str, list[tuple[str, str, str, str, str]]] = {g: list(items) for g, items in HUB_FISSI}
     for x in extra:
-        groups.setdefault(x.get("gruppo") or "Le mie app", []).append((x["nome"], x["url"], x.get("nota", "")))
-    parts = ['<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
-             f'<meta name="robots" content="noindex"><title>Hub di Ema</title><style>{HUB_CSS}</style></head><body><main>',
-             '<h1>Hub</h1><p class="sub">Tutto quello che ti serve, in un posto. Pagina privata.</p>']
-    for g, items in groups.items():
-        parts.append(f"<h2>{_esc(g)}</h2><div class=\"grid\">")
-        for nome, url, nota in items:
-            href = _esc(url) if url.startswith("https://") else url  # relativo: manager, cruscotto, whatsapp
-            parts.append(f'<a class="tile" href="{href}"><span class="n">{_esc(nome)}</span><span class="d">{_esc(nota)}</span></a>')
-        parts.append("</div>")
-    tele = st.get("telegram", "")
-    parts.append('<h2>Da sapere</h2><div class="card">'
-                 f'<p>Codice di approvazione delle regole (lo chiede il Segretario in chat): <span class="code">{secret[:6]}</span></p>'
-                 f'<p class="hint">Telegram: {_esc(str(tele))}. Un solo messaggio al giorno, il brief delle {_esc(str(st.get("brief_ora")))}. '
-                 'Comandi: /brief, /spesa, /stato.</p>'
-                 '<p class="hint">Per aggiungere un pulsante qui basta dirlo al Segretario in chat ("aggiungi all\'hub il sito X, indirizzo https://...").</p></div>')
-    parts.append("</main></body></html>")
-    return "".join(parts)
+        groups.setdefault(x.get("gruppo") or "Le mie app", []).append((x["nome"], x["url"], x.get("nota", ""), "globe", "acc"))
+    return pagine.hub(list(groups.items()), st, secret[:6])
 
 
 async def hub_page(request):
@@ -1851,7 +1731,7 @@ async def manager_page(request):
         else:
             changed, err = _config_set({key: value})
             if not err:
-                label = next((l for k, l, _, _ in MANAGER_KEYS if k == key), key)
+                label = next((l for k, l, *_ in MANAGER_KEYS if k == key), key)
                 ok = f"{label}: {'cancellata' if not value.strip() else 'salvata'}."
     return HTMLResponse(manager_html(ok, err or ""), headers={
         "Cache-Control": "no-store", "Content-Security-Policy": MANAGER_CSP, "Referrer-Policy": "no-referrer",

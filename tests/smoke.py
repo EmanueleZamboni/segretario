@@ -180,7 +180,7 @@ def main() -> None:
         with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/{secret}/cruscotto", timeout=5) as r:
             html = r.read().decode("utf-8")
             csp = r.headers.get("Content-Security-Policy", "")
-        assert r.status == 200 and "Progetti Claude" in html and "EASY RAVE" in html and "ASPETTA TE" in html, html[:300]
+        assert r.status == 200 and "Claude Dashboard" in html and "EASY RAVE" in html and "ASPETTA TE" in html, html[:300]
         assert "default-src 'none'" in csp and "&#x27;" not in html.split("<style>")[0], "CSP e escaping"
         assert "Video Match" not in html, "un video non è un progetto Claude: non va sul cruscotto"
         with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/{secret}/cruscotto?tutti=1", timeout=5) as r:

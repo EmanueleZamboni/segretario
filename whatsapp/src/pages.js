@@ -78,39 +78,56 @@ export async function statusPage({ wa, store, transcription, notice }) {
 ${waiting ? '<meta http-equiv="refresh" content="5">' : ''}
 <title>WhatsApp del Segretario</title>
 <style>
-  :root { color-scheme: light dark; --fg: #1a1a1a; --bg: #f6f6f4; --card: #fff; --muted: #6b6b6b; --line: #e3e3df; --accent: #1f7a4d; }
-  @media (prefers-color-scheme: dark) { :root { --fg: #ececec; --bg: #161616; --card: #202020; --muted: #9a9a9a; --line: #333; --accent: #3ccf7a; } }
-  * { box-sizing: border-box; }
-  body { margin: 0; padding: 24px 16px; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
-  main { max-width: 480px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 16px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 6px 0; vertical-align: top; border-bottom: 1px solid var(--line); }
-  tr:last-child th, tr:last-child td { border-bottom: 0; }
-  th { font-weight: 500; color: var(--muted); width: 38%; }
-  .muted { color: var(--muted); }
-  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; background: var(--muted); }
-  .dot.ok { background: var(--accent); } .dot.wait { background: #e0a800; } .dot.off { background: #c0392b; }
-  .qr { display: block; margin: 12px auto; border-radius: 8px; background: #fff; padding: 8px; }
-  form { display: inline-block; margin: 8px 8px 0 0; }
-  button { font: inherit; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
-  button.secondary { background: transparent; color: var(--fg); border-color: var(--line); }
-  button.danger { background: #c0392b; border-color: #c0392b; }
-  .notice { padding: 10px 12px; border-radius: 8px; background: var(--card); border: 1px solid var(--accent); margin-bottom: 16px; }
-  p { margin: 8px 0; }
+  /* Stesso sistema di design del Segretario (pagine.py): superficie grigio caldo, inchiostro grafite, accento indaco. */
+  :root{color-scheme:light dark;--bg:#ECEBE6;--surface:#F8F7F3;--surface-2:#FFFFFF;--edge:#CFCEC6;--line:#DDDCD5;--ink:#16161A;--muted:#6B6B72;--accent:#4B4EDB;--accent-ink:#FFFFFF;--ok:#2E9E5B;--warn:#D9822B;--bad:#D14343;--wa:#25D366}
+  @media(prefers-color-scheme:dark){:root{--bg:#141416;--surface:#1E1E22;--surface-2:#26262B;--edge:#0C0C0E;--line:#2E2E34;--ink:#F1F0EC;--muted:#9A9AA2;--accent:#8D8FFF;--accent-ink:#101218}}
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 16px 48px;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+  main{max-width:720px;margin:0 auto}
+  .top{display:flex;align-items:center;gap:12px;padding:14px 0 10px;position:sticky;top:0;background:var(--bg)}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font-weight:800}
+  .brand .mark{width:30px;height:30px;border-radius:9px;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-size:15px;font-weight:900}
+  .nav{margin-left:auto;display:flex;gap:6px}
+  .nav a{text-decoration:none;color:var(--muted);font-size:14px;font-weight:600;padding:7px 11px;border-radius:999px}
+  .nav a[aria-current]{background:var(--ink);color:var(--bg)}
+  h1{font-size:26px;line-height:1.15;letter-spacing:-.02em;font-weight:800;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 12px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+  .rows{display:flex;flex-direction:column}
+  .row{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row .k{flex:none;width:38%;color:var(--muted);font-size:14px}
+  .row .v{flex:1;min-width:0;overflow-wrap:anywhere}
+  .muted{color:var(--muted)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;background:var(--muted);vertical-align:middle}
+  .dot.ok{background:var(--ok);animation:breathe 2.4s ease-out infinite}
+  .dot.wait{background:var(--warn)} .dot.off{background:var(--bad)}
+  @keyframes breathe{0%{box-shadow:0 0 0 0 rgba(46,158,91,.45)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  @media(prefers-reduced-motion:reduce){.dot.ok{animation:none}}
+  .qr{display:block;margin:14px auto;border-radius:14px;background:#fff;padding:10px;box-shadow:0 3px 0 var(--edge)}
+  form{display:inline-block;margin:6px 8px 0 0}
+  button{font:inherit;font-weight:650;padding:11px 16px;border-radius:12px;border:1px solid var(--wa);background:var(--wa);color:#0b2e17;cursor:pointer;box-shadow:0 2px 0 #178f45}
+  button:active{transform:translateY(2px);box-shadow:none}
+  button.secondary{background:transparent;color:var(--ink);border-color:var(--line);box-shadow:0 2px 0 var(--edge)}
+  button.danger{background:var(--bad);border-color:var(--bad);color:#fff;box-shadow:0 2px 0 #9b2b2b}
+  .notice{padding:12px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--accent);margin-bottom:12px;font-weight:600}
+  p{margin:8px 0}
+  pre{white-space:pre-wrap;word-break:break-word;font-size:12px;color:var(--muted);background:var(--surface-2);padding:10px;border-radius:10px}
+  details.diag summary{cursor:pointer;color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
 <main>
-<h1>WhatsApp del Segretario</h1>
+<div class="top"><a class="brand" href="https://hub.emazamboni.com"><span class="mark">S</span>Segretario</a><nav class="nav"><a href="https://hub.emazamboni.com">Hub</a><a aria-current="page">WhatsApp</a></nav></div>
+<h1>WhatsApp</h1>
+<p class="sub">Il telefono collegato al Segretario, come WhatsApp Web.</p>
 ${notice ? `<div class="notice">${esc(notice)}</div>` : ''}
-<div class="card"><table>
-${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('\n')}
-</table></div>
+<div class="card"><div class="rows">
+${rows.map(([k, v]) => `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('\n')}
+</div></div>
 <div class="card">${action || '<p class="muted">Questa copia è in sola lettura: un\'altra copia del connettore possiede la connessione.</p>'}</div>
-<p class="muted">Questa pagina è privata: l\'indirizzo contiene il segreto, non condividerlo.</p>
-${diag ? `<details><summary>Diagnostica (ultime righe del log)</summary><pre>${esc(diag)}</pre></details>` : ''}
+<p class="muted">Pagina privata: l\'indirizzo contiene il segreto, non condividerlo.</p>
+${diag ? `<details class="diag"><summary>Diagnostica (ultime righe del log)</summary><pre>${esc(diag)}</pre></details>` : ''}
 </main>
 </body>
 </html>

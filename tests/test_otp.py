@@ -38,7 +38,7 @@ def main():
     os.environ["TELEGRAM_BOT_TOKEN"] = "TOKEN"  # così apply_config (dopo un salvataggio) tiene il bot finto
     c = TestClient(server.app, base_url="http://testserver")
     r = c.get(f"/{s}/manager")
-    assert r.status_code == 401 and "codice di 6 cifre" in r.text and "Chiave Groq" not in r.text
+    assert r.status_code == 401 and "6 cifre" in r.text and "Chiave Groq" not in r.text
     sent = [p["text"] for m, p in bot.calls if m == "sendMessage"]
     assert len(sent) == 1 and "Codice per aprire" in sent[0]
     code = sent[0].split("<b>")[1].split("</b>")[0]
@@ -51,11 +51,11 @@ def main():
     r = c.post(f"/{s}/manager", data={"azione": "verifica", "codice": code}, follow_redirects=False)
     assert r.status_code == 303 and server.DEVICE_COOKIE in r.headers.get("set-cookie", "")
     assert "HttpOnly" in r.headers["set-cookie"] and f"Path={server.PUBLIC_PREFIX}/{s}" in r.headers["set-cookie"]
-    assert c.get(f"/{s}/manager").status_code == 200 and "Chiave Groq" in c.get(f"/{s}/manager").text
+    assert c.get(f"/{s}/manager").status_code == 200 and "Vocali in testo" in c.get(f"/{s}/manager").text
     assert c.get(f"/{s}/cruscotto").status_code == 200
     # 4. il modulo del manager funziona ancora con il cookie
     r = c.post(f"/{s}/manager", data={"chiave": "BRIEF_ORA", "valore": "07:30", "azione": "salva"})
-    assert r.status_code == 200 and "Brief del mattino: salvata" in r.text
+    assert r.status_code == 200 and "Riepilogo del mattino: salvata" in r.text
     # 5. un altro browser (senza cookie) resta fuori; il codice usato non vale più; dopo 5 errori serve un codice nuovo
     c2 = TestClient(server.app, base_url="http://testserver")
     assert c2.get(f"/{s}/manager").status_code == 401

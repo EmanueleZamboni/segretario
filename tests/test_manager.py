@@ -25,18 +25,18 @@ def main():
     # 1. la pagina esiste solo con il segreto, non ha script, elenca le chiavi
     assert c.get("/nope/manager").status_code in (404, 405)
     r = c.get(f"/{s}/manager")
-    assert r.status_code == 200 and "<script" not in r.text and "Chiave Groq" in r.text and "non impostata" in r.text
+    assert r.status_code == 200 and "<script" not in r.text and "Vocali in testo" in r.text and "da impostare" in r.text
     assert "form-action 'self'" in r.headers["content-security-policy"]
     # 2. salvare una chiave dal modulo: validata, applicata, mai mostrata se è una password
     r = c.post(f"/{s}/manager", data={"chiave": "GROQ_API_KEY", "valore": "sbagliata", "azione": "salva"})
     assert "inizia con gsk_" in r.text and not os.environ.get("GROQ_API_KEY")
     r = c.post(f"/{s}/manager", data={"chiave": "GROQ_API_KEY", "valore": "gsk_provaprovaprova", "azione": "salva"})
-    assert "Chiave Groq: salvata" in r.text and os.environ["GROQ_API_KEY"] == "gsk_provaprovaprova" and "gsk_prova" not in r.text
+    assert "Vocali in testo: salvata" in r.text and os.environ["GROQ_API_KEY"] == "gsk_provaprovaprova" and "gsk_prova" not in r.text
     assert json.loads((DATA / "config.json").read_text())["GROQ_API_KEY"] == "gsk_provaprovaprova"
     r = c.post(f"/{s}/manager", data={"chiave": "BRIEF_ORA", "valore": "07:30", "azione": "salva"})
     assert 'value="07:30"' in r.text and server.stato()["brief_ora"] == "07:30"
     r = c.post(f"/{s}/manager", data={"chiave": "BRIEF_ORA", "valore": "", "azione": "cancella"})
-    assert "Brief del mattino: cancellata" in r.text and server.stato()["brief_ora"] == "spento"
+    assert "Riepilogo del mattino: cancellata" in r.text and server.stato()["brief_ora"] == "spento"
     r = c.post(f"/{s}/manager", data={"chiave": "SEGRETARIO_SECRET", "valore": "x", "azione": "salva"})
     assert "chiave sconosciuta" in r.text
     # 3. /trascrivi: 503 senza chiave, poi il testo con un trascrittore finto
