@@ -190,14 +190,6 @@ def hub(gruppi: list[tuple[str, list[tuple[str, str, str, str, str]]]], stato: d
     parts = ["<h1>Hub</h1><p class=\"sub\">Tutto in un posto. Pagina privata.</p>"]
     for titolo, items in gruppi:
         parts.append(f"<h2>{esc(titolo)}</h2><div class=\"keys\">" + "".join(key(*it) for it in items) + "</div>")
-    tele = str(stato.get("telegram", ""))
-    tele_on = tele == "collegato"
-    parts.append("<h2>Stato</h2><div class=\"card\"><div class=\"rows\">"
-                 f'<div class="row"><span class="ic" style="color:#26A5E4">{ICON["telegram"]}</span><div class="t"><b>Telegram</b><span>{esc(tele)}. Un solo messaggio al giorno, il riepilogo del mattino.</span></div><span class="pill {"on" if tele_on else "off"}">{"attivo" if tele_on else "da collegare"}</span></div>'
-                 f'<div class="row"><span class="ic">{ICON["sunrise"]}</span><div class="t"><b>Riepilogo del mattino</b><span>Calendario, oggi, se hai tempo, Claude aspetta te, email da leggere.</span></div><span class="pill {"on" if stato.get("brief_ora") not in (None, "", "spento") else "off"}">{esc(stato.get("brief_ora", "spento"))}</span></div>'
-                 f'<div class="row"><span class="ic">{ICON["mic"]}</span><div class="t"><b>Vocali in testo</b><span>WhatsApp, Instagram e Telegram.</span></div><span class="pill {"on" if stato.get("trascrizione") else "off"}">{"attivi" if stato.get("trascrizione") else "spenti"}</span></div>'
-                 f'<div class="row"><span class="ic">{ICON["calendar"]}</span><div class="t"><b>Calendari</b><span>Gli eventi del giorno nel riepilogo.</span></div><span class="pill {"on" if stato.get("calendario") else "off"}">{"collegati" if stato.get("calendario") else "da collegare"}</span></div>'
-                 "</div></div>")
     parts.append("<h2>Codice di approvazione</h2><div class=\"card\"><p>Quando il Segretario propone una regola, in chat scrivi \"approva\" e questo codice. Vale anche per \"approva tutte le regole proposte\".</p>"
                  f'<span class="code">{esc(codice)}</span>'
                  "<p class=\"muted\" style=\"margin-top:12px\">Per aggiungere un tasto qui: dillo al Segretario in chat, \"aggiungi all'hub il sito X, indirizzo https://...\".</p></div>")

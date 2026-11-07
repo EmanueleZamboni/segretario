@@ -1627,14 +1627,12 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
 HUB_FISSI = [
     ("Segretario", [
         ("Impostazioni", "manager", "Chiavi e interruttori", "settings", "acc"),
-        ("Claude Dashboard", "cruscotto", "I progetti Claude, gialli quando aspettano te", "dashboard", "acc"),
         ("WhatsApp", "whatsapp", "Stato del telefono e QR", "whatsapp", "wa"),
         ("Secretary", "https://claude.ai/project/01a19e2e-2434-76f8-b630-c7fb371b6d25", "La chat del Segretario", "chat", "acc"),
     ]),
     ("Posta e social", [
         ("Postino", "https://postino.emazamboni.com", "Tutte le tue caselle", "postino", ""),
         ("Link manager", "https://links.emazamboni.com/admin/", "Link, DM Instagram, post e analytics", "links", ""),
-        ("Pagina link", "https://emazamboni.com/links", "La pagina pubblica dei prodotti", "link", "acc"),
     ]),
     ("Le mie app", [
         ("EASY RAVE", "https://easyrave.com", "Groovebox nel browser", "easyrave", ""),
