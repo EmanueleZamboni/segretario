@@ -1434,7 +1434,7 @@ CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'n
 # manda un codice di 6 cifre su Telegram e lo chiede una volta: poi quel browser resta fidato 90 giorni (cookie).
 # Senza Telegram collegato il controllo non può esistere e la pagina si apre con il solo segreto.
 DEVICE_COOKIE = "seg_dispositivo"
-DEVICE_DAYS = 90
+DEVICE_DAYS = 400  # "a vita": i browser accettano al massimo 400 giorni per cookie, poi un codice nuovo
 _otp: dict = {"codice": "", "scade": 0.0, "tentativi": 0, "inviato": 0.0}
 
 
@@ -1485,7 +1485,7 @@ def _otp_verifica(codice: str) -> bool:
 def _otp_html(msg: str = "") -> str:
     return ("<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             f"<meta name=\"robots\" content=\"noindex\"><title>Segretario · codice</title><style>{MANAGER_CSS}</style></head><body><main>"
-            "<h1>Segretario</h1><p class=\"sub\">Ti ho mandato un codice di 6 cifre su Telegram. Scrivilo qui: questo browser resta fidato per 90 giorni.</p>"
+            "<h1>Segretario</h1><p class=\"sub\">Ti ho mandato un codice di 6 cifre su Telegram. Scrivilo qui: questo browser resta fidato per sempre (o quasi: i browser ricordano al massimo 400 giorni).</p>"
             + (f'<div class="err">{_esc(msg)}</div>' if msg else "")
             + '<div class="card"><form method="post" class="row"><input type="text" name="codice" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="123456" aria-label="codice" autofocus>'
             '<button type="submit" name="azione" value="verifica">Entra</button><button type="submit" name="azione" value="rimanda" class="quiet">Rimanda il codice</button></form></div>'

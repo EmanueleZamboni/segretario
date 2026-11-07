@@ -35,6 +35,7 @@ def main():
     # 2. con Telegram collegato: la prima apertura manda il codice e chiede di scriverlo
     bot = FakeTelegram("TOKEN", DATA, server.make_bot("x").hooks, chat_id="42", daily_cap=50, pair_code="abc123")
     server.bot = bot
+    os.environ["TELEGRAM_BOT_TOKEN"] = "TOKEN"  # così apply_config (dopo un salvataggio) tiene il bot finto
     c = TestClient(server.app, base_url="http://testserver")
     r = c.get(f"/{s}/manager")
     assert r.status_code == 401 and "codice di 6 cifre" in r.text and "Chiave Groq" not in r.text
