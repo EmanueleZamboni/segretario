@@ -1,5 +1,6 @@
 // Vocali -> testo, tramite il Segretario.
-// Quando arriva un vocale NUOVO (dal vivo, mai dalla storia) lo scarica e manda i byte a
+// Quando arriva un vocale NUOVO (dal vivo) lo scarica e manda i byte a
+// (i vocali vecchi si trascrivono su richiesta con request(), tool transcribe_voice)
 // POST ${SEGRETARIO_URL}/trascrivi con Content-Type = mime dell'audio. Il Segretario risponde
 // {"testo": "..."} (200) oppure {"errore": "..."} (400/503 quando non ha una chiave di trascrizione).
 // Se va bene il messaggio diventa "[vocale] <testo>" (e la ricerca lo trova); se no resta "12s".
@@ -52,6 +53,32 @@ export class Transcriber {
     return job;
   }
 
+  /**
+   * Trascrizione su richiesta di un vocale già salvato (anche vecchio). Stessa coda dei vocali nuovi.
+   * Ritorna { ok, text } oppure { ok: false, error } con il motivo in parole.
+   */
+  request(record) {
+    if (!this.enabled) return Promise.resolve({ ok: false, error: 'Vocali in testo spenti: manca la chiave nelle Impostazioni del Segretario (riga "Vocali in testo").' });
+    if (!record || record.type !== 'voice') return Promise.resolve({ ok: false, error: 'Non è un vocale.' });
+    if (!record.raw) return Promise.resolve({ ok: false, error: 'Di questo vocale non ho più l\'audio.' });
+    if (typeof record.text === 'string' && record.text.startsWith(TRANSCRIPT_PREFIX)) {
+      return Promise.resolve({ ok: true, text: record.text.slice(TRANSCRIPT_PREFIX.length), already: true });
+    }
+    const seconds = record.seconds || Number((/^(\d+)s$/.exec(record.text || '') || [])[1]) || 0;
+    if (seconds > this.maxSeconds) {
+      return Promise.resolve({ ok: false, error: `Vocale troppo lungo (${seconds}s, massimo ${this.maxSeconds}s).` });
+    }
+    const job = this.chain.then(async () => {
+      this.lastError = '';
+      const ok = await this.run(record);
+      if (!ok) return { ok: false, error: this.lastError || 'Trascrizione fallita.' };
+      const saved = this.store.message(record.chat, record.id);
+      return { ok: true, text: (saved?.text || '').slice(TRANSCRIPT_PREFIX.length) };
+    });
+    this.chain = job.catch(() => {});
+    return job;
+  }
+
   async run(record) {
     try {
       const buffer = await this.download(record.raw);
@@ -66,12 +93,14 @@ export class Transcriber {
       try { body = await res.json(); } catch { /* risposta non JSON: trattata sotto */ }
       if (!res.ok || typeof body?.testo !== 'string') {
         this.stats.failed++;
-        this.log(`trascrizione ${record.id} fallita: HTTP ${res.status}${body?.errore ? ` (${body.errore})` : ''}`);
+        this.lastError = `HTTP ${res.status}${body?.errore ? ` (${body.errore})` : ''}`;
+        this.log(`trascrizione ${record.id} fallita: ${this.lastError}`);
         return false;
       }
       const testo = body.testo.trim();
       if (!testo) {
         this.stats.failed++;
+        this.lastError = 'trascrizione vuota (silenzio?)';
         this.log(`trascrizione ${record.id} vuota`);
         return false;
       }
@@ -80,7 +109,8 @@ export class Transcriber {
       return ok;
     } catch (err) {
       this.stats.failed++;
-      this.log(`trascrizione ${record.id} fallita: ${err.name === 'TimeoutError' ? 'timeout' : err.message}`);
+      this.lastError = err.name === 'TimeoutError' ? 'timeout' : err.message;
+      this.log(`trascrizione ${record.id} fallita: ${this.lastError}`);
       return false;
     }
   }

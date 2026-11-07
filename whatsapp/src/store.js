@@ -251,6 +251,14 @@ export class Store {
     return rows.reverse();
   }
 
+  /** I vocali di una chat non ancora trascritti (hanno l'audio ma il testo è ancora "12s"), dal più recente. */
+  voiceNotesToTranscribe(chat, { limit = 1, before, after } = {}) {
+    return this.stmt(`
+      SELECT * FROM messages WHERE chat = ? AND type = 'voice' AND deleted = 0 AND raw IS NOT NULL
+        AND text NOT LIKE ? AND ts < ? AND ts > ? ORDER BY ts DESC LIMIT ?
+    `).all(this.canonical(chat), '[vocale] %', before ?? 2 ** 40, after ?? -1, limit);
+  }
+
   message(chat, id) {
     return this.stmt('SELECT * FROM messages WHERE chat = ? AND id = ?').get(chat, id);
   }

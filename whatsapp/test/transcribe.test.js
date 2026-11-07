@@ -97,3 +97,31 @@ test('voice notes are transcribed one at a time, in order', async () => {
   assert.deepEqual(order, ['A', 'B', 'C']);
   assert.equal(store.message(CHAT, 'B').text, '[vocale] B');
 });
+
+test('request(): an old voice note is transcribed on demand, a transcribed one is returned as is', async () => {
+  const fetch = reply(200, { testo: 'Porta il cavo HDMI' });
+  const { store, record, t } = setup({ fetch });
+  const old = store.message(CHAT, 'V1'); // riga del database, come la vede il tool (niente campo seconds)
+  assert.equal(old.text, '12s');
+  assert.deepEqual(store.voiceNotesToTranscribe(CHAT, { limit: 5 }).map(m => m.id), ['V1']);
+  const r = await t.request(old);
+  assert.deepEqual(r, { ok: true, text: 'Porta il cavo HDMI' });
+  assert.equal(store.message(CHAT, 'V1').text, '[vocale] Porta il cavo HDMI');
+  assert.deepEqual(store.voiceNotesToTranscribe(CHAT, { limit: 5 }), []);
+  const again = await t.request(store.message(CHAT, 'V1'));
+  assert.deepEqual(again, { ok: true, text: 'Porta il cavo HDMI', already: true });
+  assert.equal(t.stats.done, 1, 'una sola chiamata al Segretario');
+  void record;
+});
+
+test('request(): says why when it cannot (off, too long, no audio, server without key)', async () => {
+  const off = setup({ url: '' });
+  assert.match((await off.t.request(off.store.message(CHAT, 'V1'))).error, /Vocali in testo spenti/);
+  const long = setup({ fetch: reply(200, { testo: 'x' }), seconds: 2000 });
+  assert.match((await long.t.request(long.store.message(CHAT, 'V1'))).error, /troppo lungo/);
+  const nokey = setup({ fetch: reply(503, { errore: 'nessuna chiave di trascrizione' }) });
+  const r = await nokey.t.request(nokey.store.message(CHAT, 'V1'));
+  assert.equal(r.ok, false);
+  assert.match(r.error, /503/);
+  assert.match((await nokey.t.request({ type: 'voice', raw: null, text: '3s' })).error, /audio/);
+});

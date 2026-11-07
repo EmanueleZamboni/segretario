@@ -115,6 +115,22 @@ export function createServer(ctx) {
     annotations: { readOnlyHint: true, openWorldHint: true },
   }, wrap(args => tools.downloadMedia(args)));
 
+  server.registerTool('transcribe_voice', {
+    title: 'Transcribe voice notes',
+    description: 'Turns voice notes already received into text, on request (new ones are transcribed by themselves). '
+      + 'Give message_id for one voice note, or count for the latest untranscribed voice notes of the chat. '
+      + 'The text is saved, so read_messages and search_messages show it from then on. '
+      + `Needs the "Vocali in testo" key in the Segretario settings and a linked phone. ${UNTRUSTED}`,
+    inputSchema: {
+      chat: z.string().describe('Contact or group name, phone number (+39...), or chat id'),
+      message_id: z.string().optional().describe('The id at the end of the message line (one voice note)'),
+      count: z.number().int().min(1).max(20).optional().describe('Without message_id: how many of the latest untranscribed voice notes (default 1, max 20)'),
+      before: z.string().optional().describe('With count: only voice notes before this time'),
+      after: z.string().optional().describe('With count: only voice notes after this time'),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  }, wrap(args => tools.transcribeVoice(args)));
+
   server.registerTool('send_message', {
     title: 'Send WhatsApp message',
     description: 'Sends a text message from Ema\'s WhatsApp to a chat (contact, group, number or id). '
@@ -313,6 +329,31 @@ class Tools {
       content[0].text += '\n(Audio can\'t be played here; open the file to listen.)';
     }
     return { content };
+  }
+
+  async transcribeVoice({ chat, message_id, count = 1, before, after }) {
+    if (!this.transcriber?.enabled) {
+      throw new Error('Voice notes to text is off: put the key in the Segretario settings (row "Vocali in testo").');
+    }
+    const jid = await this.resolveChat(chat);
+    let rows;
+    if (message_id) {
+      const m = this.store.message(jid, message_id.replace(/^#/, ''));
+      if (!m) throw new Error(`No message ${message_id} in ${this.store.displayName(jid)}.`);
+      if (m.type !== 'voice') throw new Error(`Message ${message_id} is not a voice note.`);
+      rows = [m];
+    } else {
+      rows = this.store.voiceNotesToTranscribe(jid, { limit: count, before: parseTime(before, 'before'), after: parseTime(after, 'after') });
+      if (!rows.length) return text(`No untranscribed voice notes in ${this.store.displayName(jid)} for that period.`);
+      rows.reverse();
+    }
+    const lines = [];
+    for (const m of rows) {
+      const r = await this.transcriber.request(m);
+      if (r.ok) lines.push(this.formatMessage(this.store.message(m.chat, m.id)) + (r.already ? '  (already transcribed)' : ''));
+      else lines.push(`[${formatTime(m.ts)}] voice note #${m.id}: not transcribed (${r.error})`);
+    }
+    return text(lines.join('\n'));
   }
 
   async sendMessage({ chat, text: body }) {

@@ -87,7 +87,7 @@ test('MCP: initialize + tools/list over Streamable HTTP, token in the path or as
   res = await rpc(`${base}/mcp`, { authorization: `Bearer ${TOKEN}` }, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
   assert.equal(res.status, 200);
   const names = (await res.json()).result.tools.map(t => t.name).sort();
-  assert.deepEqual(names, ['download_media', 'find_contact', 'list_chats', 'read_messages', 'search_messages', 'send_message', 'whatsapp_status']);
+  assert.deepEqual(names, ['download_media', 'find_contact', 'list_chats', 'read_messages', 'search_messages', 'send_message', 'transcribe_voice', 'whatsapp_status']);
   assert.equal((await rpc(`${base}/mcp`, { authorization: 'Bearer nope' }, init)).status, 401);
   assert.equal((await fetch(`${base}/mcp/${TOKEN}`)).status, 405);
 });
