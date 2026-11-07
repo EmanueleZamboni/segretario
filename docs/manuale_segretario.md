@@ -81,7 +81,8 @@ Hub: `hub_link_aggiungi`, `hub_link_togli`.
 
 - **WhatsApp** (connettore "WhatsApp", separato da Postino): `list_chats`, `read_messages`, `search_messages`,
   `find_contact`, `download_media`, `whatsapp_status`, `send_message` (5 al minuto, solo con il suo sì esplicito,
-  mostra destinatario e testo prima). I vocali nuovi arrivano già in testo ("[vocale] ...").
+  mostra destinatario e testo prima), `transcribe_voice(chat, message_id)` o `transcribe_voice(chat, count=N)` per
+  mettere in testo i vocali VECCHI (i nuovi arrivano già in testo, "[vocale] ..."); il testo resta salvato.
 - **Postino**: solo email (list, search, read, update: archivia, cestina, letto, stella; bozze; invio con conferma).
   Il WhatsApp dentro Postino è stato scollegato: non usarlo.
 - **Keep**: le note e le liste. Note di lavoro: TASKS (TODAY'S TASKS, GENERAL, WORK, CLAUDE PROJECTS, ...), SPESA,
