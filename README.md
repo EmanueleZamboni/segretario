@@ -38,6 +38,12 @@ Così ogni chat parte già con le regole, senza tool call e senza dipendere dall
 | `proposta_decidi(id, approva, codice)` | applica la decisione di Ema: scrive nel file o scarta. Serve il codice di approvazione (in cima al cruscotto), che solo Ema conosce; senza codice si usano i bottoni Telegram |
 | `sessione_segna(nome, dove_sono, prossimo_passo, domanda_per_ema, stato, progetto)` | dove è arrivata una sessione (in corso, aspetta Ema, finita) |
 | `sessioni_lista(solo_aperte)` | tutte le sessioni, prima quelle che aspettano Ema |
+| `instagram_chat_lista(quante)` | le conversazioni Instagram (DM) più recenti, via il Worker del link manager |
+| `instagram_chat_leggi(conversazione, quanti)` | i messaggi di una conversazione, dal più vecchio; `from_me` = Ema |
+| `instagram_rispondi(destinatario_id, testo)` | DM di solo testo, dopo il sì di Ema in chat; entro 24 h dall'ultimo messaggio altrui |
+| `brief_testo()` | il brief del mattino fatto dal server (TASKS di oggi e SPESA per negozio da Keep, sessioni che aspettano, proposte, richieste, diario di ieri) |
+| `spesa_lista()` | le voci non spuntate di SPESA (= finite) per negozio: Lidl, Mercato agricolo, DM |
+| `spesa_negozio(prodotto, negozio)` | insegna dove Ema compra un prodotto (memoria/negozi.json) |
 | `sessione_chiudi(nome)` | segna una sessione come finita |
 | `progetto_segna(nome, dove_sono, prossimo_passo, stato, tipo, descrizione, alias)` | crea o aggiorna un progetto (video, app, lavoro, vita); gli alias servono a ritrovarlo con qualunque nome |
 | `progetto_leggi(nome)` | tutto il contesto di un progetto trovato per nome o alias: stato, materiali, documenti, righe del diario, sessioni |
@@ -104,6 +110,10 @@ Limite: `NOTIFY_DAILY_CAP` messaggi al giorno (60) per `notify` e le proposte; l
 `CADDY_NETWORK` (postino_default), `SEGRETARIO_PUBLIC_HOST` (postino.emazamboni.com), `MEMORIA_GIT_REMOTE`,
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `NOTIFY_DAILY_CAP`, `GROQ_API_KEY`, `OPENAI_API_KEY`, `ROUTINE_FIRE_URL`, `ROUTINE_FIRE_TOKEN`.
 `LINKS_API_URL` (Worker del link manager) e `LINKS_STATS_KEY` (la sua chiave Bearer) accendono i tool Instagram.
+`KEEP_MCP_URL` e `KEEP_MCP_HOST` (li scrive ops/run.sh di Various) fanno leggere Keep al server. `BRIEF_ORA` (HH:MM,
+vuoto = spento) fa partire il brief del mattino su Telegram dal server stesso, senza task di claude.ai; su Telegram
+ci sono anche `/brief` e `/spesa`. `TELEGRAM_PROPOSTE=1` manda le proposte di regola sul telefono (di default no:
+Telegram resta zitto, Ema approva in chat con il codice).
 Nel container: `SEGRETARIO_PUBLIC_PREFIX` (/segretario), `SEGRETARIO_EXTRA_HOSTS` (per i test),
 `SEGRETARIO_SECRET` (per imporre un segreto), `SEGRETARIO_TZ` (Europe/Rome), `PORT` (8766), `BIND`.
 
