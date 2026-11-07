@@ -233,16 +233,17 @@ class Telegram:
     def _command(self, text: str) -> str:
         cmd = text.split()[0].lower().split("@")[0]
         simple = {"/oggi": "diario", "/regole": "regole", "/coda": "coda", "/sessioni": "sessioni",
-                  "/progetti": "progetti", "/stato": "stato", "/brief": "brief", "/spesa": "spesa"}
+                  "/progetti": "progetti", "/stato": "stato", "/brief": "brief", "/spesa": "spesa",
+                  "/codice": "codice"}
         if cmd == "/start":
             self.send("Ci sono.", conta=False)
         elif cmd == "/aiuto":
             self.send("Scrivimi o mandami un vocale: lo passo a Claude e ti rispondo qui.\n"
-                      "/brief il riepilogo del mattino · /spesa cosa comprare, per negozio · /oggi diario · /regole · "
+                      "/codice per entrare in hub.emazamboni.com · /brief il riepilogo del mattino · /spesa cosa comprare, per negozio · /oggi diario · /regole · "
                       "/coda proposte in attesa · /sessioni · /progetti · /stato", conta=False)
         elif cmd in simple and simple[cmd] in self.hooks:
             try:
-                self.send(str(self.hooks[simple[cmd]]()), conta=False, html=simple[cmd] in ("brief", "spesa"))
+                self.send(str(self.hooks[simple[cmd]]()), conta=False, html=simple[cmd] in ("brief", "spesa", "codice"))
             except Exception as err:  # noqa: BLE001  (es. Keep non raggiungibile)
                 self.send(f"Non ci riesco adesso: {_clean(err)[:200]}", conta=False)
         else:

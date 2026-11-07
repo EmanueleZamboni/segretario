@@ -32,23 +32,28 @@ def main():
     # 1. senza Telegram: nessun secondo fattore possibile, la pagina si apre con il solo segreto
     c = TestClient(server.app, base_url="http://testserver")
     assert c.get(f"/{s}/manager").status_code == 200 and c.get(f"/{s}/cruscotto").status_code == 200
-    # 2. con Telegram collegato: aprire la pagina NON manda niente (la pagina è pubblica); il codice parte solo dal pulsante
+    # 2. con Telegram collegato: la pagina non manda MAI niente (è pubblica); il codice lo chiede Ema con /codice
     bot = FakeTelegram("TOKEN", DATA, server.make_bot("x").hooks, chat_id="42", daily_cap=50, pair_code="abc123")
     server.bot = bot
     os.environ["TELEGRAM_BOT_TOKEN"] = "TOKEN"  # così apply_config (dopo un salvataggio) tiene il bot finto
     c = TestClient(server.app, base_url="http://testserver")
     r = c.get(f"/{s}/manager")
-    assert r.status_code == 401 and "Mandami il codice" in r.text and "Chiave Groq" not in r.text
+    assert r.status_code == 401 and "/codice" in r.text and "Chiave Groq" not in r.text
     assert r.headers.get("x-robots-tag", "").startswith("noindex")
-    assert not [1 for m, p in bot.calls if m == "sendMessage"], "aprire la pagina non deve mandare codici"
-    r = c.post(f"/{s}/manager", data={"azione": "manda"})
-    sent = [p["text"] for m, p in bot.calls if m == "sendMessage"]
-    assert r.status_code == 401 and "Scrivi il codice" in r.text and len(sent) == 1 and "Codice per aprire" in sent[0]
-    code = sent[0].split("<b>")[1].split("</b>")[0]
+    for az in ("manda", "rimanda", "qualsiasi"):
+        assert c.post(f"/{s}/manager", data={"azione": az}).status_code == 401
+    assert not [1 for m, p in bot.calls if m == "sendMessage"], "la pagina non deve mandare codici, mai"
+    # senza un codice chiesto da Ema, nessun codice è giusto
+    assert c.post(f"/{s}/manager", data={"azione": "verifica", "codice": "000000"}).status_code == 401
+
+    def chiedi():
+        bot.handle({"message": {"message_id": 1, "chat": {"id": 42}, "from": {"id": 42}, "text": "/codice"}})
+        last = [p for m, p in bot.calls if m == "sendMessage"][-1]
+        assert "Codice per entrare" in last["text"] and last.get("parse_mode") == "HTML"
+        return last["text"].split("<b>")[1].split("</b>")[0]
+
+    code = chiedi()
     assert len(code) == 6 and code.isdigit()
-    r2 = c.get(f"/{s}/cruscotto")
-    assert r2.status_code == 401 and "Scrivi il codice" in r2.text and len(bot.calls) == 1
-    assert c.post(f"/{s}/cruscotto", data={"azione": "manda"}).status_code == 401 and len(bot.calls) == 1, "codice valido: non ne manda un altro"
     # 3. codice sbagliato, poi giusto: redirect, cookie, pagina aperta; il cookie vale anche per il cruscotto
     r = c.post(f"/{s}/manager", data={"azione": "verifica", "codice": "000000"})
     assert r.status_code == 401 and "sbagliato" in r.text
@@ -66,20 +71,14 @@ def main():
     assert c2.get(f"/{s}/cruscotto.json").status_code == 401, "i dati della dashboard non si leggono senza codice"
     assert c.get(f"/{s}/cruscotto.json").status_code == 200
     assert c2.post(f"/{s}/manager", data={"azione": "verifica", "codice": code}).status_code == 401
-    c2.post(f"/{s}/manager", data={"azione": "manda"})
-    new_code = [p["text"] for m, p in bot.calls if m == "sendMessage"][-1].split("<b>")[1].split("</b>")[0]
+    new_code = chiedi()
     assert new_code != code
     for _ in range(5):
         c2.post(f"/{s}/manager", data={"azione": "verifica", "codice": "111111"})
     assert c2.post(f"/{s}/manager", data={"azione": "verifica", "codice": new_code}).status_code == 401, "5 tentativi poi basta"
-    # 6. "rimanda" genera un codice nuovo; poi il tetto orario ferma chiunque
-    n = len(bot.calls)
-    c2.post(f"/{s}/manager", data={"azione": "rimanda"})
-    assert len(bot.calls) == n + 1
-    newest = bot.calls[-1][1]["text"].split("<b>")[1].split("</b>")[0]
+    # 6. un altro /codice ne fa uno nuovo che funziona
+    newest = chiedi()
     assert newest != new_code
-    r = c2.post(f"/{s}/manager", data={"azione": "rimanda"})
-    assert len(bot.calls) == n + 1 and "Troppi codici" in r.text, "3 codici in un'ora al massimo"
     r = c2.post(f"/{s}/manager", data={"azione": "verifica", "codice": newest}, follow_redirects=False)
     assert r.status_code == 303
     print("OTP OK")

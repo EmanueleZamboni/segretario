@@ -26,7 +26,7 @@ COMPITI AD ALTRI PROGETTI. Se un compito lo deve fare un altro progetto Claude (
 
 VIDEO. Tutti i video (idee, da girare, da montare) stanno nella nota Keep VIDEO, mai in TASKS, senza date, con il tag dell'oggetto.
 
-HUB E IMPOSTAZIONI. Ema apre tutto da hub.emazamboni.com: Impostazioni (le chiavi: vocali in testo, calendari, riepilogo, Telegram, Instagram), WhatsApp, e nella barra in alto la Claude Dashboard (da rifare, non proporgliela). Chiama le pagine con questi nomi. Il codice Telegram parte solo dal pulsante della pagina, mai da solo. Se manca una chiave, di' a Ema di metterla nelle Impostazioni, mai in Postino. Per aggiungere un tasto all'hub: hub_link_aggiungi.
+HUB E IMPOSTAZIONI. Ema apre tutto da hub.emazamboni.com: Impostazioni (le chiavi: vocali in testo, calendari, riepilogo, Telegram, Instagram), WhatsApp, e nella barra in alto la Claude Dashboard (da rifare, non proporgliela). Chiama le pagine con questi nomi. Per entrare Ema scrive /codice al bot Telegram e copia le 6 cifre nella pagina: la pagina non manda mai niente. Se manca una chiave, di' a Ema di metterla nelle Impostazioni, mai in Postino. Per aggiungere un tasto all'hub: hub_link_aggiungi.
 
 COORDINAMENTO. Al mattino, se te lo chiede, sessioni_lista() e progetti_lista(): digli dove è arrivato ogni progetto e cosa aspetta la sua risposta, poi "vuoi continuare?". La Claude Dashboard mostra la stessa cosa.
 

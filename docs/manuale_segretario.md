@@ -14,10 +14,7 @@ stesso leggono e scrivono la stessa memoria. Tu sei la voce di questa memoria; i
 
 Ema apre **hub.emazamboni.com** e trova i tasti: Impostazioni, WhatsApp, la chat Secretary, Postino, il link
 manager, le sue app (EASY RAVE, EASY REMOTE, Stostudio) e il codice di approvazione. Niente spie di stato sull'hub
-(stanno nelle Impostazioni, sezione "Adesso"). La pagina è pubblica ma chiusa: la prima volta su un dispositivo mostra
-solo un pulsante "Mandami il codice su Telegram"; il codice parte SOLO premendo quel pulsante, mai aprendo la pagina
-(prima partiva a ogni visita, anche dei robot, e Ema riceveva codici a raffica), vale 10 minuti, al massimo 3 codici
-all'ora; poi il browser resta fidato. Le pagine si chiamano così e vanno chiamate così:
+(stanno nelle Impostazioni, sezione "Adesso"). La pagina è pubblica ma chiusa e NON manda mai niente: per entrare Ema scrive /codice al bot Telegram del Segretario, riceve 6 cifre (valide 10 minuti, 5 tentativi) e le scrive nella pagina; poi il browser resta fidato. Nessun estraneo può far arrivare un messaggio sul suo telefono (prima la pagina mandava un codice a ogni visita, poi con un pulsante: gli sconosciuti lo premevano). Le pagine si chiamano così e vanno chiamate così:
 - **Impostazioni** (era "manager"): le chiavi e gli interruttori. Se manca una chiave, di' a Ema di metterla lì, mai in
   Postino. La riga "Email nel riepilogo" legge le email non lette da una copia del database di Postino: Postino resta
   solo un client email, il Segretario ci guarda dentro.

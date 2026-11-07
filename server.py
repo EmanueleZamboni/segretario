@@ -1283,6 +1283,7 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
         "decidi": _decidi,
         "brief": _brief_testo,
         "spesa": _spesa_testo,
+        "codice": _otp_nuovo,
     }
     if os.environ.get("ROUTINE_FIRE_URL", "").strip():
         hooks["fire"] = telegram_bot.fire_routine
@@ -1420,8 +1421,7 @@ CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'n
 # Senza Telegram collegato il controllo non può esistere e la pagina si apre con il solo segreto.
 DEVICE_COOKIE = "seg_dispositivo"
 DEVICE_DAYS = 400  # "a vita": i browser accettano al massimo 400 giorni per cookie, poi un codice nuovo
-_otp: dict = {"codice": "", "scade": 0.0, "tentativi": 0, "inviato": 0.0, "storia": []}
-OTP_MAX_ORA = 3  # codici al massimo in un'ora, chiunque li chieda: la pagina è pubblica, il Telegram è di Ema
+_otp: dict = {"codice": "", "scade": 0.0, "tentativi": 0, "inviato": 0.0}
 
 
 def _devices() -> dict:
@@ -1447,26 +1447,13 @@ def _otp_valido() -> bool:
     return bool(_otp["codice"]) and time.time() < _otp["scade"]
 
 
-def _otp_manda(nuovo: bool = False) -> str | None:
-    """Manda il codice su Telegram SOLO quando qualcuno preme il pulsante (mai aprendo la pagina). Se un codice valido
-    è già sul telefono non ne manda un altro, a meno di `nuovo` (Rimanda). Mai più di OTP_MAX_ORA all'ora. Ritorna un
-    messaggio per la pagina."""
+def _otp_nuovo() -> str:
+    """Nuovo codice di 6 cifre, valido 10 minuti. Lo chiede SOLO Ema scrivendo /codice al bot Telegram: la pagina
+    dell'hub (pubblica) non manda mai niente, così nessun estraneo può far arrivare messaggi sul suo telefono."""
     nowt = time.time()
-    if _otp_valido() and not nuovo:
-        return None
-    storia = [t for t in _otp["storia"] if nowt - t < 3600]
-    _otp["storia"] = storia
-    if len(storia) >= OTP_MAX_ORA:
-        return "Troppi codici chiesti nell'ultima ora. Se il codice è già sul tuo Telegram usalo, altrimenti riprova più tardi."
     _otp.update(codice=f"{secrets.randbelow(10**6):06d}", scade=nowt + 600, tentativi=0, inviato=nowt)
-    storia.append(nowt)
-    try:
-        bot.send(f"Codice per aprire hub.emazamboni.com: <b>{_otp['codice']}</b>\nVale 10 minuti. "
-                 "Se non l'hai chiesto tu, ignora: senza il codice nessuno entra.", conta=False, html=True)
-    except Exception as err:  # noqa: BLE001
-        log.warning("otp: %s", err)
-        return "Non riesco a mandare il codice su Telegram adesso."
-    return None
+    return (f"Codice per entrare in hub.emazamboni.com: <b>{_otp['codice']}</b>\nVale 10 minuti, 5 tentativi. "
+            "Se non l'hai chiesto tu, ignoralo.")
 
 
 def _otp_verifica(codice: str) -> bool:
@@ -1480,8 +1467,8 @@ def _otp_verifica(codice: str) -> bool:
     return False
 
 
-def _otp_html(msg: str = "", inviato: bool = False) -> str:
-    return pagine.codice(msg, inviato)
+def _otp_html(msg: str = "") -> str:
+    return pagine.codice(msg)
 
 
 async def _gate(request):
@@ -1504,13 +1491,9 @@ async def _gate(request):
                 r.set_cookie(DEVICE_COOKIE, tok, max_age=DEVICE_DAYS * 86400, httponly=True, secure=PUBLIC_HOST != "127.0.0.1",
                              samesite="lax", path=f"{PUBLIC_PREFIX}/{secret}")
                 return r
-            msg = "Codice sbagliato o scaduto."
-        elif azione == "manda":
-            msg = _otp_manda() or ""
-        elif azione == "rimanda":
-            msg = _otp_manda(nuovo=True) or ""
-    # Aprire la pagina non manda niente: la pagina è pubblica (hub.emazamboni.com) e la vedono anche i robot.
-    return HTMLResponse(_otp_html(msg, inviato=_otp_valido()), status_code=401, headers={
+            msg = "Codice sbagliato o scaduto. Scrivi /codice al bot su Telegram per averne uno nuovo."
+    # La pagina è pubblica (hub.emazamboni.com): non manda MAI niente, il codice lo chiede Ema su Telegram.
+    return HTMLResponse(_otp_html(msg), status_code=401, headers={
         "Cache-Control": "no-store", "Content-Security-Policy": MANAGER_CSP, "Referrer-Policy": "no-referrer",
         "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow"})
 
