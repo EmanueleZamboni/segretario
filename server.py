@@ -1272,6 +1272,19 @@ def _fmt_progetti() -> str:
                      + (f" -> {p['prossimo_passo']}" if p.get("prossimo_passo") else "") for p in rows)
 
 
+# Stato del codice di accesso all'hub (deve stare prima di make_bot, che lo usa all'avvio con il token vero).
+_otp: dict = {"codice": "", "scade": 0.0, "tentativi": 0, "inviato": 0.0}
+
+
+def _otp_nuovo() -> str:
+    """Nuovo codice di 6 cifre, valido 10 minuti. Lo chiede SOLO Ema scrivendo /codice al bot Telegram: la pagina
+    dell'hub (pubblica) non manda mai niente, così nessun estraneo può far arrivare messaggi sul suo telefono."""
+    nowt = time.time()
+    _otp.update(codice=f"{secrets.randbelow(10**6):06d}", scade=nowt + 600, tentativi=0, inviato=nowt)
+    return (f"Codice per entrare in hub.emazamboni.com: <b>{_otp['codice']}</b>\nVale 10 minuti, 5 tentativi. "
+            "Se non l'hai chiesto tu, ignoralo.")
+
+
 def make_bot(token: str) -> "telegram_bot.Telegram":
     hooks = {
         "diario": lambda: memoria_leggi("diario"),
@@ -1421,7 +1434,6 @@ CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'n
 # Senza Telegram collegato il controllo non può esistere e la pagina si apre con il solo segreto.
 DEVICE_COOKIE = "seg_dispositivo"
 DEVICE_DAYS = 400  # "a vita": i browser accettano al massimo 400 giorni per cookie, poi un codice nuovo
-_otp: dict = {"codice": "", "scade": 0.0, "tentativi": 0, "inviato": 0.0}
 
 
 def _devices() -> dict:
@@ -1445,15 +1457,6 @@ def _otp_possibile() -> bool:
 
 def _otp_valido() -> bool:
     return bool(_otp["codice"]) and time.time() < _otp["scade"]
-
-
-def _otp_nuovo() -> str:
-    """Nuovo codice di 6 cifre, valido 10 minuti. Lo chiede SOLO Ema scrivendo /codice al bot Telegram: la pagina
-    dell'hub (pubblica) non manda mai niente, così nessun estraneo può far arrivare messaggi sul suo telefono."""
-    nowt = time.time()
-    _otp.update(codice=f"{secrets.randbelow(10**6):06d}", scade=nowt + 600, tentativi=0, inviato=nowt)
-    return (f"Codice per entrare in hub.emazamboni.com: <b>{_otp['codice']}</b>\nVale 10 minuti, 5 tentativi. "
-            "Se non l'hai chiesto tu, ignoralo.")
 
 
 def _otp_verifica(codice: str) -> bool:
