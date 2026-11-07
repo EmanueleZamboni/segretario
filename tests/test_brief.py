@@ -86,6 +86,8 @@ def postino_db(path: Path, adesso: datetime):
         (1, 2, "Spam", '{"name":"Spam"}', "s@x.it", recent, 0, 0, 0, "person", ""),
         (1, 1, "Vecchia", '{"name":"Vecchia"}', "v@x.it", old, 0, 0, 0, "person", ""),
         (1, 1, "Mia bozza", '{"name":"Ema"}', "ema@example.com", recent, 0, 1, 1, "person", ""),
+        (1, 1, "Postino server: rapporto", '{"name":"ezamboni96"}', "ema@example.com", recent, 0, 0, 0, "person", ""),
+        (1, 1, "Re: Preventivo video", '{"name":"Anna Rossi"}', "anna@x.it", recent, 0, 0, 0, "person", ""),
     ]
     con.executemany("INSERT INTO messages (account_id, folder_id, subject, from_json, from_email, date, seen, mine, draft, category, snippet) VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
     con.commit()
@@ -117,6 +119,12 @@ def main():
     assert [e["titolo"] for e in ev] == ["Compleanno Marco", "Palestra", "Dentista"], ev
     assert ev[2] == {"ora": "10:30", "fine": "11:30", "titolo": "Dentista", "luogo": "Via Roma 1"} and ev[0]["ora"] == ""
     assert fonti.eventi_del_giorno(ICS, date(2026, 11, 9)) == []
+    assert fonti.calendari("https://a/basic.ics, https://b/basic.ics\nhttp://no") == ["https://a/basic.ics", "https://b/basic.ics"]
+    ics2 = ICS.replace("PRODID:-//test//", "PRODID:-//test//\nX-WR-CALNAME:Stostudio")
+    assert [e["titolo"] for e in fonti.eventi_del_giorno(ics2, date(2026, 11, 7), etichetta=True)][-1] == "[Stostudio] Dentista"
+    fonti.calendario_ics = lambda url, cache_dir: ics2 if "b/" in url else ICS
+    tutti = fonti.eventi_di_oggi("https://a/basic.ics https://b/basic.ics", date(2026, 11, 7), DATA)
+    assert len(tutti) == 6 and tutti[0]["ora"] == "" and "[Stostudio]" in str(tutti)
     # 4. email non lette: persone, in arrivo, ultime 48 ore, non mie
     dbp = DATA / "postino.db"
     postino_db(dbp, adesso)

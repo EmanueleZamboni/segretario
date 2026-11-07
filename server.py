@@ -998,7 +998,7 @@ def _brief_testo() -> str:
     ics = os.environ.get("CALENDAR_ICS_URL", "").strip()
     if ics:
         try:
-            calendario = fonti.eventi_del_giorno(fonti.calendario_ics(ics, DATA), t.date())
+            calendario = fonti.eventi_di_oggi(ics, t.date(), DATA)
         except Exception as err:  # noqa: BLE001
             note.append(f"calendario non letto: {str(err)[:80]}")
     email = None
@@ -1561,8 +1561,8 @@ def _config_valida(k: str, v: str) -> str | None:
         return "KEEP_MCP_URL deve essere il keep-mcp della VM (http://172.17.0.1:...) o https://"
     if k == "LINKS_API_URL" and v and not v.startswith("https://"):
         return "LINKS_API_URL deve iniziare con https://"
-    if k == "CALENDAR_ICS_URL" and v and not v.startswith("https://"):
-        return "l'indirizzo iCal inizia con https:// (Google Calendar > Impostazioni > il tuo calendario > Indirizzo segreto in formato iCal)"
+    if k == "CALENDAR_ICS_URL" and v and not fonti.calendari(v):
+        return "ogni indirizzo iCal inizia con https:// (più calendari: separati da uno spazio)"
     if k == "POSTINO_DB" and v and not v.startswith("/"):
         return "POSTINO_DB è un percorso dentro il container (di solito /postino/postino.db)"
     if k == "GROQ_API_KEY" and v and not v.startswith("gsk_"):
@@ -1643,7 +1643,7 @@ MANAGER_KEYS = [
     # (chiave, etichetta, spiegazione, tipo)
     ("GROQ_API_KEY", "Chiave Groq", "Vocali in testo (WhatsApp, Instagram, Telegram). Gratis: console.groq.com > API Keys. Inizia con gsk_", "password"),
     ("BRIEF_ORA", "Brief del mattino", "Ora del riepilogo su Telegram, es. 07:30. Vuoto = spento", "text"),
-    ("CALENDAR_ICS_URL", "Calendario (iCal segreto)", "Per gli eventi nel brief. Google Calendar sul PC > ingranaggio > Settings > il tuo calendario a sinistra > Integrate calendar > copia 'Secret address in iCal format'", "password"),
+    ("CALENDAR_ICS_URL", "Calendari (iCal segreti)", "Per gli eventi nel brief. Google Calendar sul PC > ingranaggio > Settings > un calendario a sinistra > Integrate calendar > 'Secret address in iCal format'. Più calendari (lavoro, personale, Stostudio): incollali tutti qui, separati da uno spazio", "password"),
     ("POSTINO_DB", "Database di Postino (email nel brief)", "Percorso dentro il container, lo scrive il server: /postino/postino.db. Vuoto = niente email nel brief", "text"),
     ("TELEGRAM_BOT_TOKEN", "Token del bot Telegram", "Da BotFather. Dopo averlo messo, scrivi /start <codice> al bot", "password"),
     ("LINKS_STATS_KEY", "Chiave del link manager", "La riga di STATS-KEY.txt del repo links: accende i DM Instagram", "password"),

@@ -20,11 +20,18 @@ TZ = ZoneInfo(os.environ.get("SEGRETARIO_TZ", "Europe/Rome"))
 ICS_CACHE_SECONDS = 1800
 
 
+def calendari(urls: str) -> list[str]:
+    """CALENDAR_ICS_URL può contenere più indirizzi (lavoro, personale, Stostudio...), separati da spazi, virgole o a capo."""
+    import re
+    return [u for u in re.split(r"[\s,]+", urls or "") if u.startswith("https://")]
+
+
 def calendario_ics(url: str, cache_dir: Path) -> str:
     """Scarica l'iCal (cache 30 minuti su disco: Google lo rigenera lentamente e non serve di più)."""
+    import hashlib
     import httpx
 
-    cache = cache_dir / "calendario.ics"
+    cache = cache_dir / f"calendario-{hashlib.sha256(url.encode()).hexdigest()[:12]}.ics"
     try:
         if cache.exists() and time.time() - cache.stat().st_mtime < ICS_CACHE_SECONDS:
             return cache.read_text(encoding="utf-8")
@@ -42,17 +49,21 @@ def calendario_ics(url: str, cache_dir: Path) -> str:
     return text
 
 
-def eventi_del_giorno(ics_text: str, giorno: date) -> list[dict]:
-    """Gli eventi di un giorno (ricorrenze comprese), ordinati: {'ora': 'HH:MM' | '', 'fine': ..., 'titolo', 'luogo'}."""
+def eventi_del_giorno(ics_text: str, giorno: date, etichetta: bool = False) -> list[dict]:
+    """Gli eventi di un giorno (ricorrenze comprese), ordinati: {'ora': 'HH:MM' | '', 'fine': ..., 'titolo', 'luogo'}.
+    Con etichetta=True il nome del calendario (X-WR-CALNAME) va davanti al titolo, utile con più calendari."""
     import icalendar
     import recurring_ical_events
 
     cal = icalendar.Calendar.from_ical(ics_text)
+    nome = str(cal.get("X-WR-CALNAME", "")).strip() if etichetta else ""
     out = []
     for ev in recurring_ical_events.of(cal).at(giorno):
         start = ev.get("DTSTART").dt
         end = ev.get("DTEND").dt if ev.get("DTEND") else None
         titolo = str(ev.get("SUMMARY", "")).strip() or "(senza titolo)"
+        if nome and "@" not in nome:
+            titolo = f"[{nome}] {titolo}"
         luogo = str(ev.get("LOCATION", "")).strip()
         if isinstance(start, datetime):
             s = start.astimezone(TZ) if start.tzinfo else start.replace(tzinfo=TZ)
@@ -63,6 +74,21 @@ def eventi_del_giorno(ics_text: str, giorno: date) -> list[dict]:
     out.sort(key=lambda x: x["_k"])
     for x in out:
         x.pop("_k", None)
+    return out
+
+
+def eventi_di_oggi(urls: str, giorno: date, cache_dir: Path) -> list[dict]:
+    """Tutti i calendari insieme, ordinati; un calendario che non risponde non ferma gli altri."""
+    lista = calendari(urls)
+    out, errori = [], []
+    for u in lista:
+        try:
+            out += eventi_del_giorno(calendario_ics(u, cache_dir), giorno, etichetta=len(lista) > 1)
+        except Exception as err:  # noqa: BLE001
+            errori.append(str(err)[:60])
+    out.sort(key=lambda e: (1, e["ora"]) if e["ora"] else (0, ""))
+    if errori and not out and len(errori) == len(lista):
+        raise RuntimeError("; ".join(errori))
     return out
 
 
@@ -82,18 +108,27 @@ def email_non_lette(db_path: str, adesso: datetime, ore: int = 48, massimo: int 
         con = sqlite3.connect(f"file:{(tmp / src.name).as_posix()}?mode=ro", uri=True)
         try:
             da = (adesso - timedelta(hours=ore)).astimezone(ZoneInfo("UTC")).strftime("%Y-%m-%dT%H:%M:%S")
+            miei = {r[0].lower() for r in con.execute("SELECT email FROM accounts").fetchall()}
             rows = con.execute(
                 """SELECT m.subject, m.from_json, m.from_email, m.date, m.snippet, a.email AS account
                    FROM messages m JOIN folders f ON f.id = m.folder_id JOIN accounts a ON a.id = m.account_id
                    WHERE m.seen = 0 AND m.mine = 0 AND m.draft = 0 AND m.category = 'person'
                      AND f.role IN ('inbox') AND m.date >= ?
-                   ORDER BY m.date DESC LIMIT ?""", (da, massimo)).fetchall()
+                   ORDER BY m.date DESC LIMIT ?""", (da, massimo * 4)).fetchall()
+            rows = [r for r in rows if (r[2] or "").lower() not in miei]
         finally:
             con.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     out = []
+    visti = set()
     for subject, from_json, from_email, d, snippet, account in rows:
+        chiave = ((from_email or "").lower(), (subject or "").strip().lower().removeprefix("re:").strip())
+        if chiave in visti:
+            continue
+        visti.add(chiave)
+        if len(out) >= massimo:
+            break
         try:
             fj = json.loads(from_json or "{}")
             nome = (fj.get("name") or fj.get("address") or from_email or "?").strip()
