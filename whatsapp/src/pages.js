@@ -48,6 +48,9 @@ export async function statusPage({ wa, store, transcription, notice }) {
     ['Vocali in testo', transcription ? 'attiva (tramite il Segretario)' : '<span class="muted">spenta (SEGRETARIO_URL non impostato)</span>'],
   ];
   if (wa?.lastError && state !== 'open') rows.push(['Ultimo errore', esc(wa.lastError)]);
+  const diag = (wa?.logTail || []).slice(-25).map(l => {
+    try { const j = JSON.parse(l); return `${j.time ? new Date(j.time).toISOString().slice(11, 19) : ''} ${j.msg || ''} ${j.err?.message || j.err || ''} ${j.code ?? ''} ${j.connection ?? ''}`.trim(); } catch { return l; }
+  }).join('\n');
 
   let action = '';
   if (wa) {
@@ -107,6 +110,7 @@ ${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('\n')}
 </table></div>
 <div class="card">${action || '<p class="muted">Questa copia è in sola lettura: un\'altra copia del connettore possiede la connessione.</p>'}</div>
 <p class="muted">Questa pagina è privata: l\'indirizzo contiene il segreto, non condividerlo.</p>
+${diag ? `<details><summary>Diagnostica (ultime righe del log)</summary><pre>${esc(diag)}</pre></details>` : ''}
 </main>
 </body>
 </html>

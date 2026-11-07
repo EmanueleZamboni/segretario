@@ -32,7 +32,18 @@ export class WhatsApp extends EventEmitter {
     this.authDir = join(dataDir, 'auth');
     this.store = store;
     this.pairingPhone = pairingPhone?.replace(/\D/g, '');
-    this.logger = pino({ level: logLevel }, pino.destination(2)); // stderr: stdout è dell'MCP (stdio)
+    // Log su stderr (stdout è dell'MCP stdio) e, in più, le ultime righe in memoria per la pagina /stato:
+    // senza accesso alla VM è l'unico modo di leggere cosa dice WhatsApp quando il collegamento fallisce.
+    this.logTail = [];
+    const tail = this.logTail;
+    const err = pino.destination(2);
+    this.logger = pino({ level: logLevel }, {
+      write(line) {
+        err.write(line);
+        tail.push(line.trim().slice(0, 400));
+        if (tail.length > 60) tail.shift();
+      },
+    });
     this.state = 'not_linked';
     this.lastError = undefined;
     this.me = undefined;
@@ -72,7 +83,7 @@ export class WhatsApp extends EventEmitter {
       version,
       auth: state,
       logger: this.logger,
-      browser: Browsers.macOS('Desktop'), // un dispositivo "desktop" riceve tutta la storia al primo collegamento
+      browser: Browsers.ubuntu('Segretario'), // come Postino sulla stessa VM (collegamento provato); la storia arriva comunque con syncFullHistory
       syncFullHistory: true,
       markOnlineOnConnect: false, // restiamo "offline" così il telefono continua a ricevere le notifiche
       getMessage: async key => {
@@ -110,6 +121,8 @@ export class WhatsApp extends EventEmitter {
 
     const conn = events['connection.update'];
     if (conn) {
+      this.logger.warn({ connection: conn.connection, qr: !!conn.qr, code: conn.lastDisconnect?.error?.output?.statusCode,
+        err: conn.lastDisconnect?.error?.message }, 'connection.update');
       if (conn.qr && !this.pairingPhone) {
         this.state = 'qr';
         this.qr = { data: conn.qr, at: Date.now() };
