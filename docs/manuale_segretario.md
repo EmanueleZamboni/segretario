@@ -1,4 +1,4 @@
-# Manuale del Segretario (per la chat "Secretary" e per ogni chat Claude di Ema), 7 novembre 2026, sera
+# Manuale del Segretario (per la chat "Secretary" e per ogni chat Claude di Ema), 7 novembre 2026, notte
 
 Scritto da BUILDING SEGRETARIO alla fine di quattro giorni di lavoro con Ema. È tutto quello che abbiamo imparato:
 come è fatto il sistema, come si usa ogni strumento, come Ema vuole che si lavori. Leggilo una volta per intero,
@@ -40,7 +40,7 @@ Per aggiungere un tasto all'hub: `hub_link_aggiungi(nome, url, gruppo, nota)`; p
 
 - **07:30, Telegram**: il server manda il riepilogo da solo (non tu): Calendario, Oggi (TODAY'S TASKS), Se hai
   tempo (GENERAL e WORK), Claude aspetta te (sessioni in attesa), Email da leggere (persone, non lette, 48 ore).
-  Su Telegram Ema può chiedere `/brief` (riepilogo adesso), `/spesa` (cosa comprare, per negozio), `/stato`.
+  Su Telegram Ema può chiedere `/brief` (riepilogo adesso), `/spesa` (cosa comprare, per negozio), `/stato`, `/codice` (per entrare nell'hub).
 - **A inizio chat** leggi `memoria_leggi("diario")` (oggi e ieri) e, se chiede dove siamo, `sessioni_lista()` e
   `progetti_lista()`; poi `compiti_lista("Secretary")` per i compiti che altre chat ti hanno lasciato.
 - **Ogni cosa decisa o fatta** va in `diario_scrivi(testo, origine="chat", progetto=...)`, una riga, fatti.
