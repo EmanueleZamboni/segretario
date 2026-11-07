@@ -40,8 +40,16 @@ def _clean(err: Exception) -> str:
     return _URL_RE.sub("<url>", str(err))[:200]
 
 
-def transcribe_bytes(data: bytes, filename: str = "voice.ogg") -> str:
-    """Trascrive un audio in italiano: Groq (whisper-large-v3-turbo) se c'è la chiave, altrimenti OpenAI."""
+def transcription_configured() -> bool:
+    return bool(os.environ.get("GROQ_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip())
+
+
+def transcribe_bytes(data: bytes, filename: str = "voice.ogg", mime: str = "audio/ogg") -> str:
+    """Trascrive un audio (italiano o inglese, riconosciuti da soli): Groq (whisper-large-v3-turbo) se c'è la
+    chiave, altrimenti OpenAI. Usato per i vocali Telegram, WhatsApp (via /trascrivi) e Instagram."""
+    mime = (mime or "audio/ogg").split(";")[0].strip() or "audio/ogg"
+    if "." not in filename:
+        filename += "." + {"audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/wav": "wav", "audio/webm": "webm"}.get(mime, "ogg")
     groq = os.environ.get("GROQ_API_KEY", "").strip()
     openai = os.environ.get("OPENAI_API_KEY", "").strip()
     errors = []
@@ -53,8 +61,8 @@ def transcribe_bytes(data: bytes, filename: str = "voice.ogg") -> str:
             continue
         try:
             r = httpx.post(url, headers={"Authorization": f"Bearer {key}"},
-                           files={"file": (filename, data, "audio/ogg")},
-                           data={"model": model, "language": "it", "response_format": "json"}, timeout=120)
+                           files={"file": (filename, data, mime)},
+                           data={"model": model, "response_format": "json"}, timeout=120)
             r.raise_for_status()
             text = (r.json().get("text") or "").strip()
             if text:
@@ -136,7 +144,7 @@ class Telegram:
         r.raise_for_status()
         return r.content
 
-    def send(self, text: str, buttons: list[list[tuple[str, str]]] | None = None, conta: bool = True) -> int:
+    def send(self, text: str, buttons: list[list[tuple[str, str]]] | None = None, conta: bool = True, html: bool = False) -> int:
         """Manda un messaggio a Ema (solo a lui). buttons: righe di (etichetta, callback_data).
         conta=False per le risposte ai suoi comandi, che non consumano il limite giornaliero."""
         if self.chat_id is None:
@@ -154,6 +162,8 @@ class Telegram:
         mid = 0
         for i, chunk in enumerate(chunks):
             params: dict = {"chat_id": self.chat_id, "text": chunk, "disable_web_page_preview": True}
+            if html:
+                params["parse_mode"] = "HTML"
             if buttons and i == len(chunks) - 1:
                 params["reply_markup"] = {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in row] for row in buttons]}
             mid = self.api("sendMessage", **params)["message_id"]
@@ -232,7 +242,7 @@ class Telegram:
                       "/coda proposte in attesa · /sessioni · /progetti · /stato", conta=False)
         elif cmd in simple and simple[cmd] in self.hooks:
             try:
-                self.send(str(self.hooks[simple[cmd]]()), conta=False)
+                self.send(str(self.hooks[simple[cmd]]()), conta=False, html=simple[cmd] in ("brief", "spesa"))
             except Exception as err:  # noqa: BLE001  (es. Keep non raggiungibile)
                 self.send(f"Non ci riesco adesso: {_clean(err)[:200]}", conta=False)
         else:

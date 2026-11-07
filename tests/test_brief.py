@@ -52,7 +52,8 @@ def main():
     assert "Pasta" not in str(groups)
     testo = brief.spesa_testo(SPESA, mapping)
     assert testo.index("Lidl") < testo.index("Mercato") < testo.index("DM") < testo.index("Da assegnare")
-    assert brief.spesa_testo([{"text": "Pasta", "checked": True}], mapping).startswith("Spesa: niente")
+    assert testo.startswith("<b>Spesa</b>") and "<b>Lidl</b>: Tahina, Semini, Ceci" in testo
+    assert "Niente da comprare" in brief.spesa_testo([{"text": "Pasta", "checked": True}], mapping)
     # 4. insegnare un negozio (tool) -> file negozi.json nella memoria, usato dopo
     r = server.spesa_negozio("Cera per surf", "Decathlon")
     assert r == {"prodotto": "cera per surf", "negozio": "Decathlon"}
@@ -69,20 +70,20 @@ def main():
     reqs = [{"stato": "aperta"}, {"stato": "aperta"}, {"stato": "fatta"}]
     diario = "- 18:44 [brief] brief inviato\n- 18:46 [chat] Brief disattivato\n"
     t1 = brief.costruisci(adesso, server.MEMORIA, sess, props, reqs, diario)
-    assert t1.startswith("Buongiorno Ema. sabato 07/11.") and "VIDEO MATCH: posso fare il test render?" in t1
-    assert "Regole proposte da approvare: 1" in t1 and "Richieste di miglioramento aperte: 2" in t1
-    assert "Ieri:" in t1 and "Brief disattivato" in t1 and "TASKS" not in t1
+    assert t1.startswith("<b>Sabato 7 novembre</b>") and "VIDEO MATCH: posso fare il test render?" in t1
+    assert "1 regole da approvare · 2 richieste in lavorazione" in t1
+    assert "<b>Ieri</b>\n• brief inviato\n• Brief disattivato" in t1 and "Oggi" not in t1, t1
     os.environ["KEEP_MCP_URL"] = "http://172.17.0.1:8765/x/mcp"
     keep.note = fake_note
     t2 = brief.costruisci(adesso, server.MEMORIA, sess, props, reqs, diario)
-    assert "Oggi (TASKS):\n• Chiamare riparazione VHS\n• Spedire lettore a Pablo" in t2, t2
-    assert "• Mercato agricolo: Cipolla" in t2 and "Bolletta" not in t2 and "#iphone5c" not in t2
+    assert "<b>Oggi</b>\n• Chiamare riparazione VHS\n• Spedire lettore a Pablo" in t2, t2
+    assert "<b>Mercato agricolo</b>: Cipolla" in t2 and "Bolletta" not in t2 and "#iphone5c" not in t2
     # Keep rotto: il brief parte lo stesso e lo dice
     keep.note = lambda title: (_ for _ in ()).throw(RuntimeError("Keep: nessuna risposta"))
     t3 = brief.costruisci(adesso, server.MEMORIA, sess, props, reqs, diario)
-    assert "Buongiorno" in t3 and "VIDEO MATCH" in t3 and "(Keep non letto: Keep: nessuna risposta)" in t3
+    assert "<b>Sabato" in t3 and "VIDEO MATCH" in t3 and "<i>Keep non letto: Keep: nessuna risposta</i>" in t3
     keep.note = fake_note
-    assert "Oggi (TASKS)" in server.brief_testo()
+    assert "<b>Oggi</b>" in server.brief_testo()
     # 6. quando mandarlo: all'ora, una volta al giorno, mai dopo mezzogiorno, mai se spento
     assert brief.dovuto(datetime(2026, 11, 7, 7, 30), "07:30", "") is True
     assert brief.dovuto(datetime(2026, 11, 7, 7, 29), "07:30", "") is False

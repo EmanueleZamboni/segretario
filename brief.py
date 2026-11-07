@@ -7,6 +7,7 @@ Il brief è SPENTO finché BRIEF_ORA (es. "07:30") non è impostato in /config: 
 
 from __future__ import annotations
 
+import html as _html
 import json
 import re
 from datetime import datetime
@@ -64,31 +65,37 @@ def spesa_per_negozio(items: list[dict], mapping: dict[str, list[str]]) -> dict[
     return out
 
 
+def esc(s: str) -> str:
+    return _html.escape(str(s), quote=False)
+
+
 def spesa_testo(items: list[dict], mapping: dict[str, list[str]]) -> str:
+    """Testo HTML per Telegram (grassetto = negozio)."""
     groups = spesa_per_negozio(items, mapping)
     if not groups:
-        return "Spesa: niente da comprare, la lista è tutta spuntata."
-    lines = ["Spesa (voci non spuntate in SPESA):"]
+        return "<b>Spesa</b>\nNiente da comprare: la lista è tutta spuntata."
+    lines = ["<b>Spesa</b>"]
     for shop in list(mapping) + [k for k in groups if k not in mapping]:
         if shop in groups:
-            lines.append(f"• {shop}: " + ", ".join(groups[shop]))
+            lines.append(f"<b>{esc(shop)}</b>: " + ", ".join(esc(x) for x in groups[shop]))
     return "\n".join(lines)
 
 
 def costruisci(adesso: datetime, memoria: Path, sessioni: list[dict], proposte: list[dict], richieste: list[dict],
                diario_ieri: str, con_keep: bool = True) -> str:
     """Il testo del brief. Ogni blocco è indipendente: un errore in uno non ferma gli altri."""
-    giorni = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
-    parts = [f"Buongiorno Ema. {giorni[adesso.weekday()]} {adesso:%d/%m}."]
+    giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
+    mesi = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
+    parts = [f"<b>{giorni[adesso.weekday()]} {adesso.day} {mesi[adesso.month - 1]}</b>"]
     keep_err = None
     if con_keep and keep.configured():
         try:
             tasks = keep.note("TASKS")
             oggi = keep.section(tasks.get("text", ""), "TODAY'S TASKS")
             if oggi:
-                parts.append("Oggi (TASKS):\n" + "\n".join(f"• {t}" for t in oggi[:12]))
+                parts.append("<b>Oggi</b>\n" + "\n".join(f"• {esc(t)}" for t in oggi[:12]))
             else:
-                parts.append("Oggi (TASKS): niente in TODAY'S TASKS.")
+                parts.append("<b>Oggi</b>\nNiente in TODAY'S TASKS.")
         except Exception as err:  # noqa: BLE001
             keep_err = str(err)
         try:
@@ -98,20 +105,23 @@ def costruisci(adesso: datetime, memoria: Path, sessioni: list[dict], proposte: 
             keep_err = keep_err or str(err)
     attese = [s for s in sessioni if s.get("stato") == "aspetta Ema"]
     if attese:
-        parts.append("Aspettano una tua risposta:\n" + "\n".join(
-            f"• {s['nome']}: {s.get('domanda_per_ema') or s.get('prossimo_passo') or s.get('dove_sono', '')}" for s in attese[:6]))
+        parts.append("<b>Aspettano te</b>\n" + "\n".join(
+            f"• {esc(s['nome'])}: {esc(s.get('domanda_per_ema') or s.get('prossimo_passo') or s.get('dove_sono', ''))}" for s in attese[:6]))
     in_attesa = [p for p in proposte if p.get("stato") == "in attesa"]
-    if in_attesa:
-        parts.append(f"Regole proposte da approvare: {len(in_attesa)} (/coda, o il codice in chat).")
     aperte = [r for r in richieste if r.get("stato") == "aperta"]
+    code = []
+    if in_attesa:
+        code.append(f"{len(in_attesa)} regole da approvare")
     if aperte:
-        parts.append(f"Richieste di miglioramento aperte: {len(aperte)}.")
+        code.append(f"{len(aperte)} richieste in lavorazione")
+    if code:
+        parts.append("<b>Segretario</b>\n" + " · ".join(code))
     if diario_ieri.strip():
-        righe = [l[2:] for l in diario_ieri.splitlines() if l.startswith("- ")]
+        righe = [re.sub(r"^\d\d:\d\d \[[^\]]*\]\s*", "", l[2:]) for l in diario_ieri.splitlines() if l.startswith("- ")]
         if righe:
-            parts.append("Ieri:\n" + "\n".join(f"• {r[:140]}" for r in righe[-6:]))
+            parts.append("<b>Ieri</b>\n" + "\n".join(f"• {esc(r[:140])}" for r in righe[-6:]))
     if keep_err:
-        parts.append(f"(Keep non letto: {keep_err[:120]})")
+        parts.append(f"<i>Keep non letto: {esc(keep_err[:120])}</i>")
     return "\n\n".join(parts)
 
 
