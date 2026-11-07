@@ -22,7 +22,7 @@ def main():
     assert o["nome"] == "Sony Vaio P (2009)" and o["prestato_a"] == "Francesco", o
     o = server.oggetto_segna("sony vaio p", prestato_a="nessuno")
     assert o["prestato_a"] == ""
-    server.diario_scrivi("girato il TikTok sul Vaio #sony-vaio-p", origine="chat", progetto="Video")
+    server.diario_scrivi("girato il TikTok sul Vaio #sony-vaio-p", origine="chat")
     r = server.oggetto_leggi("SONY-VAIO-P")
     assert r["scheda"]["dove"].startswith("scatola") and any("#sony-vaio-p" in h["testo"] for h in r["righe"]), r
     assert (server.MEMORIA / "oggetti.md").read_text(encoding="utf-8").count("#sony-vaio-p") == 1
