@@ -63,6 +63,8 @@ def main():
     # 5. un altro browser (senza cookie) resta fuori; il codice usato non vale più; dopo 5 errori serve un codice nuovo
     c2 = TestClient(server.app, base_url="http://testserver")
     assert c2.get(f"/{s}/manager").status_code == 401
+    assert c2.get(f"/{s}/cruscotto.json").status_code == 401, "i dati della dashboard non si leggono senza codice"
+    assert c.get(f"/{s}/cruscotto.json").status_code == 200
     assert c2.post(f"/{s}/manager", data={"azione": "verifica", "codice": code}).status_code == 401
     c2.post(f"/{s}/manager", data={"azione": "manda"})
     new_code = [p["text"] for m, p in bot.calls if m == "sendMessage"][-1].split("<b>")[1].split("</b>")[0]
