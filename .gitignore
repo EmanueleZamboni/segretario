@@ -5,3 +5,5 @@ STATUS.txt
 CONNECTOR_URL.txt
 *.log
 *.tmp
+whatsapp/node_modules/
+whatsapp/data/

@@ -16,6 +16,8 @@ services:
       - SEGRETARIO_PUBLIC_HOST=${SEGRETARIO_PUBLIC_HOST:-postino.emazamboni.com}
       - SEGRETARIO_PUBLIC_PREFIX=/segretario
       - SEGRETARIO_SECRET=${SEGRETARIO_SECRET:-}
+      # Solo per mostrare nel manager il link della pagina WhatsApp (il servizio è whatsapp/)
+      - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
       - MEMORIA_GIT_REMOTE=${MEMORIA_GIT_REMOTE:-}
       # Consegna al telefono (opzionali: senza, il Segretario funziona lo stesso, senza notify)
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
@@ -44,6 +46,40 @@ services:
       timeout: 5s
       retries: 3
 
+  # WhatsApp del Segretario (cartella whatsapp/): connettore MCP + pagina /stato per collegare il telefono.
+  # Caddy manda /whatsapp/* a whatsapp:8787 togliendo il prefisso. Nessuna porta pubblicata.
+  #   pagina di stato / QR:  https://<host>/whatsapp/mcp/<WHATSAPP_TOKEN>/stato
+  #   connettore Claude:     https://<host>/whatsapp/mcp/<WHATSAPP_TOKEN>   (in CONNECTOR_URL.txt)
+  whatsapp:
+    build: ./whatsapp
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - MCP_TOKEN=${WHATSAPP_TOKEN:-}
+      # Vocali WhatsApp -> testo tramite il Segretario (POST <SEGRETARIO_URL>/trascrivi); vuoto = spento
+      - SEGRETARIO_URL=${SEGRETARIO_URL:-}
+      - TZ=Europe/Rome
+    volumes:
+      - whatsapp_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    expose:
+      - "8787"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 # La rete di Caddy (progetto compose "postino" => "postino_default"). install.sh la rileva e la scrive in .env.
 networks:
   default:
@@ -52,3 +88,4 @@ networks:
 
 volumes:
   segretario_data:
+  whatsapp_data:

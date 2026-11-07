@@ -135,3 +135,10 @@ Nel container: `SEGRETARIO_PUBLIC_PREFIX` (/segretario), `SEGRETARIO_EXTRA_HOSTS
 ## Cosa non fa
 
 Non legge Keep, email o calendario: quelli restano nei loro connettori, e sono i task cloud e le chat a metterli insieme. Note di progetto: `Desktop\Claude Things\26_11_03 Segretario`.
+
+## WhatsApp (servizio separato, cartella `whatsapp/`)
+
+Il telefono di Ema è collegato come "dispositivo collegato" (Baileys) a un container suo, non a Postino. Pagina di
+stato con il QR: `https://<host>/whatsapp/mcp/<WHATSAPP_TOKEN>/stato` (link anche nel manager); connettore per
+claude.ai: `.../whatsapp/mcp/<WHATSAPP_TOKEN>`. I vocali nuovi diventano testo passando da `POST /<segreto>/trascrivi`
+del Segretario (chiave Groq nel manager). Dettagli in `whatsapp/README.md`.

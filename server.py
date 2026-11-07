@@ -1554,6 +1554,11 @@ button.quiet{background:transparent;color:var(--acc)}.ok{background:#e8f5e9;colo
 """
 
 
+def _wa_url() -> str:
+    tok = os.environ.get("WHATSAPP_TOKEN", "").strip()
+    return f"https://{PUBLIC_HOST}/whatsapp/mcp/{tok}" if tok else ""
+
+
 def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
     st = stato()
     base = f"https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}"
@@ -1581,7 +1586,9 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
             "<h1>Segretario · manager</h1><p class=\"sub\">Le chiavi e gli interruttori del Segretario. I valori non escono mai da qui.</p>"
             + (f'<div class="ok">{_esc(msg_ok)}</div>' if msg_ok else "") + (f'<div class="err">{_esc(msg_err)}</div>' if msg_err else "")
             + '<div class="card"><div class="stato">' + "".join(f"<div><span class=\"k\">{_esc(a)}</span>: {_esc(str(b))}</div>" for a, b in stato_rows) + "</div>"
-            + f'<div class="hint" style="margin-top:8px">Cruscotto: <a href="{base}/cruscotto">{base}/cruscotto</a> · codice di approvazione: {secret[:6]}</div></div>'
+            + f'<div class="hint" style="margin-top:8px">Cruscotto: <a href="{base}/cruscotto">{base}/cruscotto</a> · codice di approvazione: {secret[:6]}</div>'
+            + (f'<div class="hint">WhatsApp (stato, QR per collegare il telefono): <a href="{_wa_url()}/stato">{_wa_url()}/stato</a></div>' if _wa_url() else "")
+            + "</div>"
             + "".join(rows) + "</main></body></html>")
 
 

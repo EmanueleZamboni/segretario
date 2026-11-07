@@ -34,6 +34,19 @@ if [ ! -f "$ENVF" ]; then
   say ".env written (network $NET, host $DOMAIN)"
 fi
 
+# 2b. WhatsApp (cartella whatsapp/): il suo segreto, generato una volta sola, e l'URL interno del
+#     Segretario per trascrivere i vocali. Aggiunti anche a un .env già esistente, se mancano.
+if ! grep -q '^WHATSAPP_TOKEN=' "$ENVF"; then
+  WTOKEN="$(head -c 48 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' | cut -c1-43)"
+  (umask 077; printf '# WhatsApp: segreto nell'"'"'URL del connettore e della pagina /stato (generato una volta)\nWHATSAPP_TOKEN=%s\n' "$WTOKEN" >> "$ENVF")
+  say "WHATSAPP_TOKEN added to .env"
+fi
+if ! grep -q '^SEGRETARIO_URL=' "$ENVF"; then
+  CUR_SECRET="$(grep -E '^SEGRETARIO_SECRET=' "$ENVF" | cut -d= -f2-)"
+  (umask 077; printf '# Vocali WhatsApp -> testo: il Segretario visto dal container whatsapp (vuoto = spento)\nSEGRETARIO_URL=http://segretario:8766/%s\n' "$CUR_SECRET" >> "$ENVF")
+  say "SEGRETARIO_URL added to .env"
+fi
+
 # 3. Avvio (o aggiornamento) del container. Se fallisce si va avanti lo stesso (cron e rapporto),
 #    così il prossimo push può rimediare da solo e il motivo resta leggibile.
 FAILED=0
@@ -55,7 +68,13 @@ chmod +x "$HERE/scripts/auto-update.sh" "$HERE/scripts/install.sh" 2>/dev/null
 SECRET="$(grep -E '^SEGRETARIO_SECRET=' "$ENVF" | cut -d= -f2-)"
 if [ -n "$SECRET" ]; then
   URL="https://$DOMAIN/segretario/$SECRET/mcp"
-  (umask 077; printf 'Connettore Claude (segreto, non condividere):\n%s\nCruscotto:\nhttps://%s/segretario/%s/cruscotto\n' "$URL" "$DOMAIN" "$SECRET" > "$HERE/CONNECTOR_URL.txt")
+  WTOKEN="$(grep -E '^WHATSAPP_TOKEN=' "$ENVF" | cut -d= -f2-)"
+  (umask 077; {
+    printf 'Connettore Claude (segreto, non condividere):\n%s\nCruscotto:\nhttps://%s/segretario/%s/cruscotto\n' "$URL" "$DOMAIN" "$SECRET"
+    if [ -n "$WTOKEN" ]; then
+      printf 'Connettore WhatsApp (segreto, non condividere):\nhttps://%s/whatsapp/mcp/%s\nPagina WhatsApp (stato, QR per collegare il telefono):\nhttps://%s/whatsapp/mcp/%s/stato\n' "$DOMAIN" "$WTOKEN" "$DOMAIN" "$WTOKEN"
+    fi
+  } > "$HERE/CONNECTOR_URL.txt")
   # L'URL non va mai su stdout: finirebbe nel rapporto che Postino manda per email e nel log del cron.
   say "connettore Claude pronto: URL in $HERE/CONNECTOR_URL.txt (segreto, non va in nessuna mail)"
 else
