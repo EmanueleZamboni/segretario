@@ -18,6 +18,9 @@ services:
       - SEGRETARIO_SECRET=${SEGRETARIO_SECRET:-}
       # Solo per mostrare nel manager il link della pagina WhatsApp (il servizio è whatsapp/)
       - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
+      # Keep letto dal server per il brief del mattino (li scrive ops/run.sh di Various nel .env)
+      - KEEP_MCP_URL=${KEEP_MCP_URL:-}
+      - KEEP_MCP_HOST=${KEEP_MCP_HOST:-}
       - MEMORIA_GIT_REMOTE=${MEMORIA_GIT_REMOTE:-}
       # Consegna al telefono (opzionali: senza, il Segretario funziona lo stesso, senza notify)
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
