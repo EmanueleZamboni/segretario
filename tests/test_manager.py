@@ -71,6 +71,30 @@ def main():
     m = [{"id": "m3", "text": "", "attachments": [{"type": "audio", "url": "https://cdn/y.m4a"}]}]
     server._ig_trascrivi(m)
     assert "manca la chiave Groq" in m[0]["vocale"] and calls == ["https://cdn/x.m4a"]
+    # 5. hub: pagina con i pulsanti, link relativi per manager/cruscotto/whatsapp, pulsanti aggiunti dalla chat
+    r = c.get(f"/{s}/hub")
+    assert r.status_code == 200 and 'href="manager"' in r.text and 'href="cruscotto"' in r.text and 'href="whatsapp"' in r.text
+    assert "links.emazamboni.com/admin" in r.text and "postino.emazamboni.com" in r.text and server.secret[:6] in r.text
+    server.hub_link_aggiungi("Punti Vacanza", "https://punti.example.com", nota="i punti delle vacanze")
+    r = c.get(f"/{s}/hub")
+    assert "Punti Vacanza" in r.text and "punti.example.com" in r.text
+    server.hub_link_togli("punti vacanza")
+    assert "Punti Vacanza" not in c.get(f"/{s}/hub").text
+    try:
+        server.hub_link_aggiungi("x", "http://no")
+        raise SystemExit("solo https")
+    except ValueError:
+        pass
+    assert c.get(f"/{s}/whatsapp").status_code == 404, "senza WHATSAPP_TOKEN"
+    os.environ["WHATSAPP_TOKEN"] = "tok"
+    r = c.get(f"/{s}/whatsapp", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"].endswith("/whatsapp/mcp/tok/stato")
+    # calendari: campo visibile, una riga per indirizzo
+    os.environ["CALENDAR_ICS_URL"] = "https://a/basic.ics https://b/basic.ics"
+    r = c.get(f"/{s}/manager")
+    assert "<textarea" in r.text and "https://a/basic.ics\nhttps://b/basic.ics" in r.text
+    r = c.post(f"/{s}/manager", data={"chiave": "CALENDAR_ICS_URL", "valore": "https://a/basic.ics\r\nhttps://c/basic.ics", "azione": "salva"})
+    assert r.status_code == 200 and os.environ["CALENDAR_ICS_URL"].startswith("https://a/basic.ics")
     print("MANAGER OK")
 
 

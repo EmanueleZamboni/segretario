@@ -190,7 +190,8 @@ def ensure_data() -> str:
     url_file.write_text(
         f"https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/mcp\n"
         f"cruscotto: https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/cruscotto\n"
-        f"manager: https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/manager\n", encoding="utf-8")
+        f"manager: https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/manager\n"
+        f"hub: https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/hub\n", encoding="utf-8")
     os.chmod(url_file, 0o600)
     return secret
 
@@ -1643,7 +1644,7 @@ MANAGER_KEYS = [
     # (chiave, etichetta, spiegazione, tipo)
     ("GROQ_API_KEY", "Chiave Groq", "Vocali in testo (WhatsApp, Instagram, Telegram). Gratis: console.groq.com > API Keys. Inizia con gsk_", "password"),
     ("BRIEF_ORA", "Brief del mattino", "Ora del riepilogo su Telegram, es. 07:30. Vuoto = spento", "text"),
-    ("CALENDAR_ICS_URL", "Calendari (iCal segreti)", "Per gli eventi nel brief. Google Calendar sul PC > ingranaggio > Settings > un calendario a sinistra > Integrate calendar > 'Secret address in iCal format'. Più calendari (lavoro, personale, Stostudio): incollali tutti qui, separati da uno spazio", "password"),
+    ("CALENDAR_ICS_URL", "Calendari (iCal segreti)", "Per gli eventi nel brief: un indirizzo per riga, tutti i calendari che vuoi (personale, lavoro, Stostudio...). Dove si trova: Google Calendar sul PC > ingranaggio > Settings > il calendario a sinistra > Integrate calendar > 'Secret address in iCal format'. Salva sostituisce la lista con quello che vedi qui", "textarea"),
     ("POSTINO_DB", "Database di Postino (email nel brief)", "Percorso dentro il container, lo scrive il server: /postino/postino.db. Vuoto = niente email nel brief", "text"),
     ("TELEGRAM_BOT_TOKEN", "Token del bot Telegram", "Da BotFather. Dopo averlo messo, scrivi /start <codice> al bot", "password"),
     ("LINKS_STATS_KEY", "Chiave del link manager", "La riga di STATS-KEY.txt del repo links: accende i DM Instagram", "password"),
@@ -1683,14 +1684,18 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
     rows = []
     for key, label, hint, kind in MANAGER_KEYS:
         is_set = bool(os.environ.get(key, "").strip())
-        shown = _esc(os.environ.get(key, "")) if kind == "text" and is_set else ""
+        shown = _esc(os.environ.get(key, "")) if kind in ("text", "textarea") and is_set else ""
+        if kind == "textarea" and key == "CALENDAR_ICS_URL":
+            shown = _esc("\n".join(fonti.calendari(os.environ.get(key, ""))))
         rows.append(
             f'<div class="card"><div class="row"><span class="k">{_esc(label)}</span>'
             f'<span class="tag {"on" if is_set else "off"}">{"impostata" if is_set else "non impostata"}</span></div>'
             f'<div class="hint">{_esc(hint)}</div>'
             f'<form method="post" class="row"><input type="hidden" name="chiave" value="{key}">'
-            f'<input type="{kind}" name="valore" value="{shown}" placeholder="{"lascia vuoto e premi Cancella per togliere" if is_set else "incolla qui"}" autocomplete="off">'
-            f'<button type="submit" name="azione" value="salva">Salva</button>'
+            + (f'<textarea name="valore" rows="4" placeholder="un indirizzo per riga" style="flex:1 1 220px;min-width:0;font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)">{shown}</textarea>'
+               if kind == "textarea" else
+               f'<input type="{kind}" name="valore" value="{shown}" placeholder="{"lascia vuoto e premi Cancella per togliere" if is_set else "incolla qui"}" autocomplete="off">')
+            +             f'<button type="submit" name="azione" value="salva">Salva</button>'
             + (f'<button type="submit" name="azione" value="cancella" class="quiet">Cancella</button>' if is_set else "")
             + "</form></div>")
     stato_rows = [
@@ -1708,6 +1713,124 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
             + (f'<div class="hint">WhatsApp (stato, QR per collegare il telefono): <a href="{_wa_url()}/stato">{_wa_url()}/stato</a></div>' if _wa_url() else "")
             + "</div>"
             + "".join(rows) + "</main></body></html>")
+
+
+# ---------------------------------------------------------------- hub: tutto in una pagina
+# Raggiungibile direttamente (/<segreto>/hub, dietro il codice Telegram) e attraverso hub.emazamboni.com (un
+# Worker Cloudflare che fa da specchio: tiene lui il segreto, l'indirizzo resta memorizzabile). I link interni sono
+# relativi (manager, cruscotto, whatsapp) così funzionano in tutti e due i modi.
+HUB_FISSI = [
+    ("Segretario", [
+        ("Manager", "manager", "Chiavi e interruttori: vocali, calendari, brief, Telegram, link manager"),
+        ("Cruscotto", "cruscotto", "I progetti Claude: gialli quando aspettano te"),
+        ("WhatsApp", "whatsapp", "Stato del collegamento e QR per il telefono"),
+        ("Progetto Secretary", "https://claude.ai/project/01a19e2e-2434-76f8-b630-c7fb371b6d25", "La chat del Segretario su claude.ai"),
+    ]),
+    ("Posta e social", [
+        ("Postino", "https://postino.emazamboni.com", "Le tue email, tutte le caselle"),
+        ("Link manager", "https://links.emazamboni.com/admin/", "Link, DM Instagram, post su TikTok/YouTube/Instagram, analytics"),
+        ("Pagina link", "https://emazamboni.com/links", "La pagina pubblica con i prodotti"),
+    ]),
+    ("Le mie app", [
+        ("EASY RAVE", "https://easyrave.com", "Groovebox nel browser"),
+        ("EASY REMOTE", "https://easy-remote.pages.dev", "Gioca al PC da telefono e Mac"),
+        ("Stostudio", "https://stostudio.it", "Il sito dello studio"),
+    ]),
+]
+
+
+def _hub_extra() -> list[dict]:
+    try:
+        return json.loads(_read("hub.json") or "[]")
+    except ValueError:
+        return []
+
+
+@mcp.tool()
+def hub_link_aggiungi(nome: str, url: str, gruppo: str = "Le mie app", nota: str = "") -> dict:
+    """Aggiunge (o aggiorna, stesso nome) un pulsante nella pagina hub di Ema (hub.emazamboni.com): nome, indirizzo
+    https, gruppo (Segretario | Posta e social | Le mie app | altro a scelta), una riga di spiegazione."""
+    n = _one_line(nome, "nome", 60)
+    u = _one_line(url, "url", 300)
+    if not u.startswith("https://"):
+        raise ValueError("l'indirizzo deve iniziare con https://")
+    with lock:
+        items = [x for x in _hub_extra() if x.get("nome", "").lower() != n.lower()]
+        items.append({"nome": n, "url": u, "gruppo": _one_line(gruppo, "gruppo", 40), "nota": _one_line(nota, "nota", 120) if nota.strip() else ""})
+        _write_json(MEMORIA / "hub.json", items)
+        commit(f"hub: {n}")
+    return {"aggiunto": n, "gruppo": gruppo}
+
+
+@mcp.tool()
+def hub_link_togli(nome: str) -> dict:
+    """Toglie un pulsante aggiunto alla pagina hub (quelli fissi non si tolgono)."""
+    n = _one_line(nome, "nome", 60)
+    with lock:
+        items = _hub_extra()
+        rest = [x for x in items if x.get("nome", "").lower() != n.lower()]
+        if len(rest) == len(items):
+            raise ValueError(f"nessun pulsante chiamato {n}")
+        _write_json(MEMORIA / "hub.json", rest)
+        commit(f"hub: tolto {n}")
+    return {"tolto": n}
+
+
+HUB_CSS = MANAGER_CSS + """
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+a.tile{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 12px;text-decoration:none;color:var(--ink);min-height:96px}
+a.tile:active{transform:scale(.98)}a.tile .n{font-weight:700;font-size:17px;display:block;margin-bottom:4px}a.tile .d{color:var(--mut);font-size:13px;line-height:1.3}
+h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:18px 0 8px}
+.code{display:inline-block;font:700 22px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:3px;padding:8px 12px;border:1px dashed var(--line);border-radius:10px}
+"""
+
+
+def hub_html() -> str:
+    with lock:
+        extra = _hub_extra()
+    st = stato()  # fuori dal lock: stato() lo prende da solo
+    groups: dict[str, list[tuple[str, str, str]]] = {g: list(items) for g, items in HUB_FISSI}
+    for x in extra:
+        groups.setdefault(x.get("gruppo") or "Le mie app", []).append((x["nome"], x["url"], x.get("nota", "")))
+    parts = ['<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
+             f'<meta name="robots" content="noindex"><title>Hub di Ema</title><style>{HUB_CSS}</style></head><body><main>',
+             '<h1>Hub</h1><p class="sub">Tutto quello che ti serve, in un posto. Pagina privata.</p>']
+    for g, items in groups.items():
+        parts.append(f"<h2>{_esc(g)}</h2><div class=\"grid\">")
+        for nome, url, nota in items:
+            href = _esc(url) if url.startswith("https://") else url  # relativo: manager, cruscotto, whatsapp
+            parts.append(f'<a class="tile" href="{href}"><span class="n">{_esc(nome)}</span><span class="d">{_esc(nota)}</span></a>')
+        parts.append("</div>")
+    tele = st.get("telegram", "")
+    parts.append('<h2>Da sapere</h2><div class="card">'
+                 f'<p>Codice di approvazione delle regole (lo chiede il Segretario in chat): <span class="code">{secret[:6]}</span></p>'
+                 f'<p class="hint">Telegram: {_esc(str(tele))}. Un solo messaggio al giorno, il brief delle {_esc(str(st.get("brief_ora")))}. '
+                 'Comandi: /brief, /spesa, /stato.</p>'
+                 '<p class="hint">Per aggiungere un pulsante qui basta dirlo al Segretario in chat ("aggiungi all\'hub il sito X, indirizzo https://...").</p></div>')
+    parts.append("</main></body></html>")
+    return "".join(parts)
+
+
+async def hub_page(request):
+    from starlette.responses import HTMLResponse
+    gate = await _gate(request)
+    if gate is not None:
+        return gate
+    return HTMLResponse(hub_html(), headers={
+        "Cache-Control": "no-store", "Content-Security-Policy": MANAGER_CSP, "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff"})
+
+
+async def whatsapp_redirect(request):
+    """/<segreto>/whatsapp -> la pagina di stato del servizio WhatsApp (dietro il codice Telegram)."""
+    from starlette.responses import PlainTextResponse, RedirectResponse
+    gate = await _gate(request)
+    if gate is not None:
+        return gate
+    url = _wa_url()
+    if not url:
+        return PlainTextResponse("WhatsApp non configurato (WHATSAPP_TOKEN)", status_code=404)
+    return RedirectResponse(url + "/stato", status_code=302)
 
 
 MANAGER_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'self' https://claude.ai https://*.claude.ai"
@@ -1739,6 +1862,8 @@ inner.add_route("/health", health, methods=["GET"])
 inner.add_route(f"/{secret}/config", config_endpoint, methods=["GET", "POST"])
 inner.add_route(f"/{secret}/cruscotto", cruscotto_page, methods=["GET", "POST"])
 inner.add_route(f"/{secret}/manager", manager_page, methods=["GET", "POST"])
+inner.add_route(f"/{secret}/hub", hub_page, methods=["GET", "POST"])
+inner.add_route(f"/{secret}/whatsapp", whatsapp_redirect, methods=["GET", "POST"])
 inner.add_route(f"/{secret}/trascrivi", trascrivi_endpoint, methods=["POST"])
 inner.add_route(f"/{secret}/cruscotto.json", cruscotto_json, methods=["GET"])
 
