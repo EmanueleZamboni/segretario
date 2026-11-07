@@ -200,10 +200,13 @@ export class WhatsApp extends EventEmitter {
       return;
     }
     if (!this.creds?.registered) {
-      // Nessuno ha scansionato il QR in tempo: si torna in attesa, il pulsante "Collega" lo rifà.
+      // Nessuno ha scansionato il QR in tempo (408), oppure la connessione è caduta prima: si torna in attesa,
+      // il pulsante "Collega" lo rifà. Il motivo vero resta leggibile nella pagina /stato.
       this.state = 'not_linked';
       this.sock = undefined;
-      this.lastError = 'QR scaduto, nessuna scansione';
+      this.lastError = code === DisconnectReason.timedOut || code === 408
+        ? 'QR scaduto, nessuna scansione'
+        : `connessione chiusa prima del collegamento: ${error?.message || 'motivo sconosciuto'} (codice ${code ?? '?'})`;
       this.emit('qr-expired');
       return;
     }
