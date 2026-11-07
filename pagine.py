@@ -224,12 +224,19 @@ def impostazioni(sezioni: list[tuple[str, str, list[dict]]], stato_righe: list[t
     return shell("Impostazioni · Segretario", "".join(parts), current="manager")
 
 
-def codice(msg: str = "") -> str:
-    body = ("<div class=\"otp\"><div class=\"card\"><h1>Un codice, una volta</h1><p class=\"sub\">L'ho mandato su Telegram: 6 cifre. Questo browser resta fidato per sempre.</p>"
-            + (f'<div class="msg err">{esc(msg)}</div>' if msg else "")
-            + '<form method="post"><input type="text" name="codice" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="······" aria-label="codice" autofocus>'
-            '<div class="actions"><button class="btn" type="submit" name="azione" value="verifica">Entra</button>'
-            '<button class="btn quiet" type="submit" name="azione" value="rimanda">Rimanda il codice</button></div></form></div></div>')
+def codice(msg: str = "", inviato: bool = False) -> str:
+    """La porta: prima un solo pulsante (nessun codice parte aprendo la pagina), poi la casella per il codice."""
+    err = f'<div class="msg err">{esc(msg)}</div>' if msg else ""
+    if inviato:
+        body = ('<div class="otp"><div class="card"><h1>Scrivi il codice</h1><p class="sub">È sul tuo Telegram: 6 cifre, vale 10 minuti. Questo browser poi resta fidato.</p>'
+                + err
+                + '<form method="post"><input type="text" name="codice" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="······" aria-label="codice" autofocus>'
+                '<div class="actions"><button class="btn" type="submit" name="azione" value="verifica">Entra</button>'
+                '<button class="btn quiet" type="submit" name="azione" value="rimanda">Mandane uno nuovo</button></div></form></div></div>')
+    else:
+        body = ('<div class="otp"><div class="card"><h1>Pagina privata</h1><p class="sub">Per entrare serve un codice di 6 cifre che arriva sul Telegram di Ema. Questo browser poi resta fidato.</p>'
+                + err
+                + '<form method="post"><div class="actions"><button class="btn" type="submit" name="azione" value="manda">Mandami il codice su Telegram</button></div></form></div></div>')
     return shell("Codice · Segretario", body)
 
 

@@ -1395,7 +1395,8 @@ CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'n
 # Senza Telegram collegato il controllo non può esistere e la pagina si apre con il solo segreto.
 DEVICE_COOKIE = "seg_dispositivo"
 DEVICE_DAYS = 400  # "a vita": i browser accettano al massimo 400 giorni per cookie, poi un codice nuovo
-_otp: dict = {"codice": "", "scade": 0.0, "tentativi": 0, "inviato": 0.0}
+_otp: dict = {"codice": "", "scade": 0.0, "tentativi": 0, "inviato": 0.0, "storia": []}
+OTP_MAX_ORA = 3  # codici al massimo in un'ora, chiunque li chieda: la pagina è pubblica, il Telegram è di Ema
 
 
 def _devices() -> dict:
@@ -1417,14 +1418,26 @@ def _otp_possibile() -> bool:
     return bot is not None and bot.chat_id is not None
 
 
-def _otp_manda() -> str | None:
-    """Manda (o rimanda, non più di una volta al minuto) il codice su Telegram. Ritorna un messaggio per la pagina."""
+def _otp_valido() -> bool:
+    return bool(_otp["codice"]) and time.time() < _otp["scade"]
+
+
+def _otp_manda(nuovo: bool = False) -> str | None:
+    """Manda il codice su Telegram SOLO quando qualcuno preme il pulsante (mai aprendo la pagina). Se un codice valido
+    è già sul telefono non ne manda un altro, a meno di `nuovo` (Rimanda). Mai più di OTP_MAX_ORA all'ora. Ritorna un
+    messaggio per la pagina."""
     nowt = time.time()
-    if _otp["codice"] and nowt < _otp["scade"] and nowt - _otp["inviato"] < 60:
+    if _otp_valido() and not nuovo:
         return None
+    storia = [t for t in _otp["storia"] if nowt - t < 3600]
+    _otp["storia"] = storia
+    if len(storia) >= OTP_MAX_ORA:
+        return "Troppi codici chiesti nell'ultima ora. Se il codice è già sul tuo Telegram usalo, altrimenti riprova più tardi."
     _otp.update(codice=f"{secrets.randbelow(10**6):06d}", scade=nowt + 600, tentativi=0, inviato=nowt)
+    storia.append(nowt)
     try:
-        bot.send(f"Codice per aprire il manager/cruscotto del Segretario: <b>{_otp['codice']}</b>\nVale 10 minuti. Se non sei stato tu, ignora.", conta=False, html=True)
+        bot.send(f"Codice per aprire hub.emazamboni.com: <b>{_otp['codice']}</b>\nVale 10 minuti. "
+                 "Se non l'hai chiesto tu, ignora: senza il codice nessuno entra.", conta=False, html=True)
     except Exception as err:  # noqa: BLE001
         log.warning("otp: %s", err)
         return "Non riesco a mandare il codice su Telegram adesso."
@@ -1442,8 +1455,8 @@ def _otp_verifica(codice: str) -> bool:
     return False
 
 
-def _otp_html(msg: str = "") -> str:
-    return pagine.codice(msg)
+def _otp_html(msg: str = "", inviato: bool = False) -> str:
+    return pagine.codice(msg, inviato)
 
 
 async def _gate(request):
@@ -1467,12 +1480,14 @@ async def _gate(request):
                              samesite="lax", path=f"{PUBLIC_PREFIX}/{secret}")
                 return r
             msg = "Codice sbagliato o scaduto."
+        elif azione == "manda":
+            msg = _otp_manda() or ""
         elif azione == "rimanda":
-            _otp.update(codice="", scade=0.0)
-    err = _otp_manda()
-    return HTMLResponse(_otp_html(err or msg), status_code=401, headers={
+            msg = _otp_manda(nuovo=True) or ""
+    # Aprire la pagina non manda niente: la pagina è pubblica (hub.emazamboni.com) e la vedono anche i robot.
+    return HTMLResponse(_otp_html(msg, inviato=_otp_valido()), status_code=401, headers={
         "Cache-Control": "no-store", "Content-Security-Policy": MANAGER_CSP, "Referrer-Policy": "no-referrer",
-        "X-Content-Type-Options": "nosniff"})
+        "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow"})
 
 
 async def cruscotto_page(request):
