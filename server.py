@@ -1426,7 +1426,7 @@ def _tutti(request) -> bool:
     return request.query_params.get("tutti", "") not in ("", "0", "no")
 
 
-CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self' https://claude.ai https://*.claude.ai"
 
 
 async def cruscotto_page(request):
@@ -1592,7 +1592,7 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
             + "".join(rows) + "</main></body></html>")
 
 
-MANAGER_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+MANAGER_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'self' https://claude.ai https://*.claude.ai"
 
 
 async def manager_page(request):
