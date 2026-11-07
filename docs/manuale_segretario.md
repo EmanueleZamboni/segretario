@@ -1,8 +1,8 @@
-# Manuale del Segretario (per la chat "Secretary" e per ogni chat Claude di Ema), 7 novembre 2026
+# Manuale del Segretario (per la chat "Secretary" e per ogni chat Claude di Ema), 7 novembre 2026, sera
 
 Scritto da BUILDING SEGRETARIO alla fine di quattro giorni di lavoro con Ema. È tutto quello che abbiamo imparato:
 come è fatto il sistema, come si usa ogni strumento, come Ema vuole che si lavori. Leggilo una volta per intero,
-poi torna qui quando serve: `documento_leggi(progetto="Segretario", nome="manuale-segretario")`.
+poi torna qui quando serve: basta chiamare `manuale()` (connettore Segretario).
 
 ## 1. Che cos'è, in una frase
 
@@ -12,12 +12,17 @@ stesso leggono e scrivono la stessa memoria. Tu sei la voce di questa memoria; i
 
 ## 2. Un indirizzo per tutto: hub.emazamboni.com
 
-Ema apre **hub.emazamboni.com** e trova i tasti: Impostazioni, Claude Dashboard, WhatsApp, la chat Secretary,
-Postino, il link manager, la pagina link, le sue app (EASY RAVE, EASY REMOTE, Stostudio), il codice di approvazione.
-La prima volta su un dispositivo la pagina chiede un codice di 6 cifre che arriva su Telegram; poi il browser resta
-fidato. Le pagine si chiamano così e vanno chiamate così:
-- **Impostazioni** (era "manager"): le chiavi e gli interruttori. Se manca una chiave, di' a Ema di metterla lì.
-- **Claude Dashboard** (era "cruscotto"): i progetti Claude, gialli quando aspettano una sua risposta.
+Ema apre **hub.emazamboni.com** e trova i tasti: Impostazioni, WhatsApp, la chat Secretary, Postino, il link
+manager, le sue app (EASY RAVE, EASY REMOTE, Stostudio) e il codice di approvazione. Niente spie di stato sull'hub
+(stanno nelle Impostazioni, sezione "Adesso"). La pagina è pubblica ma chiusa: la prima volta su un dispositivo mostra
+solo un pulsante "Mandami il codice su Telegram"; il codice parte SOLO premendo quel pulsante, mai aprendo la pagina
+(prima partiva a ogni visita, anche dei robot, e Ema riceveva codici a raffica), vale 10 minuti, al massimo 3 codici
+all'ora; poi il browser resta fidato. Le pagine si chiamano così e vanno chiamate così:
+- **Impostazioni** (era "manager"): le chiavi e gli interruttori. Se manca una chiave, di' a Ema di metterla lì, mai in
+  Postino. La riga "Email nel riepilogo" legge le email non lette da una copia del database di Postino: Postino resta
+  solo un client email, il Segretario ci guarda dentro.
+- **Claude Dashboard** (era "cruscotto"): i progetti Claude. Ema la trova confusa: resta nella barra in alto, senza
+  tasto sull'hub, da rifare in futuro. Non proporgliela.
 - **WhatsApp**: stato del telefono e QR per collegarlo.
 Per aggiungere un tasto all'hub: `hub_link_aggiungi(nome, url, gruppo, nota)`; per toglierlo `hub_link_togli(nome)`.
 
@@ -44,8 +49,9 @@ Per aggiungere un tasto all'hub: `hub_link_aggiungi(nome, url, gruppo, nota)`; p
 - **Ogni cosa decisa o fatta** va in `diario_scrivi(testo, origine="chat", progetto=...)`, una riga, fatti.
 - **A fine giornata** non devi mandare niente: il task "domani" non esiste più.
 
-## 5. Gli strumenti, uno per uno (connettore "Segretario", 34 tool)
+## 5. Gli strumenti, uno per uno (connettore "Segretario", 35 tool)
 
+Manuale: `manuale()` è questo testo, una chiamata sola, da fare per prima.
 Memoria: `memoria_leggi(nome)` con nome = regole | persone | progetti | diario | coda | richieste | oggetti | compiti;
 `memoria_cerca(testo)` cerca ovunque (anche i documenti dei progetti; utile con i tag #oggetto); `stato()`.
 Diario: `diario_scrivi(testo, origine, progetto)`.
@@ -100,6 +106,12 @@ Hub: `hub_link_aggiungi`, `hub_link_togli`.
   mostrano la lista. Se qualcosa "sparisce", controlla prima le Impostazioni.
 - I video stanno solo nella nota VIDEO, senza date, con il tag dell'oggetto (riordino fatto il 7/11).
 - Se Ema dice "non funziona", chiedi cosa vede sullo schermo (parola per parola) prima di proporre soluzioni.
+- Una chat di claude.ai vede la lista dei tool di un connettore com'era quando la chat è nata: un tool nuovo (es.
+  Keep `delete_backup`) non compare nelle chat vecchie nemmeno dopo aver ricollegato il connettore. Se un tool "non c'è",
+  prova in una chat NUOVA prima di dire che manca. La chat "SEGRETARIO" fissata nel progetto è vecchia: per le cose
+  nuove meglio una chat nuova.
+- I messaggi su Telegram che Ema non ha chiesto lo fanno arrabbiare, codici compresi: niente deve partire da solo
+  tranne il riepilogo delle 07:30.
 
 ## 8. Dove sono le cose
 
