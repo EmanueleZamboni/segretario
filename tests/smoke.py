@@ -47,7 +47,8 @@ async def run(url: str, data: Path, secret: str) -> None:
                     "richiesta_scrivi", "richiesta_chiudi", "progetto_segna", "progetto_leggi", "progetti_lista",
                     "materiale_aggiungi", "documento_salva", "documento_leggi",
                     "instagram_chat_lista", "instagram_chat_leggi", "instagram_rispondi",
-                    "brief_testo", "spesa_lista", "spesa_negozio"}
+                    "brief_testo", "spesa_lista", "spesa_negozio",
+                    "oggetto_segna", "oggetto_leggi", "oggetti_lista", "compito_assegna", "compiti_lista", "compito_chiudi"}
             assert want <= tools, want - tools
             print("tool:", len(tools))
 

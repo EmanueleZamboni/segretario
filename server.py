@@ -395,6 +395,23 @@ FIXED = (
 )
 
 
+def _compiti() -> list[dict]:
+    try:
+        return json.loads(_read("compiti.json") or "[]")
+    except ValueError:
+        return []
+
+
+def _save_compiti(items: list[dict]) -> None:
+    _write_json(MEMORIA / "compiti.json", items)
+    righe = ["# Compiti passati da una chat a un progetto Claude (li legge chi ha il contesto giusto)", ""]
+    for c in items:
+        righe.append(f"- [{c['id']}] [{c['stato']}] {c['quando']} → {c['progetto']}: {c['testo']}" + (f" (da {c['da']})" if c.get("da") else "")
+                     + (f" · esito: {c['esito']}" if c.get("esito") else ""))
+    (MEMORIA / "compiti.md").write_text("\n".join(righe) + "\n", encoding="utf-8")
+
+
+
 def build_instructions() -> str:
     regole = [l for l in _read("regole.md").splitlines() if l.startswith("- ")][:MAX_RULES_IN_INSTRUCTIONS]
     aperte = [p for p in _proposte() if p["stato"] == "in attesa"]
@@ -407,6 +424,10 @@ def build_instructions() -> str:
         coda += f"\n{len(attese)} sessioni aspettano una risposta di Ema (sessioni_lista)."
     if richieste:
         coda += f"\n{len(richieste)} richieste di miglioramento aperte (memoria_leggi richieste)."
+    compiti = [c for c in _compiti() if c["stato"] == "aperto"]
+    if compiti:
+        progs = ", ".join(sorted({c["progetto"] for c in compiti}))
+        coda += f"\n{len(compiti)} compiti consegnati a progetti ({progs}): chi lavora su quel progetto li legge con compiti_lista."
     t = now()
     giorni = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
     return FIXED.format(
@@ -435,7 +456,7 @@ mcp = FastMCP(
 
 @mcp.tool()
 def memoria_leggi(nome: str, giorno: str = "", ultimi_giorni: int = 2) -> str:
-    """Legge la memoria di Ema. nome: regole, persone, progetti, diario, coda (proposte in attesa).
+    """Legge la memoria di Ema. nome: regole, persone, progetti, diario, coda (proposte in attesa), richieste, oggetti, compiti.
     Per il diario: giorno = AAAA-MM-GG, 'oggi' o 'ieri'; senza giorno ritorna gli ultimi `ultimi_giorni` (max 14)."""
     nome = (nome or "").strip().lower()
     with lock:
@@ -445,6 +466,10 @@ def memoria_leggi(nome: str, giorno: str = "", ultimi_giorni: int = 2) -> str:
             return _read("regole_in_coda.md") or "(nessuna proposta)"
         if nome == "richieste":
             return _read("richieste.md") or "(nessuna richiesta)"
+        if nome == "oggetti":
+            return _read("oggetti.md") or "(nessun oggetto registrato)"
+        if nome == "compiti":
+            return _read("compiti.md") or "(nessun compito)"
         if nome == "diario":
             if giorno:
                 return _read(f"diario/{_parse_day(giorno):%Y-%m-%d}.md") or "(niente nel diario quel giorno)"
@@ -456,7 +481,7 @@ def memoria_leggi(nome: str, giorno: str = "", ultimi_giorni: int = 2) -> str:
                 if text:
                     parts.append(f"## {d:%Y-%m-%d}\n{text.strip()}")
             return "\n\n".join(parts) or "(diario vuoto negli ultimi giorni)"
-    raise ValueError("nome: usa regole, persone, progetti, diario, coda o richieste")
+    raise ValueError("nome: usa regole, persone, progetti, diario, coda, richieste, oggetti o compiti")
 
 
 @mcp.tool()
@@ -1037,6 +1062,124 @@ def _brief_loop() -> None:
         except Exception as err:  # noqa: BLE001
             log.warning("brief: %s", err)
         time.sleep(60)
+
+
+# ---------- oggetti (tag unico ovunque) e compiti passati tra progetti ----------
+def _tag(s: str) -> str:
+    s = (s or "").strip().lstrip("#").lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    if not s:
+        raise ValueError("tag vuoto")
+    return s[:40]
+
+
+def _oggetti() -> dict:
+    try:
+        return json.loads(_read("oggetti.json") or "{}")
+    except ValueError:
+        return {}
+
+
+def _save_oggetti(items: dict) -> None:
+    _write_json(MEMORIA / "oggetti.json", items)
+    righe = ["# Oggetti di Ema (tag unico: lo stesso in Keep VIDEO, INVENTARIO, nei task e nel diario)", ""]
+    for tag, o in sorted(items.items()):
+        extra = []
+        if o.get("dove"):
+            extra.append(f"sta: {o['dove']}")
+        if o.get("prestato_a"):
+            extra.append(f"prestato a: {o['prestato_a']}")
+        if o.get("note"):
+            extra.append(o["note"])
+        righe.append(f"- #{tag} · {o.get('nome', tag)}" + (" · " + " · ".join(extra) if extra else ""))
+    (MEMORIA / "oggetti.md").write_text("\n".join(righe) + "\n", encoding="utf-8")
+
+
+@mcp.tool()
+def oggetto_segna(tag: str, nome: str = "", dove: str = "", note: str = "", prestato_a: str = "") -> dict:
+    """Registra o aggiorna un oggetto di Ema con il suo tag unico (es. #sony-vaio-p): nome, dove sta fisicamente
+    (scatola, stanza, da chi), note, a chi è prestato (vuoto = nessuno). Lo stesso tag va messo nelle righe di Keep
+    (VIDEO, INVENTARIO, TASKS) e nel diario: oggetto_leggi(tag) poi trova tutto. I campi vuoti non cancellano."""
+    tg = _tag(tag)
+    with lock:
+        items = _oggetti()
+        o = items.get(tg, {})
+        for k, v in (("nome", nome), ("dove", dove), ("note", note)):
+            if v.strip():
+                o[k] = _one_line(v, k, 300)
+        if prestato_a.strip():
+            o["prestato_a"] = "" if prestato_a.strip().lower() in ("nessuno", "no", "-") else _one_line(prestato_a, "prestato_a", 100)
+        o.setdefault("nome", tg.replace("-", " "))
+        o["aggiornato"] = now().strftime("%Y-%m-%d %H:%M")
+        items[tg] = o
+        _save_oggetti(items)
+        commit(f"oggetto #{tg}")
+    return {"tag": f"#{tg}", **o}
+
+
+@mcp.tool()
+def oggetto_leggi(tag: str) -> dict:
+    """Tutto quello che la memoria sa di un oggetto dal suo tag: scheda (dove sta, prestiti, note) e ogni riga di
+    diario, progetto, documento o sessione che contiene il tag. Per Keep usa anche il connettore Keep cercando #tag."""
+    tg = _tag(tag)
+    with lock:
+        scheda = _oggetti().get(tg)
+    hits = memoria_cerca(f"#{tg}")
+    return {"tag": f"#{tg}", "scheda": scheda, "righe": hits[:60]}
+
+
+@mcp.tool()
+def oggetti_lista(solo_prestati: bool = False) -> list[dict]:
+    """Gli oggetti registrati (tag, nome, dove stanno, prestiti)."""
+    with lock:
+        items = _oggetti()
+    rows = [{"tag": f"#{k}", **v} for k, v in sorted(items.items())]
+    return [r for r in rows if r.get("prestato_a")] if solo_prestati else rows
+
+
+@mcp.tool()
+def compito_assegna(progetto: str, testo: str, da: str = "chat Secretary") -> dict:
+    """Passa un compito a un altro progetto Claude (es. "rispondi alla mail di Anna" al progetto che conosce quel
+    cliente): lo troverà la prossima chat o sessione di quel progetto (compiti_lista) e le istruzioni del
+    connettore lo segnalano. Non fa partire nulla da solo: è una consegna, non un'esecuzione."""
+    prog = _one_line(progetto, "progetto", 80)
+    item = {"id": "c" + uuid.uuid4().hex[:6], "progetto": prog, "testo": _one_line(testo, "testo", 600),
+            "da": _one_line(da, "da", 80) if da.strip() else "", "quando": now().strftime("%Y-%m-%d %H:%M"),
+            "stato": "aperto", "esito": ""}
+    with lock:
+        items = _compiti()
+        items.append(item)
+        _save_compiti(items[-MAX_LIST:])
+        commit(f"compito {item['id']} per {prog}")
+    return item
+
+
+@mcp.tool()
+def compiti_lista(progetto: str = "", solo_aperti: bool = True) -> list[dict]:
+    """I compiti consegnati a un progetto (o a tutti, con progetto vuoto). Chi lavora su un progetto li legge
+    all'inizio e chiude quelli fatti con compito_chiudi."""
+    with lock:
+        items = _compiti()
+    p = (progetto or "").strip().lower()
+    return [c for c in items if (not p or c["progetto"].lower() == p) and (not solo_aperti or c["stato"] == "aperto")]
+
+
+@mcp.tool()
+def compito_chiudi(id: str, esito: str, stato: str = "fatto") -> dict:
+    """Chiude un compito: stato fatto | rimandato | annullato, con l'esito in una riga."""
+    if stato not in ("fatto", "rimandato", "annullato"):
+        raise ValueError("stato: fatto, rimandato o annullato")
+    with lock:
+        items = _compiti()
+        for c in items:
+            if c["id"] == id.strip():
+                c["stato"] = stato
+                c["esito"] = _one_line(esito, "esito", 400)
+                c["chiuso"] = now().strftime("%Y-%m-%d %H:%M")
+                _save_compiti(items)
+                commit(f"compito {id} {stato}")
+                return c
+    raise ValueError(f"compito {id} non trovato")
 
 
 @mcp.tool()

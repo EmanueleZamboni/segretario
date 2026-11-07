@@ -44,6 +44,8 @@ Così ogni chat parte già con le regole, senza tool call e senza dipendere dall
 | `brief_testo()` | il brief del mattino fatto dal server (TASKS di oggi e SPESA per negozio da Keep, sessioni che aspettano, proposte, richieste, diario di ieri) |
 | `spesa_lista()` | le voci non spuntate di SPESA (= finite) per negozio: Lidl, Mercato agricolo, DM |
 | `spesa_negozio(prodotto, negozio)` | insegna dove Ema compra un prodotto (memoria/negozi.json) |
+| `oggetto_segna(tag, nome, dove, note, prestato_a)` / `oggetto_leggi(tag)` / `oggetti_lista()` | gli oggetti di Ema con il tag unico (#sony-vaio-p): dove stanno, prestiti, e tutte le righe di memoria con quel tag |
+| `compito_assegna(progetto, testo, da)` / `compiti_lista(progetto)` / `compito_chiudi(id, esito)` | un compito passato da una chat a un altro progetto Claude; le istruzioni del connettore lo segnalano |
 | `sessione_chiudi(nome)` | segna una sessione come finita |
 | `progetto_segna(nome, dove_sono, prossimo_passo, stato, tipo, descrizione, alias)` | crea o aggiorna un progetto (video, app, lavoro, vita); gli alias servono a ritrovarlo con qualunque nome |
 | `progetto_leggi(nome)` | tutto il contesto di un progetto trovato per nome o alias: stato, materiali, documenti, righe del diario, sessioni |
