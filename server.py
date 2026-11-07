@@ -37,6 +37,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
 import brief as brief_mod
+import fonti
 import keep
 import telegram_bot
 
@@ -988,13 +989,26 @@ def instagram_rispondi(destinatario_id: str, testo: str) -> dict:
 # ---------- brief e spesa (fatti dal server, senza Claude) ----------
 def _brief_testo() -> str:
     t = now()
-    ieri = (t - timedelta(days=1)).strftime("%Y-%m-%d")
     with lock:
         sess = list(_sessioni().values())
         props = _proposte()
         reqs = _richieste()
-        diario_ieri = _read(f"diario/{ieri}.md")
-    return brief_mod.costruisci(t, MEMORIA, sess, props, reqs, diario_ieri)
+    note: list[str] = []
+    calendario = None
+    ics = os.environ.get("CALENDAR_ICS_URL", "").strip()
+    if ics:
+        try:
+            calendario = fonti.eventi_del_giorno(fonti.calendario_ics(ics, DATA), t.date())
+        except Exception as err:  # noqa: BLE001
+            note.append(f"calendario non letto: {str(err)[:80]}")
+    email = None
+    db = os.environ.get("POSTINO_DB", "").strip()
+    if db:
+        try:
+            email = fonti.email_non_lette(db, t)
+        except Exception as err:  # noqa: BLE001
+            note.append(f"email non lette: {str(err)[:80]}")
+    return brief_mod.costruisci(t, MEMORIA, sess, props, reqs, calendario=calendario, email=email, note=note)
 
 
 def _spesa_testo() -> str:
@@ -1211,6 +1225,8 @@ def stato() -> dict:
         "instagram": bool(os.environ.get("LINKS_STATS_KEY", "").strip()),
         "keep": keep.configured(),
         "brief_ora": os.environ.get("BRIEF_ORA", "").strip() or "spento",
+        "calendario": bool(os.environ.get("CALENDAR_ICS_URL", "").strip()),
+        "email_nel_brief": bool(os.environ.get("POSTINO_DB", "").strip()),
     }
 
 
@@ -1253,7 +1269,8 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
 
 
 CONFIG_KEYS = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GROQ_API_KEY", "OPENAI_API_KEY", "ROUTINE_FIRE_URL", "ROUTINE_FIRE_TOKEN",
-               "LINKS_API_URL", "LINKS_STATS_KEY", "KEEP_MCP_URL", "KEEP_MCP_HOST", "BRIEF_ORA", "TELEGRAM_PROPOSTE")
+               "LINKS_API_URL", "LINKS_STATS_KEY", "KEEP_MCP_URL", "KEEP_MCP_HOST", "BRIEF_ORA", "TELEGRAM_PROPOSTE",
+               "CALENDAR_ICS_URL", "POSTINO_DB")
 
 
 def load_config() -> dict:
@@ -1544,6 +1561,10 @@ def _config_valida(k: str, v: str) -> str | None:
         return "KEEP_MCP_URL deve essere il keep-mcp della VM (http://172.17.0.1:...) o https://"
     if k == "LINKS_API_URL" and v and not v.startswith("https://"):
         return "LINKS_API_URL deve iniziare con https://"
+    if k == "CALENDAR_ICS_URL" and v and not v.startswith("https://"):
+        return "l'indirizzo iCal inizia con https:// (Google Calendar > Impostazioni > il tuo calendario > Indirizzo segreto in formato iCal)"
+    if k == "POSTINO_DB" and v and not v.startswith("/"):
+        return "POSTINO_DB è un percorso dentro il container (di solito /postino/postino.db)"
     if k == "GROQ_API_KEY" and v and not v.startswith("gsk_"):
         return "una chiave Groq inizia con gsk_"
     return None
@@ -1622,6 +1643,8 @@ MANAGER_KEYS = [
     # (chiave, etichetta, spiegazione, tipo)
     ("GROQ_API_KEY", "Chiave Groq", "Vocali in testo (WhatsApp, Instagram, Telegram). Gratis: console.groq.com > API Keys. Inizia con gsk_", "password"),
     ("BRIEF_ORA", "Brief del mattino", "Ora del riepilogo su Telegram, es. 07:30. Vuoto = spento", "text"),
+    ("CALENDAR_ICS_URL", "Calendario (iCal segreto)", "Per gli eventi nel brief. Google Calendar sul PC > ingranaggio > Settings > il tuo calendario a sinistra > Integrate calendar > copia 'Secret address in iCal format'", "password"),
+    ("POSTINO_DB", "Database di Postino (email nel brief)", "Percorso dentro il container, lo scrive il server: /postino/postino.db. Vuoto = niente email nel brief", "text"),
     ("TELEGRAM_BOT_TOKEN", "Token del bot Telegram", "Da BotFather. Dopo averlo messo, scrivi /start <codice> al bot", "password"),
     ("LINKS_STATS_KEY", "Chiave del link manager", "La riga di STATS-KEY.txt del repo links: accende i DM Instagram", "password"),
     ("LINKS_API_URL", "URL del link manager", "Di solito https://links-tracker.ezamboni96.workers.dev", "text"),

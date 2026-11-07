@@ -47,6 +47,13 @@ if ! grep -q '^SEGRETARIO_URL=' "$ENVF"; then
   say "SEGRETARIO_URL added to .env"
 fi
 
+# 2c. Il database di Postino per le email nel brief (sola lettura): la cartella data di Postino sulla stessa VM.
+PDATA="$HOME/various/postino/data"
+if [ -f "$PDATA/postino.db" ] && ! grep -q '^POSTINO_DATA_DIR=' "$ENVF"; then
+  (umask 077; printf 'POSTINO_DATA_DIR=%s\nPOSTINO_DB=/postino/postino.db\n' "$PDATA" >> "$ENVF")
+  say "POSTINO_DATA_DIR added to .env (email nel brief)"
+fi
+
 # 3. Avvio (o aggiornamento) del container. Se fallisce si va avanti lo stesso (cron e rapporto),
 #    così il prossimo push può rimediare da solo e il motivo resta leggibile.
 FAILED=0

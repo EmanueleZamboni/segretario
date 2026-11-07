@@ -112,7 +112,9 @@ Limite: `NOTIFY_DAILY_CAP` messaggi al giorno (60) per `notify` e le proposte; l
 `CADDY_NETWORK` (postino_default), `SEGRETARIO_PUBLIC_HOST` (postino.emazamboni.com), `MEMORIA_GIT_REMOTE`,
 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `NOTIFY_DAILY_CAP`, `GROQ_API_KEY`, `OPENAI_API_KEY`, `ROUTINE_FIRE_URL`, `ROUTINE_FIRE_TOKEN`.
 `LINKS_API_URL` (Worker del link manager) e `LINKS_STATS_KEY` (la sua chiave Bearer) accendono i tool Instagram.
-`KEEP_MCP_URL` e `KEEP_MCP_HOST` (li scrive ops/run.sh di Various) fanno leggere Keep al server. `BRIEF_ORA` (HH:MM,
+`CALENDAR_ICS_URL` (indirizzo segreto iCal di Google Calendar, dal manager) mette gli eventi del giorno in cima al brief;
+`POSTINO_DB` (lo scrive install.sh: il database di Postino montato in sola lettura in /postino) mette in fondo le email
+importanti non lette. `KEEP_MCP_URL` e `KEEP_MCP_HOST` (li scrive ops/run.sh di Various) fanno leggere Keep al server. `BRIEF_ORA` (HH:MM,
 vuoto = spento) fa partire il brief del mattino su Telegram dal server stesso, senza task di claude.ai; su Telegram
 ci sono anche `/brief` e `/spesa`. `TELEGRAM_PROPOSTE=1` manda le proposte di regola sul telefono (di default no:
 Telegram resta zitto, Ema approva in chat con il codice).

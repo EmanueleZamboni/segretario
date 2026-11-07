@@ -3,3 +3,6 @@ starlette==1.10.0
 uvicorn==0.54.0
 tzdata==2026.6
 python-multipart>=0.0.20
+icalendar>=6.0
+recurring-ical-events>=3.0
+httpx>=0.27

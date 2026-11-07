@@ -21,6 +21,8 @@ services:
       # Keep letto dal server per il brief del mattino (li scrive ops/run.sh di Various nel .env)
       - KEEP_MCP_URL=${KEEP_MCP_URL:-}
       - KEEP_MCP_HOST=${KEEP_MCP_HOST:-}
+      # Email importanti nel brief: il database di Postino, montato in sola lettura (vuoto = niente email)
+      - POSTINO_DB=${POSTINO_DB:-}
       - MEMORIA_GIT_REMOTE=${MEMORIA_GIT_REMOTE:-}
       # Consegna al telefono (opzionali: senza, il Segretario funziona lo stesso, senza notify)
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
@@ -34,6 +36,7 @@ services:
       - ROUTINE_FIRE_TOKEN=${ROUTINE_FIRE_TOKEN:-}
     volumes:
       - segretario_data:/data
+      - ${POSTINO_DATA_DIR:-/nonexistent}:/postino:ro
     read_only: true
     tmpfs:
       - /tmp

@@ -82,46 +82,56 @@ def spesa_testo(items: list[dict], mapping: dict[str, list[str]]) -> str:
 
 
 def costruisci(adesso: datetime, memoria: Path, sessioni: list[dict], proposte: list[dict], richieste: list[dict],
-               diario_ieri: str, con_keep: bool = True) -> str:
-    """Il testo del brief. Ogni blocco è indipendente: un errore in uno non ferma gli altri."""
+               diario_ieri: str = "", con_keep: bool = True, calendario: list[dict] | None = None,
+               email: list[dict] | None = None, note: list[str] | None = None) -> str:
+    """Il brief del mattino, nell'ordine voluto da Ema (7/11): calendario, poi i task di oggi, poi cose che
+    potrebbe fare dalle liste non urgenti, poi le sessioni Claude che aspettano lui, e per ultime le email
+    importanti non lette. HTML per Telegram (grassetti). Ogni blocco è indipendente: un errore in uno non
+    ferma gli altri; `note` raccoglie gli avvisi (fonte non letta) in coda."""
     giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
     mesi = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"]
     parts = [f"<b>{giorni[adesso.weekday()]} {adesso.day} {mesi[adesso.month - 1]}</b>"]
-    keep_err = None
+    note = list(note or [])
+
+    # 1. calendario
+    if calendario is not None:
+        if calendario:
+            righe = []
+            for ev in calendario[:10]:
+                ora = f"{ev['ora']}" + (f"–{ev['fine']}" if ev.get("fine") else "") if ev.get("ora") else "tutto il giorno"
+                righe.append(f"• {esc(ora)}  {esc(ev['titolo'])}" + (f" · {esc(ev['luogo'])}" if ev.get("luogo") else ""))
+            parts.append("<b>Calendario</b>\n" + "\n".join(righe))
+        else:
+            parts.append("<b>Calendario</b>\nNiente in programma.")
+
+    # 2. i task di oggi e 3. cose che potrebbe fare, da Keep
     if con_keep and keep.configured():
         try:
             tasks = keep.note("TASKS")
-            oggi = keep.section(tasks.get("text", ""), "TODAY'S TASKS")
-            if oggi:
-                parts.append("<b>Oggi</b>\n" + "\n".join(f"• {esc(t)}" for t in oggi[:12]))
-            else:
-                parts.append("<b>Oggi</b>\nNiente in TODAY'S TASKS.")
+            text = tasks.get("text", "")
+            oggi = keep.section(text, "TODAY'S TASKS")
+            parts.append("<b>Oggi</b>\n" + ("\n".join(f"• {esc(t)}" for t in oggi[:12]) if oggi else "Niente di fissato per oggi."))
+            altri = (keep.section(text, "GENERAL") + keep.section(text, "WORK"))[:5]
+            if altri:
+                parts.append("<b>Se hai tempo</b>\n" + "\n".join(f"• {esc(t)}" for t in altri))
         except Exception as err:  # noqa: BLE001
-            keep_err = str(err)
-        try:
-            spesa = keep.note("SPESA")
-            parts.append(spesa_testo(spesa.get("items", []), negozi(memoria)))
-        except Exception as err:  # noqa: BLE001
-            keep_err = keep_err or str(err)
+            note.append(f"Keep non letto: {err}")
+
+    # 4. sessioni Claude che aspettano lui
     attese = [s for s in sessioni if s.get("stato") == "aspetta Ema"]
     if attese:
-        parts.append("<b>Aspettano te</b>\n" + "\n".join(
-            f"• {esc(s['nome'])}: {esc(s.get('domanda_per_ema') or s.get('prossimo_passo') or s.get('dove_sono', ''))}" for s in attese[:6]))
-    in_attesa = [p for p in proposte if p.get("stato") == "in attesa"]
-    aperte = [r for r in richieste if r.get("stato") == "aperta"]
-    code = []
-    if in_attesa:
-        code.append(f"{len(in_attesa)} regole da approvare")
-    if aperte:
-        code.append(f"{len(aperte)} richieste in lavorazione")
-    if code:
-        parts.append("<b>Segretario</b>\n" + " · ".join(code))
-    if diario_ieri.strip():
-        righe = [re.sub(r"^\d\d:\d\d \[[^\]]*\]\s*", "", l[2:]) for l in diario_ieri.splitlines() if l.startswith("- ")]
-        if righe:
-            parts.append("<b>Ieri</b>\n" + "\n".join(f"• {esc(r[:140])}" for r in righe[-6:]))
-    if keep_err:
-        parts.append(f"<i>Keep non letto: {esc(keep_err[:120])}</i>")
+        parts.append("<b>Claude aspetta te</b>\n" + "\n".join(
+            f"• {esc(s['nome'])}: {esc(s.get('domanda_per_ema') or s.get('prossimo_passo') or s.get('dove_sono', ''))}" for s in attese[:5]))
+
+    # 5. email importanti non lette, per ultime
+    if email is not None:
+        if email:
+            parts.append("<b>Email da leggere</b>\n" + "\n".join(f"• {esc(m['da'])}: {esc(m['oggetto'][:80])}" for m in email[:8]))
+        else:
+            parts.append("<b>Email da leggere</b>\nNessuna email importante non letta.")
+
+    if note:
+        parts.append("<i>" + " · ".join(esc(n[:120]) for n in note) + "</i>")
     return "\n\n".join(parts)
 
 
