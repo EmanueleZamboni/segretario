@@ -198,6 +198,15 @@ export class WhatsApp extends EventEmitter {
     this.lastError = error?.message;
     this.qr = undefined;
     if (this.stopped) return;
+    if (code === DisconnectReason.restartRequired) {
+      // Subito dopo la scansione del QR WhatsApp chiude e chiede di riaprire con le chiavi appena salvate:
+      // non è un errore, va fatto al volo (come Postino), altrimenti il telefono resta su "Accesso in corso".
+      this.state = 'reconnecting';
+      this.lastError = undefined;
+      this.sock = undefined;
+      setTimeout(() => this.start().catch(err => this.onClose(err)), 500);
+      return;
+    }
     if (code === DisconnectReason.loggedOut) {
       this.state = 'logged_out';
       this.sock = undefined;
