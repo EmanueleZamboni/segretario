@@ -72,11 +72,15 @@ def main():
     assert bot.handle(msg(42, voice={"file_id": "f2", "duration": 999})) == "troppo-lungo"
     # 6. proposta di regola -> bottoni -> approvazione via callback
     server.bot = bot
+    n_before = len(bot.calls)
     prop = server.regola_proponi("Rispondi sempre in italiano su Telegram", "detto il 4/11")
+    assert len(bot.calls) == n_before, "una proposta NON deve mandare messaggi Telegram (Ema: solo il brief)"
+    os.environ["TELEGRAM_PROPOSTE"] = "1"
+    server.regola_proponi("Regola con avviso sul telefono", "prova")
     last_method, last_params = bot.calls[-1]
     assert last_method == "sendMessage" and "inline_keyboard" in last_params["reply_markup"]
-    data = last_params["reply_markup"]["inline_keyboard"][0][0]["callback_data"]
-    assert data == f"regola:{prop['id']}:si", data
+    os.environ.pop("TELEGRAM_PROPOSTE")
+    data = f"regola:{prop['id']}:si"
     cq = {"update_id": 2, "callback_query": {"id": "cq1", "from": {"id": 42}, "data": data,
                                              "message": {"message_id": 7, "text": "Nuova regola proposta"}}}
     assert bot.handle(cq) == "approvata"

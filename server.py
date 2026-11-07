@@ -24,6 +24,7 @@ import re
 import secrets
 import subprocess
 import threading
+import time
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -34,6 +35,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse
 
+import brief as brief_mod
+import keep
 import telegram_bot
 
 DATA = Path(os.environ.get("SEGRETARIO_DATA", "/data"))
@@ -344,7 +347,9 @@ def _propose(file: str, testo: str, motivo: str) -> dict:
         items.append(item)
         _save_proposte(items)
         commit(f"proposta {item['id']} per {file}")
-    if bot is not None and bot.chat_id is not None:
+    # Telegram resta zitto: Ema approva in chat (con il codice) o dal cruscotto. Solo se lo chiede
+    # (TELEGRAM_PROPOSTE=1 in /config) le proposte arrivano sul telefono con i bottoni.
+    if bot is not None and bot.chat_id is not None and os.environ.get("TELEGRAM_PROPOSTE", "").strip() == "1":
         kind = "regola" if file == "regole" else "nota"
         try:
             bot.send(f"Nuova {kind} proposta ({file}):\n{item['testo']}" + (f"\nMotivo: {item['motivo']}" if item["motivo"] else ""),
@@ -911,6 +916,85 @@ def instagram_rispondi(destinatario_id: str, testo: str) -> dict:
     return {"inviato": True, "message_id": out.get("message_id"), "quando": f"{t:%Y-%m-%d %H:%M}"}
 
 
+# ---------- brief e spesa (fatti dal server, senza Claude) ----------
+def _brief_testo() -> str:
+    t = now()
+    ieri = (t - timedelta(days=1)).strftime("%Y-%m-%d")
+    with lock:
+        sess = list(_sessioni().values())
+        props = _proposte()
+        reqs = _richieste()
+        diario_ieri = _read(f"diario/{ieri}.md")
+    return brief_mod.costruisci(t, MEMORIA, sess, props, reqs, diario_ieri)
+
+
+def _spesa_testo() -> str:
+    spesa = keep.note("SPESA")
+    with lock:
+        mapping = brief_mod.negozi(MEMORIA)
+    return brief_mod.spesa_testo(spesa.get("items", []), mapping)
+
+
+@mcp.tool()
+def brief_testo() -> str:
+    """Il brief del mattino come lo manda il Segretario da solo: TASKS di oggi e SPESA per negozio (da Keep),
+    sessioni che aspettano Ema, proposte e richieste aperte, diario di ieri. Usalo per leggerlo o rifinirlo;
+    per mandarlo sul telefono c'è notify."""
+    return _brief_testo()
+
+
+@mcp.tool()
+def spesa_lista() -> dict:
+    """Cosa deve comprare Ema: le voci NON spuntate della lista Keep SPESA (= finite), raggruppate per negozio
+    (Lidl, Mercato agricolo, DM). La lista SPESA contiene solo le cose che compra sempre: una cosa da comprare
+    una volta sola NON va aggiunta lì."""
+    spesa = keep.note("SPESA")
+    with lock:
+        mapping = brief_mod.negozi(MEMORIA)
+    return {"per_negozio": brief_mod.spesa_per_negozio(spesa.get("items", []), mapping), "testo": brief_mod.spesa_testo(spesa.get("items", []), mapping)}
+
+
+@mcp.tool()
+def spesa_negozio(prodotto: str, negozio: str) -> dict:
+    """Insegna al Segretario dove Ema compra un prodotto della lista SPESA (negozio: Lidl, Mercato agricolo, DM,
+    o un altro). Da usare quando una voce finisce in "Da assegnare a un negozio" o Ema corregge."""
+    prod = _one_line(prodotto, "prodotto", 80).lower()
+    shop = _one_line(negozio, "negozio", 40)
+    with lock:
+        mapping = brief_mod.negozi(MEMORIA)
+        for k in mapping:
+            mapping[k] = [x for x in mapping[k] if x.lower() != prod]
+        key = next((k for k in mapping if k.lower() == shop.lower()), shop)
+        mapping.setdefault(key, []).append(prod)
+        _write_json(MEMORIA / brief_mod.NEGOZI_FILE, mapping)
+        commit(f"spesa: {prod} -> {key}")
+    return {"prodotto": prod, "negozio": key}
+
+
+# Il brief parte dal server all'ora BRIEF_ORA (vuota = spento). Un thread controlla ogni minuto; se il bot
+# c'è e il brief di oggi non è ancora partito, lo manda. Non dipende da claude.ai né dal PC di Ema.
+def _brief_loop() -> None:
+    marker = DATA / "brief_sent"
+    while True:
+        try:
+            ora = os.environ.get("BRIEF_ORA", "").strip()
+            if ora and bot is not None and bot.chat_id is not None:
+                t = now()
+                ultimo = marker.read_text(encoding="utf-8").strip() if marker.exists() else ""
+                if brief_mod.dovuto(t, ora, ultimo):
+                    marker.write_text(t.strftime("%Y-%m-%d"), encoding="utf-8")
+                    testo = _brief_testo()
+                    bot.send(testo)
+                    with lock:
+                        path = MEMORIA / f"diario/{t:%Y-%m-%d}.md"
+                        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+                        path.write_text(existing + f"- {t:%H:%M} [brief] brief del mattino inviato dal server" + "\n", encoding="utf-8")
+                        commit("diario: brief inviato dal server")
+        except Exception as err:  # noqa: BLE001
+            log.warning("brief: %s", err)
+        time.sleep(60)
+
+
 @mcp.tool()
 def stato() -> dict:
     """Stato del Segretario: data e ora, numero di regole, proposte in attesa, sessioni aperte, ultimo commit."""
@@ -938,6 +1022,8 @@ def stato() -> dict:
         "cervello_on_demand": bool(os.environ.get("ROUTINE_FIRE_URL", "").strip()),
         "trascrizione": bool(os.environ.get("GROQ_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip()),
         "instagram": bool(os.environ.get("LINKS_STATS_KEY", "").strip()),
+        "keep": keep.configured(),
+        "brief_ora": os.environ.get("BRIEF_ORA", "").strip() or "spento",
     }
 
 
@@ -968,6 +1054,8 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
         "progetti": _fmt_progetti,
         "stato": lambda: json.dumps(stato(), ensure_ascii=False, indent=1),
         "decidi": _decidi,
+        "brief": _brief_testo,
+        "spesa": _spesa_testo,
     }
     if os.environ.get("ROUTINE_FIRE_URL", "").strip():
         hooks["fire"] = telegram_bot.fire_routine
@@ -978,7 +1066,7 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
 
 
 CONFIG_KEYS = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GROQ_API_KEY", "OPENAI_API_KEY", "ROUTINE_FIRE_URL", "ROUTINE_FIRE_TOKEN",
-               "LINKS_API_URL", "LINKS_STATS_KEY")
+               "LINKS_API_URL", "LINKS_STATS_KEY", "KEEP_MCP_URL", "KEEP_MCP_HOST", "BRIEF_ORA", "TELEGRAM_PROPOSTE")
 
 
 def load_config() -> dict:
@@ -1188,6 +1276,10 @@ async def config_endpoint(request):
             v = str(v or "").strip()
             if k == "ROUTINE_FIRE_URL" and v and not v.startswith("https://api.anthropic.com/"):
                 return JSONResponse({"errore": "ROUTINE_FIRE_URL deve essere l'endpoint /fire di api.anthropic.com"}, status_code=400)
+            if k == "BRIEF_ORA" and v and not re.fullmatch(r"\d{1,2}:\d{2}", v):
+                return JSONResponse({"errore": "BRIEF_ORA deve essere HH:MM (vuoto = spento)"}, status_code=400)
+            if k == "KEEP_MCP_URL" and v and not v.startswith(("http://172.17.0.1:", "https://")):
+                return JSONResponse({"errore": "KEEP_MCP_URL deve essere il keep-mcp della VM (http://172.17.0.1:...) o https://"}, status_code=400)
             if k == "LINKS_API_URL" and v and not v.startswith("https://"):
                 return JSONResponse({"errore": "LINKS_API_URL deve iniziare con https://"}, status_code=400)
             if v:
@@ -1229,6 +1321,7 @@ if __name__ == "__main__":
         bot.start()
     else:
         print("Telegram: non configurato (TELEGRAM_BOT_TOKEN vuoto): nessuna consegna al telefono", flush=True)
+    threading.Thread(target=_brief_loop, name="brief", daemon=True).start()
     uvicorn.run(
         app,
         host=BIND,
