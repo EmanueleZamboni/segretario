@@ -7,3 +7,4 @@ CONNECTOR_URL.txt
 *.tmp
 whatsapp/node_modules/
 whatsapp/data/
+.claude/

@@ -5,6 +5,7 @@ set SEGRETARIO_DATA=%LOCALAPPDATA%\Temp\segretario-dev
 set SEGRETARIO_PUBLIC_HOST=127.0.0.1
 set SEGRETARIO_EXTRA_HOSTS=127.0.0.1:8766,localhost:8766
 set SEGRETARIO_SECRET=devsecret-devsecret-devsecret-0000
+set SEGRETARIO_VOCE_DEMO=1
 set PORT=8766
 set BIND=127.0.0.1
 cd /d "%~dp0.."

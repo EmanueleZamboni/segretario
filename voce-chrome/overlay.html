@@ -1,0 +1,42 @@
+<div id="voce-root" data-fase="riposo" data-modo="voce" data-look="verde" data-host="claude">
+<canvas id="scena" aria-hidden="true"></canvas>
+<i class="ang a"></i><i class="ang b"></i><i class="ang c"></i><i class="ang d"></i>
+<div class="hud">
+  <header class="top">
+    <div class="brand"><b>SEGRETARI<i>O</i></b><span class="cap" id="sotto">voce · canale privato</span></div>
+    <div class="clock"><b id="ora">--:--</b><span class="cap" id="data"></span></div>
+  </header>
+  <section class="mid">
+    <div class="pan l">
+      <div class="blk" id="b-cal"><h3>Calendario</h3><ul><li class="nl">…</li></ul></div>
+      <div class="blk" id="b-oggi"><h3>Oggi</h3><ul><li class="nl">…</li></ul></div>
+      <div class="blk" id="b-tempo"><h3>Se hai tempo</h3><ul></ul></div>
+    </div>
+    <div class="centro"><div id="righe" aria-live="polite"></div></div>
+    <div class="pan r">
+      <div class="blk" id="b-att"><h3>Claude aspetta te</h3><ul><li class="nl">…</li></ul></div>
+      <div class="blk" id="b-lav"><h3>Al lavoro</h3><ul></ul></div>
+      <div class="blk" id="b-mail"><h3>Email da leggere</h3><ul></ul></div>
+    </div>
+  </section>
+  <footer class="bot">
+    <div class="modi" role="group" aria-label="Modo">
+      <button type="button" data-m="testo" aria-pressed="false">Voce → testo</button>
+      <button type="button" data-m="voce" aria-pressed="true">Voce → voce</button>
+      <button type="button" data-m="live" aria-pressed="false">Live</button>
+      <button type="button" class="chatnorm" id="chatnorm" title="Nascondi la Voce e usa la chat normale">Chat normale</button>
+    </div>
+    <div class="cmd">
+      <button id="parla" type="button" aria-label="Parla" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+      </button>
+      <span class="l">tieni premuto e parla</span>
+    </div>
+    <div class="dx">
+      <input id="scrivi" type="text" placeholder="oppure scrivi e premi Invio" autocomplete="off" spellcheck="false">
+      <div class="sys" id="sys"></div>
+      <button id="zitto" type="button" title="Zitto finché non ti chiamo per nome">Silenzio</button>
+    </div>
+  </footer>
+</div>
+</div>

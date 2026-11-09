@@ -41,6 +41,7 @@ import fonti
 import keep
 import pagine
 import telegram_bot
+import voce as voce_mod
 
 DATA = Path(os.environ.get("SEGRETARIO_DATA", "/data"))
 MEMORIA = DATA / "memoria"
@@ -1308,7 +1309,7 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
 
 CONFIG_KEYS = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GROQ_API_KEY", "OPENAI_API_KEY", "ROUTINE_FIRE_URL", "ROUTINE_FIRE_TOKEN",
                "LINKS_API_URL", "LINKS_STATS_KEY", "KEEP_MCP_URL", "KEEP_MCP_HOST", "BRIEF_ORA", "TELEGRAM_PROPOSTE",
-               "CALENDAR_ICS_URL", "POSTINO_DB")
+               "CALENDAR_ICS_URL", "POSTINO_DB", "ANTHROPIC_API_KEY")
 
 
 def load_config() -> dict:
@@ -1533,6 +1534,8 @@ def _config_valida(k: str, v: str) -> str | None:
         return "POSTINO_DB è un percorso dentro il container (di solito /postino/postino.db)"
     if k == "GROQ_API_KEY" and v and not v.startswith("gsk_"):
         return "una chiave Groq inizia con gsk_"
+    if k == "ANTHROPIC_API_KEY" and v and not v.startswith("sk-ant-"):
+        return "una chiave di Claude inizia con sk-ant-"
     return None
 
 
@@ -1657,7 +1660,7 @@ HUB_FISSI = [
     ("Segretario", [
         ("Impostazioni", "manager", "Chiavi e interruttori", "settings", "acc"),
         ("WhatsApp", "whatsapp", "Stato del telefono e QR", "whatsapp", "wa"),
-        ("Secretary", "https://claude.ai/project/01a19e2e-2434-76f8-b630-c7fb371b6d25", "La chat del Segretario", "chat", "acc"),
+        ("Secretary", "https://claude.ai/project/01a19e2e-2434-76f8-b630-c7fb371b6d25", "La chat del Segretario (con la Voce, premi VOCE)", "chat", "acc"),
     ]),
     ("Posta e social", [
         ("Postino", "https://postino.emazamboni.com", "Tutte le tue caselle", "postino", ""),
@@ -1764,6 +1767,223 @@ async def manager_page(request):
         "Cache-Control": "no-store", "Content-Security-Policy": MANAGER_CSP, "Referrer-Policy": "no-referrer",
         "X-Content-Type-Options": "nosniff"})
 
+
+# ---------------------------------------------------------------- Voce: l'interfaccia vocale (voce.html + voce.py)
+# La pagina (dietro lo stesso codice Telegram dell'hub) mostra la giornata di Ema e parla con lui. Tre endpoint,
+# tutti solo per un browser fidato: voce.json (i dati dei pannelli), voce/ascolta (audio -> testo con la chiave
+# dei vocali), voce/parla (testo -> risposta di Claude, in sola lettura sulla memoria).
+VOCE_HTML = Path(__file__).with_name("voce.html")
+VOCE_CACHE_S = 60
+VOCE_MAX_DOMANDE = 40  # per ora: un tetto ai costi se qualcosa impazzisce
+_voce_cache: dict = {"t": 0.0, "dati": None}
+_voce_tasks: dict = {"t": 0.0, "testo": None}
+_voce_domande: list[float] = []
+
+
+def _voce_tasks_testo() -> str:
+    """La nota Keep TASKS (cache 60 s: Keep è lento)."""
+    if time.time() - _voce_tasks["t"] < VOCE_CACHE_S and _voce_tasks["testo"] is not None:
+        return _voce_tasks["testo"]
+    testo = keep.note("TASKS").get("text", "") if keep.configured() else ""
+    _voce_tasks.update(t=time.time(), testo=testo)
+    return testo
+
+
+def _voce_calendario(giorno: str) -> list[dict]:
+    ics = os.environ.get("CALENDAR_ICS_URL", "").strip()
+    if not ics:
+        return []
+    return fonti.eventi_di_oggi(ics, _parse_day(giorno).date(), DATA)
+
+
+def _voce_email() -> list[dict]:
+    db = os.environ.get("POSTINO_DB", "").strip()
+    return fonti.email_non_lette(db, now()) if db else []
+
+
+def voce_dati(forza: bool = False) -> dict:
+    """Quello che i pannelli della Voce mostrano. Ogni blocco è indipendente: una fonte che non risponde
+    diventa None (la pagina scrive "non letto"), mai un errore."""
+    if not forza and _voce_cache["dati"] and time.time() - _voce_cache["t"] < VOCE_CACHE_S:
+        return _voce_cache["dati"]
+    t = now()
+    avvisi: list[str] = []
+
+    def prova(nome, fn):
+        try:
+            return fn()
+        except Exception as err:  # noqa: BLE001
+            avvisi.append(f"{nome}: {str(err)[:80]}")
+            return None
+
+    eventi = prova("calendario", lambda: _voce_calendario(f"{t:%Y-%m-%d}")) if os.environ.get("CALENDAR_ICS_URL", "").strip() else None
+    tasks = prova("Keep", _voce_tasks_testo) if keep.configured() else None
+    with lock:
+        sess = list(_sessioni().values())
+    aspettano = [{"nome": s["nome"], "domanda": s.get("domanda_per_ema") or s.get("prossimo_passo") or s.get("dove_sono", ""),
+                  "progetto": s.get("progetto", ""), "da": _age(s.get("aggiornato", ""))}
+                 for s in sess if s.get("stato") == "aspetta Ema"]
+    lavorano = [{"nome": s["nome"], "dove_sono": s.get("dove_sono", ""), "da": _age(s.get("aggiornato", ""))}
+                for s in sess if s.get("stato") == "in corso"]
+    progetti = prova("progetti", lambda: [{"nome": p["nome"], "stato": p["stato"], "dove_sono": p.get("dove_sono", ""),
+                                            "prossimo_passo": p.get("prossimo_passo", "")} for p in progetti_lista(True)[:8]])
+    email = prova("email", _voce_email) if os.environ.get("POSTINO_DB", "").strip() else None
+    st = stato()
+    if os.environ.get("SEGRETARIO_VOCE_DEMO", "").strip():  # solo sul server di sviluppo: pannelli pieni per guardare la pagina
+        eventi = [{"ora": "10:30", "fine": "11:30", "titolo": "Call con Stostudio", "luogo": "Meet"}, {"ora": "15:00", "titolo": "Ritiro camcorder", "luogo": "Via Zamboni"}, {"ora": "", "titolo": "Scadenza fatture"}]
+        tasks = ("TODAY'S TASKS\n- montare il B-roll di Video Match\n- rispondere ad Anna\n- portare il VAIO a Francesco #sony-vaio-p\n\n"
+                 "GENERAL\n- comprare le pile per il MT-32\n- ordinare la cinghia per il Nokia\n\nWORK\n- footer delle guide EASY RAVE\n")
+        email = [{"da": "Anna Rossi <anna@example.com>", "oggetto": "Preventivo video per il lancio di primavera"}, {"da": "Netflix Partner Team", "oggetto": "Contract addendum: please review"}]
+    dati = {
+        "adesso": t.isoformat(timespec="seconds"),
+        "eventi": eventi,
+        "oggi": keep.section(tasks, "TODAY'S TASKS")[:12] if tasks is not None else None,
+        "se_hai_tempo": (keep.section(tasks, "GENERAL") + keep.section(tasks, "WORK"))[:6] if tasks is not None else None,
+        "aspettano": aspettano,
+        "lavorano": lavorano,
+        "progetti": progetti,
+        "email": [{"da": m["da"], "oggetto": m["oggetto"][:90]} for m in email[:6]] if email is not None else None,
+        "sistemi": {"memoria": True, "telegram": st["telegram"] == "collegato", "keep": st["keep"], "calendario": st["calendario"],
+                    "whatsapp": bool(_wa_url()), "orecchie": st["trascrizione"], "voce": voce_mod.configurata()},
+        "proposte_in_attesa": st["proposte_in_attesa"],
+        "avvisi": avvisi,
+    }
+    _voce_cache.update(t=time.time(), dati=dati)
+    return dati
+
+
+def _voce_contesto(d: dict) -> str:
+    """La fotografia di adesso, in testo, per Claude (va in coda al messaggio: non rompe la cache del prompt)."""
+    giorni = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+    t = now()
+    righe = [f"Ora: {giorni[t.weekday()]} {t:%d/%m/%Y %H:%M} (Bologna)."]
+    if d.get("eventi") is None:
+        righe.append("Calendario di oggi: non letto.")
+    else:
+        righe.append("Calendario di oggi: " + ("; ".join(
+            f"{e.get('ora') or 'tutto il giorno'}{'-' + e['fine'] if e.get('fine') else ''} {e['titolo']}" for e in d["eventi"][:10]) or "niente."))
+    if d.get("oggi") is not None:
+        righe.append("Task di oggi (Keep TODAY'S TASKS): " + ("; ".join(d["oggi"]) or "nessuno."))
+    if d.get("aspettano"):
+        righe.append("Sessioni Claude che aspettano Ema: " + "; ".join(f"{s['nome']}: {s['domanda']}" for s in d["aspettano"][:5]))
+    if d.get("email"):
+        righe.append(f"Email importanti non lette: {len(d['email'])}.")
+    return "\n".join(righe)
+
+
+_voce_id_cache: dict = {"t": 0.0, "testo": ""}
+
+
+def _voce_identita() -> str:
+    """Chi è il Segretario: le istruzioni del progetto Secretary (nel repo) più il manuale (nella memoria).
+    La Voce usa le stesse, così è la stessa persona della chat; cache 10 minuti."""
+    if time.time() - _voce_id_cache["t"] < 600 and _voce_id_cache["testo"]:
+        return _voce_id_cache["testo"]
+    parti = []
+    try:
+        parti.append(Path(__file__).with_name("docs").joinpath("istruzioni_progetto_secretary.md").read_text(encoding="utf-8"))
+    except OSError:
+        pass
+    try:
+        parti.append(str(documento_leggi("Segretario", "manuale-segretario")))
+    except Exception:  # noqa: BLE001
+        pass
+    testo = "\n\n".join(p for p in parti if p)[:40000]
+    _voce_id_cache.update(t=time.time(), testo=testo)
+    return testo
+
+
+def _voce_strumenti() -> dict:
+    return {
+        "memoria_leggi": memoria_leggi, "memoria_cerca": memoria_cerca, "progetto_leggi": progetto_leggi,
+        "progetti_lista": progetti_lista, "sessioni_lista": sessioni_lista, "calendario": _voce_calendario,
+        "tasks": _voce_tasks_testo, "spesa_lista": lambda: spesa_lista()["testo"], "oggetto_leggi": oggetto_leggi,
+        "email": _voce_email,
+    }
+
+
+VOCE_CSP_BASE = ("default-src 'none'; script-src 'nonce-{n}'; style-src 'unsafe-inline' https://fonts.googleapis.com; "
+                 "font-src https://fonts.gstatic.com; img-src data:; media-src blob:; connect-src 'self'; base-uri 'none'; "
+                 "form-action 'self'; frame-ancestors 'none'")
+
+
+def _voce_negato():
+    return JSONResponse({"errore": "serve il codice: riapri la pagina"}, status_code=401, headers={"Cache-Control": "no-store"})
+
+
+def _voce_fidato(request) -> bool:
+    return not _otp_possibile() or _device_ok(request)
+
+
+async def voce_page(request):
+    from starlette.responses import HTMLResponse
+    gate = await _gate(request)
+    if gate is not None:
+        return gate
+    nonce = secrets.token_urlsafe(16)
+    page = (VOCE_HTML.read_text(encoding="utf-8").replace("{{NONCE}}", nonce)
+            .replace("/*SCENA*/", VOCE_HTML.with_name("voce_mesh.js").read_text(encoding="utf-8") + "\n" + VOCE_HTML.with_name("voce_testa.js").read_text(encoding="utf-8") + "\n" + VOCE_HTML.with_name("voce_scena.js").read_text(encoding="utf-8"), 1)
+            .replace("/*LOGICA*/", VOCE_HTML.with_name("voce_logica.js").read_text(encoding="utf-8"), 1))
+    return HTMLResponse(page, headers={
+        "Cache-Control": "no-store", "Content-Security-Policy": VOCE_CSP_BASE.format(n=nonce),
+        "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow",
+        "Permissions-Policy": "microphone=(self)"})
+
+
+async def voce_json(request):
+    if not _voce_fidato(request):
+        return _voce_negato()
+    forza = request.query_params.get("forza", "") not in ("", "0")
+    return JSONResponse(await asyncio.to_thread(voce_dati, forza), headers={"Cache-Control": "no-store"})
+
+
+async def voce_ascolta(request):
+    """Audio registrato dalla pagina -> testo (Groq whisper, la stessa chiave dei vocali)."""
+    if not _voce_fidato(request):
+        return _voce_negato()
+    if not telegram_bot.transcription_configured():
+        return JSONResponse({"errore": "Per sentirti serve la chiave Vocali in testo nelle Impostazioni."}, status_code=503)
+    data = await request.body()
+    if len(data) < 800:
+        return JSONResponse({"testo": ""})
+    if len(data) > MAX_AUDIO_BYTES:
+        return JSONResponse({"errore": "audio troppo lungo"}, status_code=413)
+    mime = request.headers.get("content-type", "audio/webm").split(";")[0]
+    nome = "voce.webm" if "webm" in mime else ("voce.mp4" if "mp4" in mime else "voce.ogg")
+    try:
+        testo = await asyncio.to_thread(telegram_bot.transcribe_bytes, data, nome, mime)
+    except Exception as err:  # noqa: BLE001
+        return JSONResponse({"errore": f"trascrizione: {str(err)[:200]}"}, status_code=502)
+    return JSONResponse({"testo": testo})
+
+
+async def voce_parla(request):
+    """{"testo": "...", "storia": [{"ruolo": "ema"|"segretario", "testo": "..."}]} -> {"testo"} | {"silenzio"}."""
+    if not _voce_fidato(request):
+        return _voce_negato()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"errore": "JSON non valido"}, status_code=400)
+    testo = str((body or {}).get("testo", "")).strip()
+    storia = body.get("storia") if isinstance(body.get("storia"), list) else []
+    if not testo:
+        return JSONResponse({"silenzio": "turno"})
+    ora = time.time()
+    _voce_domande[:] = [x for x in _voce_domande if ora - x < 3600]
+    if len(_voce_domande) >= VOCE_MAX_DOMANDE:
+        return JSONResponse({"errore": "Troppe domande in un'ora: mi fermo per non spendere troppo. Riprova più tardi."}, status_code=429)
+    _voce_domande.append(ora)
+    d = await asyncio.to_thread(voce_dati)
+    regole = memoria_leggi("regole")
+    out = await asyncio.to_thread(voce_mod.rispondi, testo, storia, _voce_contesto(d), regole, _voce_strumenti(), _voce_identita())
+    return JSONResponse(out, status_code=200 if "errore" not in out else 502, headers={"Cache-Control": "no-store"})
+
+
+inner.add_route(f"/{secret}/voce", voce_page, methods=["GET", "POST"])
+inner.add_route(f"/{secret}/voce.json", voce_json, methods=["GET"])
+inner.add_route(f"/{secret}/voce/ascolta", voce_ascolta, methods=["POST"])
+inner.add_route(f"/{secret}/voce/parla", voce_parla, methods=["POST"])
 
 inner.add_route("/health", health, methods=["GET"])
 inner.add_route(f"/{secret}/config", config_endpoint, methods=["GET", "POST"])
