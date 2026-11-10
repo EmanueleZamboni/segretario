@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Segretario · Voce",
-  "version": "1.0.9",
+  "version": "1.0.11",
   "description": "La Voce del Segretario sopra la chat Secretary di claude.ai: parli, lui risponde a voce, con la scena. Un tasto e torni alla chat normale.",
   "permissions": [],
   "host_permissions": [

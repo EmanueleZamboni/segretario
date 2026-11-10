@@ -327,9 +327,9 @@ async function voceClaude(mio, R, segmenti) {
    soprattutto, a capire quando Ema ha davvero finito di parlare: le parole di Chrome arrivano a scatti, e fidarsi
    solo di quelle tagliava le frasi a metà. */
 const Orecchio = {
-  stream: null, ctx: null, src: null, an: null, buf: null, timer: 0, giro: 0, liv: 0, fondo: 0.004, ultimoSuono: 0, ok: false, finto: 0, t0: 0,
+  stream: null, ctx: null, src: null, an: null, buf: null, timer: 0, giro: 0, liv: 0, fondo: 0.004, ultimoSuono: 0, ok: false, finto: 0, t0: 0, picco: 0, sentito: false,
   async apri() {
-    this.chiudi(); const io = this.giro; this.t0 = this.ultimoSuono = ora();
+    this.chiudi(); const io = this.giro; this.t0 = this.ultimoSuono = ora(); this.sentito = false;
     if (this.finto) { this.ok = true; this.timer = setInterval(() => this.misura(), 50); return; }   // solo nelle prove
     try {
       const st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
@@ -337,7 +337,8 @@ const Orecchio = {
       const c = this.ctx && this.ctx.state !== "closed" ? this.ctx : (this.ctx = new (window.AudioContext || window.webkitAudioContext)());
       if (c.state === "suspended") c.resume().catch(() => {});
       this.stream = st; this.src = c.createMediaStreamSource(st); this.an = c.createAnalyser(); this.an.fftSize = 1024; this.buf = new Float32Array(1024);
-      this.src.connect(this.an); this.ok = true; this.ultimoSuono = ora();
+      this.src.connect(this.an); this.ok = true; this.ultimoSuono = ora(); this.picco = 0;
+      log("orecchio: aperto");
       this.timer = setInterval(() => this.misura(), 50);
     } catch (err) { this.ok = false; log("orecchio: non disponibile (" + (err && err.name) + ")"); }
   },
@@ -345,12 +346,13 @@ const Orecchio = {
     let v = 0;
     if (this.finto) v = ora() - this.t0 < this.finto ? 0.08 : 0.001;
     else if (this.an) { this.an.getFloatTimeDomainData(this.buf); let e = 0; for (let i = 0; i < this.buf.length; i += 2) e += this.buf[i] * this.buf[i]; v = Math.sqrt(e / (this.buf.length / 2)); }
-    this.liv = v;
+    this.liv = v; if (v > this.picco) this.picco = v;
     // il rumore di fondo della stanza: scende subito, sale piano e solo con suoni deboli (la voce non lo sposta)
     if (v < this.fondo) this.fondo = this.fondo * 0.8 + v * 0.2; else if (v < this.fondo * 2.5) this.fondo = this.fondo * 0.99 + v * 0.01;
-    if (v > Math.max(0.012, this.fondo * 3)) this.ultimoSuono = ora();
+    if (v > Math.max(0.006, this.fondo * 4)) { this.ultimoSuono = ora(); this.sentito = true; }
   },
   chiudi() {
+    if (this.ok && !this.finto) log("orecchio: chiuso, picco " + this.picco.toFixed(3) + " fondo " + this.fondo.toFixed(4));
     this.giro++; clearInterval(this.timer); this.timer = 0; this.ok = false; this.liv = 0;
     if (this.src) { try { this.src.disconnect(); } catch (_) {} this.src = null; }
     if (this.stream) { try { this.stream.getTracks().forEach((t) => t.stop()); } catch (_) {} this.stream = null; }
@@ -394,7 +396,7 @@ const Mic = {
       if (io !== this.giro) return;                          // chiuso da noi: già gestito
       const t = this.testo(); const durata = ora() - this.t0;
       // Chrome a volte chiude il riconoscimento da solo: se Ema sta ancora parlando si riapre e la frase continua
-      const parlava = Orecchio.ok && !Orecchio.finto && ora() - Orecchio.ultimoSuono < 1200;
+      const parlava = Orecchio.ok && Orecchio.sentito && !Orecchio.finto && ora() - Orecchio.ultimoSuono < 1200;
       if (parlava && this.riavvii < 4 && this.modo !== "rilascio") {
         this.riavvii++; this.finale = t ? t + " " : ""; this.parziale = ""; log("mic: Chrome ha chiuso mentre parlavi, riapro");
         if (this.apriRec()) return;
@@ -423,7 +425,8 @@ const Mic = {
     if (!this.testo()) return;
     if (this.modo === "tap" && premuto && adesso - premuto > 450) return;
     const daRis = adesso - this.ultimoRis;
-    if (Orecchio.ok) { if ((adesso - Orecchio.ultimoSuono > 1700 && daRis > 700) || daRis > 4500) this.consegna(); }
+    // la misura del volume vale solo se ha sentito davvero la voce (microfono molto basso = non fidarsi)
+    if (Orecchio.ok && Orecchio.sentito) { if ((adesso - Orecchio.ultimoSuono > 1700 && daRis > 700) || daRis > 4500) this.consegna(); }
     else if (daRis > 2000) this.consegna();
   },
   rilascio() { if (!this.attivo) return; this.modo = "rilascio"; this.rilasciato = ora(); },
