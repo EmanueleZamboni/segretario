@@ -28,7 +28,7 @@
 .clock b{display:block;font:700 26px/1 "Space Mono",monospace;letter-spacing:.06em}
 .clock span{display:block;margin-top:4px}
 /* i due pannelli ai lati: la giornata */
-.mid{display:grid;grid-template-columns:minmax(200px,300px) 1fr minmax(200px,300px);align-items:end;gap:var(--pad);min-height:0}
+.mid{display:grid;grid-template-columns:minmax(200px,300px) minmax(0,1fr) minmax(200px,300px);align-items:end;gap:var(--pad);min-height:0}
 .pan{display:flex;flex-direction:column;gap:16px;max-height:100%;overflow:hidden;mask-image:linear-gradient(#000 85%,transparent)}
 .pan.r{text-align:right}
 .blk h3{margin:0 0 6px;font:400 10px/1 "Space Mono",monospace;letter-spacing:.22em;text-transform:uppercase;color:var(--acc);text-shadow:0 0 8px var(--acc)}
@@ -40,8 +40,8 @@
 .blk li.vuoto,.blk li.nl{color:var(--faint);font-style:italic}
 .blk li.att{color:var(--amber)}
 /* centro: sottotitoli */
-.centro{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:10px;min-height:0;padding-bottom:4vh}
-#righe{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:min(680px,92vw);text-align:center}
+.centro{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:10px;min-height:0;min-width:0;padding-bottom:4vh}
+#righe{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:min(680px,100%);text-align:center}
 .riga{margin:0;font-size:15px;line-height:1.4;color:var(--ink);max-width:100%;animation:up .35s ease both}
 .riga .chi{display:block;font:400 9px/1 "Space Mono",monospace;letter-spacing:.3em;color:var(--dim);margin-bottom:4px}
 .riga.seg .t{font-size:17px;color:#fff;text-shadow:0 0 10px rgba(255,255,255,.35),0 0 24px rgba(0,0,0,.9)}
@@ -72,7 +72,7 @@
 #voce-root[data-modo=testo] #scrivi{width:min(420px,100%);font:400 15px/1.3 "IBM Plex Sans",system-ui,sans-serif;background:rgba(6,4,10,.6);padding:10px 12px;border:1px solid var(--line);border-radius:4px}
 #voce-root[data-modo=testo] .modi button,#voce-root[data-modo=testo] #zitto{background:rgba(6,4,10,.75)}
 /* la voce: sottotitoli comunque leggibili, su un velo */
-#voce-root:not([data-modo=testo]) #righe{padding:10px 18px;background:linear-gradient(transparent,rgba(0,0,0,.55) 30%,rgba(0,0,0,.55) 70%,transparent);border-radius:8px}
+#voce-root:not([data-modo=testo]) #righe{max-height:42vh;overflow-y:auto;scrollbar-width:none;box-sizing:border-box;padding:10px 18px;background:linear-gradient(transparent,rgba(0,0,0,.55) 30%,rgba(0,0,0,.55) 70%,transparent);border-radius:8px}
 #voce-root:not([data-modo=testo]) .riga.seg .t{font-size:19px;font-family:"IBM Plex Sans",system-ui,sans-serif;font-weight:500}
 #voce-root:not([data-modo=testo]) .riga.ema .t{font-size:14px}
 .pan,.blk li{text-shadow:0 1px 2px #000,0 0 8px rgba(0,0,0,.95),0 0 18px rgba(0,0,0,.8)}
@@ -126,6 +126,49 @@
  .bot{grid-template-columns:1fr;justify-items:center;gap:12px}.dx{align-items:center}.sys{justify-content:center}
  .clock b{font-size:20px}.riga{font-size:14px}.riga.seg .t{font-size:16px}
 }
+/* il tasto del microfono: uno stato, un colore, un'animazione. Spento = grigio e fermo. */
+#voce-root{--st:#7d778a}
+#voce-root[data-st=ascolto]{--st:#ff3b3b}#voce-root[data-st=penso]{--st:var(--amber)}#voce-root[data-st=parlo]{--st:#5cff8a}#voce-root[data-st=spento]{--st:#6a6570}
+#voce-root .tasto{display:flex;align-items:center;gap:14px}
+#voce-root .barre{display:flex;align-items:center;gap:3px;width:92px;height:46px;opacity:.25;transition:opacity .25s}
+#voce-root .barre i{flex:1;height:100%;border-radius:2px;background:var(--st);transform:scaleY(.05);box-shadow:0 0 8px -1px var(--st);transition:background .25s}
+#voce-root[data-st=ascolto] .barre,#voce-root[data-st=parlo] .barre{opacity:1}
+#voce-root #parla{border-color:var(--st);color:var(--st);box-shadow:none;background:radial-gradient(circle at 50% 45%,rgba(0,0,0,.35),rgba(0,0,0,.85));transition:box-shadow .2s,transform .12s,border-color .25s,color .25s}
+#voce-root #parla::before{border-color:var(--st);opacity:.22;animation:none}
+#voce-root #parla::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--st);opacity:0;pointer-events:none}
+#voce-root #parla svg{filter:none;display:none}
+#voce-root[data-ic=mic] #parla .i-mic,#voce-root[data-ic=stop] #parla .i-stop,#voce-root[data-ic=off] #parla .i-off{display:block}
+#voce-root #parla .i-stop{fill:currentColor;stroke:none}
+#voce-root[data-st=riposo] #parla:hover,#voce-root[data-st=spento] #parla:hover{border-color:var(--acc);color:var(--acc);box-shadow:0 0 18px -6px var(--acc)}
+#voce-root[data-st=ascolto] #parla{background:radial-gradient(circle at 50% 42%,#ff6464,#b3121f 72%);color:#fff;border-color:#ff9a9a;
+ box-shadow:0 0 calc(24px + var(--liv,0)*46px) -2px #ff3b3b,inset 0 0 22px -8px rgba(255,255,255,.8);transform:scale(calc(1 + var(--liv,0)*.07))}
+#voce-root[data-st=ascolto] #parla::after{animation:vanello 1.4s ease-out infinite}
+#voce-root[data-st=ascolto] #parla::before{border-style:solid;animation:vanello 1.4s ease-out .7s infinite}
+@keyframes vanello{from{transform:scale(1);opacity:.75}to{transform:scale(1.6);opacity:0}}
+#voce-root[data-st=penso] #parla{box-shadow:0 0 26px -6px var(--st),inset 0 0 22px -12px var(--st)}
+#voce-root[data-st=penso] #parla::before{opacity:.95;border-width:2px;animation:spin 1.5s linear infinite}
+#voce-root[data-st=parlo] #parla{box-shadow:0 0 calc(20px + var(--liv,0)*42px) -4px var(--st),inset 0 0 26px -10px var(--st)}
+/* la striscia di stato: scorre da una scritta all'altra e prende il colore dello stato */
+#voce-root .l{height:16px;overflow:hidden;min-width:320px;text-align:center;font-size:11px;line-height:16px;color:var(--st);text-shadow:0 0 8px var(--st);transition:color .3s}
+#voce-root .nastro{display:flex;flex-direction:column;transition:transform .45s cubic-bezier(.2,.9,.2,1)}
+#voce-root .nastro span{display:block;height:16px;white-space:nowrap}
+#voce-root[data-st=ascolto] .nastro{transform:translateY(-16px)}#voce-root[data-st=penso] .nastro{transform:translateY(-32px)}
+#voce-root[data-st=parlo] .nastro{transform:translateY(-48px)}#voce-root[data-st=spento] .nastro{transform:translateY(-64px)}
+#voce-root[data-st=ascolto] .l{font-weight:700}
+#voce-root .nastro .rec::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff3b3b;margin-right:9px;box-shadow:0 0 8px #ff3b3b;animation:halpulse 1s ease-in-out infinite}
+/* HAL: la barra di caricamento sul tasto */
+#voce-root #hal{position:relative;overflow:hidden}
+#voce-root #hal::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:calc(var(--p,0)*100%);background:#ff3b3b;box-shadow:0 0 8px #ff3b3b;transition:width .9s linear}
+#voce-root #hal.carica{animation:none;color:#ff8f8f;border-color:#ff3b3b}
+/* quanto è occupata la scheda video */
+#voce-root .gpu{display:flex;align-items:center;gap:8px;font:400 10px/1 "Space Mono",monospace;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+#voce-root .gpu[hidden]{display:none}
+#voce-root .gpu b{font-weight:700;color:var(--ink);min-width:4ch;text-align:right}
+#voce-root .gpu .gb{display:block;width:70px;height:5px;background:rgba(255,255,255,.14);border-radius:3px;overflow:hidden}
+#voce-root .gpu .gb u{display:block;height:100%;width:calc(var(--g,0)*100%);background:var(--acc);transition:width .6s,background .3s}
+#voce-root .gpu.caldo,#voce-root .gpu.caldo b{color:#ff3b3b}#voce-root .gpu.caldo .gb u{background:#ff3b3b}
+@media (max-width:900px){#voce-root .l{min-width:0}#voce-root .barre{width:64px}}
+@media (prefers-reduced-motion:reduce){#voce-root #parla::after,#voce-root #parla::before,#voce-root .nastro .rec::before{animation:none}#voce-root .nastro{transition:none}}
 @media (prefers-reduced-motion:reduce){#parla::before{animation:none}.riga{animation:none}}
 
 #voce-richiamo{position:fixed;right:14px;bottom:14px;z-index:2147482999;appearance:none;border:1px solid rgba(82,255,106,.6);background:rgba(0,0,0,.7);

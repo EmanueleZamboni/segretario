@@ -51,21 +51,29 @@ function fase(f) {
   etichetta();
 }
 function setMuto(m) { S.muto = !!m; ROOT.dataset.muto = m ? "1" : ""; Scena.muto(!!m); Scena.stato(m ? "dorme" : S.fase); etichetta(); }
-function etichetta(testo) {
+let premuto = 0;                                              // quando Ema ha messo il dito sul tasto (0 = non lo sta premendo)
+/* Lo stato a colpo d'occhio: il colore e l'icona del tasto, e la striscia sotto che scorre sulla scritta giusta.
+   data-st: riposo (grigio, microfono sbarrato) | ascolto (rosso, registra) | penso (ambra) | parlo (chiaro) | spento. */
+function etichetta() {
   const b = $("#parla"), l = $(".cmd .l"); if (!b || !l) return;
-  let t = testo;
-  if (!t) {
-    if (S.modo === "live") {
-      const on = Nativo.attivo || S.liveOn;
-      t = !on ? "TOCCA PER INIZIARE" : Nativo.micSpento ? "MICROFONO SPENTO · TOCCA PER CHIUDERE" : S.fase === "parlo" ? "PARLA · TOCCA PER CHIUDERE" : S.fase === "penso" ? "PENSA · TOCCA PER CHIUDERE" : "TI ASCOLTO · TOCCA PER CHIUDERE";
-      b.setAttribute("aria-pressed", on ? "true" : "false");
-    } else {
-      t = S.fase === "ascolto" ? "TI ASCOLTO · TOCCA PER INVIARE" : S.fase === "penso" ? "PENSA · TOCCA PER FERMARE" : S.fase === "parlo" ? "PARLA · TOCCA PER FERMARE" : "TOCCA E PARLA";
-      b.setAttribute("aria-pressed", S.fase === "ascolto" ? "true" : "false");
-    }
-    if (S.muto) t = "IN SILENZIO · DI' «SEGRETARIO»";
-  }
-  l.textContent = t;
+  const live = S.modo === "live", on = Nativo.attivo || S.liveOn;
+  const spento = S.muto || (Nativo.attivo && Nativo.micSpento);
+  const st = spento ? "spento" : (live && !on) ? "riposo" : S.fase === "ascolto" || S.fase === "penso" || S.fase === "parlo" ? S.fase : "riposo";
+  const tenuto = !live && Mic.attivo && Mic.modo === "tap" && premuto && ora() - premuto > 450;
+  const T = live ? {
+    riposo: "LIVE SPENTO · TOCCA PER INIZIARE", ascolto: "TI ASCOLTO · TOCCA PER CHIUDERE", penso: "PENSA · TOCCA PER CHIUDERE", parlo: "PARLA · TOCCA PER CHIUDERE",
+    spento: S.muto ? "IN SILENZIO · DI' «SEGRETARIO»" : "MICROFONO SPENTO · TOCCA PER CHIUDERE",
+  } : {
+    riposo: "MICROFONO SPENTO · TOCCA E PARLA", ascolto: tenuto ? "REGISTRO · RILASCIA PER INVIARE" : "REGISTRO · TOCCA PER INVIARE",
+    penso: "PENSA · TOCCA PER FERMARE", parlo: "PARLA · TOCCA PER FERMARE", spento: "IN SILENZIO · DI' «SEGRETARIO»",
+  };
+  let n = l.querySelector(".nastro");
+  if (!n) { l.textContent = ""; n = document.createElement("div"); n.className = "nastro"; ["riposo", "ascolto", "penso", "parlo", "spento"].forEach((k) => { const sp = document.createElement("span"); sp.dataset.k = k; if (k === "ascolto") sp.className = "rec"; n.append(sp); }); l.append(n); }
+  n.querySelectorAll("span").forEach((sp) => { const t = T[sp.dataset.k] || ""; if (sp.textContent !== t) sp.textContent = t; });
+  ROOT.dataset.st = st;
+  ROOT.dataset.ic = st === "riposo" || st === "spento" ? "off" : (!live && (st === "penso" || st === "parlo")) ? "stop" : "mic";
+  b.setAttribute("aria-pressed", (live ? on : S.fase === "ascolto") ? "true" : "false");
+  b.setAttribute("aria-label", T[st]);
 }
 
 // ------------------------------------------------------------------ le righe (sottotitoli / colonna di lettura)
@@ -100,7 +108,12 @@ function nuovaRisposta() {
       });
       const box = $("#righe"); if (box) box.scrollTop = box.scrollHeight;
     },
-    evidenzia(i) { corrente = i; if (el) el.querySelectorAll(".fr").forEach((f) => f.classList.toggle("ora", +f.dataset.i === i)); },
+    evidenzia(i) {
+      corrente = i; if (!el) return;
+      let viva = null; el.querySelectorAll(".fr").forEach((f) => { const on = +f.dataset.i === i; f.classList.toggle("ora", on); if (on) viva = f; });
+      const box = $("#righe");                               // risposta lunga: scorre da sola sulla frase che sta dicendo
+      if (viva && box && box.scrollHeight > box.clientHeight + 4) { const r = viva.getBoundingClientRect(), q = box.getBoundingClientRect(); box.scrollTo({ top: box.scrollTop + (r.top - q.top) - (box.clientHeight - r.height) / 2, behavior: "smooth" }); }
+    },
     rimuovi() { togli(el); el = null; },
   };
 }
@@ -163,12 +176,18 @@ const audioMic = () => parseFloat(html.getAttribute("data-voce-mic") || "0") || 
 const Hal = {
   url: CFG.neurale || "http://127.0.0.1:8768", pronto: false, giro: 0, actx: null, an: null, buf: null, src: null, ctl: null,
   async get(via, ms) { const r = await fetch(this.url + via, { signal: AbortSignal.timeout(ms || 2000) }); return r.json(); },
-  disegna(stato) {
+  disegna(stato, p) {
     const b = $("#hal"); if (!b) return;
     b.setAttribute("aria-pressed", S.hal ? "true" : "false");
     b.classList.toggle("carica", stato === "carica");
-    b.textContent = stato === "carica" ? "HAL…" : "HAL";
+    b.style.setProperty("--p", stato === "carica" ? String(Math.max(0.04, p || 0)) : "0");
+    b.textContent = stato === "carica" ? "HAL " + Math.round(Math.max(0.04, p || 0) * 100) + "%" : S.hal && this.pronto ? "HAL ON" : "HAL OFF";
     ROOT.dataset.hal = !S.hal ? "spento" : stato === "carica" ? "carica" : this.pronto ? "pronto" : "spento";
+  },
+  /* A che punto è il caricamento (0..1): il programma della voce dice in che fase è e da quanti secondi. */
+  progresso(p) {
+    const d = +p.da_s || 0;
+    return p.carico === "modello" ? Math.min(0.6, d / 14 * 0.6) : p.carico === "riscaldamento" ? 0.6 + Math.min(0.2, d / 6 * 0.2) : p.carico === "prova" ? 0.8 + Math.min(0.19, d / 5 * 0.19) : 0.04;
   },
   async accendi() {
     const io = ++this.giro; this.pronto = false; this.disegna("carica"); log("hal accendi");
@@ -188,18 +207,19 @@ const Hal = {
       avviso("La voce HAL sul PC è spenta: doppio clic su avvia_voce.cmd nella cartella voce-pc, poi premi di nuovo HAL. Intanto parla Claude.");
       return;
     }
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 200; i++) {
       if (io !== this.giro || !S.hal) return;
       try {
         const p = await this.get("/pronto", 1500);
         if (p.pronto) { this.pronto = true; this.disegna(); log("hal pronto"); riga("sys", "HAL è pronto.", "piano"); return; }
+        this.disegna("carica", this.progresso(p));
         if (p.motivo === "lento") {
           S.hal = false; salva("voce.hal", "0"); this.disegna(); log("hal rifiutato: lento " + p.tempo_s + " s per " + p.voce_s + " s di voce");
           avviso("HAL è troppo lento adesso: la scheda video è occupata (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
           return;
         }
       } catch (_) {}
-      await attesa(1000);
+      await attesa(700);
     }
     if (io === this.giro) { S.hal = false; salva("voce.hal", "0"); this.disegna(); avviso("HAL non si è caricato. Intanto parla Claude."); }
   },
@@ -235,9 +255,15 @@ const Hal = {
     const ctl = new AbortController(); this.ctl = ctl;
     const prepara = (k) => { if (k < coda.length && !pronte.has(k)) { const p = self.sintetizza(coda[k].testo, ctl.signal); p.catch(() => {}); pronte.set(k, p); } };
     function spezza(sg, idx) {
-      // la prima frase, se lunga, si spezza alla prima virgola: la voce parte prima
-      if (idx === 0 && sg.testo.length > 70) { const m = sg.testo.match(/^(.{20,70}?[,;:])\s+(.{12,})$/); if (m) return [{ testo: m[1], tono: sg.tono, idx }, { testo: m[2], tono: sg.tono, idx }]; }
-      return [{ testo: sg.testo, tono: sg.tono, idx, enfasi: (sg.enfasi || []).length }];
+      // le frasi lunghe si dicono a pezzi, alle virgole: la voce parte prima e non lascia vuoti lunghi tra un pezzo e l'altro
+      const pezzi = []; let resto = sg.testo, primo = idx === 0;
+      while (resto.length > (primo ? 70 : 100)) {
+        const m = primo ? resto.match(/^(.{20,70}?[,;:])\s+(\S.{11,})$/s) : resto.match(/^(.{30,100}[,;:])\s+(\S.{11,})$/s);
+        if (!m) break;
+        pezzi.push(m[1]); resto = m[2]; primo = false;
+      }
+      pezzi.push(resto);
+      return pezzi.map((testo, k) => ({ testo, tono: sg.tono, idx, enfasi: k === 0 ? (sg.enfasi || []).length : 0 }));
     }
     (async () => {
       let parlato = false;
@@ -297,22 +323,64 @@ async function voceClaude(mio, R, segmenti) {
 }
 
 // ------------------------------------------------------------------ il microfono (riconoscimento vocale di Chrome)
+/* L'orecchio: misura il volume VERO del microfono mentre Chrome trascrive. Serve alle onde attorno al tasto e,
+   soprattutto, a capire quando Ema ha davvero finito di parlare: le parole di Chrome arrivano a scatti, e fidarsi
+   solo di quelle tagliava le frasi a metà. */
+const Orecchio = {
+  stream: null, ctx: null, src: null, an: null, buf: null, timer: 0, giro: 0, liv: 0, fondo: 0.004, ultimoSuono: 0, ok: false, finto: 0, t0: 0,
+  async apri() {
+    this.chiudi(); const io = this.giro; this.t0 = this.ultimoSuono = ora();
+    if (this.finto) { this.ok = true; this.timer = setInterval(() => this.misura(), 50); return; }   // solo nelle prove
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      if (io !== this.giro) { st.getTracks().forEach((t) => t.stop()); return; }
+      const c = this.ctx && this.ctx.state !== "closed" ? this.ctx : (this.ctx = new (window.AudioContext || window.webkitAudioContext)());
+      if (c.state === "suspended") c.resume().catch(() => {});
+      this.stream = st; this.src = c.createMediaStreamSource(st); this.an = c.createAnalyser(); this.an.fftSize = 1024; this.buf = new Float32Array(1024);
+      this.src.connect(this.an); this.ok = true; this.ultimoSuono = ora();
+      this.timer = setInterval(() => this.misura(), 50);
+    } catch (err) { this.ok = false; log("orecchio: non disponibile (" + (err && err.name) + ")"); }
+  },
+  misura() {
+    let v = 0;
+    if (this.finto) v = ora() - this.t0 < this.finto ? 0.08 : 0.001;
+    else if (this.an) { this.an.getFloatTimeDomainData(this.buf); let e = 0; for (let i = 0; i < this.buf.length; i += 2) e += this.buf[i] * this.buf[i]; v = Math.sqrt(e / (this.buf.length / 2)); }
+    this.liv = v;
+    // il rumore di fondo della stanza: scende subito, sale piano e solo con suoni deboli (la voce non lo sposta)
+    if (v < this.fondo) this.fondo = this.fondo * 0.8 + v * 0.2; else if (v < this.fondo * 2.5) this.fondo = this.fondo * 0.99 + v * 0.01;
+    if (v > Math.max(0.012, this.fondo * 3)) this.ultimoSuono = ora();
+  },
+  chiudi() {
+    this.giro++; clearInterval(this.timer); this.timer = 0; this.ok = false; this.liv = 0;
+    if (this.src) { try { this.src.disconnect(); } catch (_) {} this.src = null; }
+    if (this.stream) { try { this.stream.getTracks().forEach((t) => t.stop()); } catch (_) {} this.stream = null; }
+    this.an = null;
+  },
+};
 const Mic = {
   Classe: window.SpeechRecognition || window.webkitSpeechRecognition || null,
-  rec: null, attivo: false, modo: "", finale: "", parziale: "", timer: 0, el: null, giro: 0, impulso: 0, corti: 0, t0: 0,
+  rec: null, attivo: false, modo: "", finale: "", parziale: "", guardia: 0, el: null, giro: 0, impulso: 0, corti: 0, t0: 0, ultimoRis: 0, rilasciato: 0, riavvii: 0,
   avvia(modo) {
     if (this.attivo) return;
     if (CFG.stt === "esterno" && typeof CFG.avviaAscolto === "function") { this.attivo = true; this.modo = modo; this.esterno = true; this.finale = ""; this.parziale = ""; this.el = null; fase("ascolto"); try { CFG.avviaAscolto(modo, S.lingua); } catch (_) { this.attivo = false; fase("riposo"); } return; }
     if (!this.Classe) { avviso("Questo browser non ha il riconoscimento vocale: usa Chrome, oppure scrivi nel campo in basso."); return; }
+    this.attivo = true; this.esterno = false; this.modo = modo; this.finale = ""; this.parziale = ""; this.el = null; this.t0 = this.ultimoRis = ora(); this.riavvii = 0;
+    if (!this.apriRec()) return;
+    Orecchio.apri();
+    clearInterval(this.guardia); this.guardia = setInterval(() => this.controlla(), 100);
+    log("mic avvia " + modo + " " + S.lingua);
+    fase("ascolto");
+  },
+  apriRec() {
     const io = ++this.giro; const rec = new this.Classe();
     rec.lang = S.lingua; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
-    this.rec = rec; this.attivo = true; this.esterno = false; this.modo = modo; this.finale = ""; this.parziale = ""; this.el = null; this.t0 = ora();
+    this.rec = rec;
     rec.onresult = (e) => {
       if (io !== this.giro) return;
       let fin = "", tmp = "";
       for (let i = e.resultIndex; i < e.results.length; i++) { const r = e.results[i]; if (r.isFinal) fin += r[0].transcript + " "; else tmp += r[0].transcript; }
       if (fin) this.finale += fin;
-      this.parziale = tmp; this.impulso = 1;
+      this.parziale = tmp; this.impulso = 1; this.ultimoRis = ora();
       this.aggiorna();
     };
     rec.onerror = (e) => {
@@ -324,27 +392,41 @@ const Mic = {
     };
     rec.onend = () => {
       if (io !== this.giro) return;                          // chiuso da noi: già gestito
-      const t = this.testo(); const durata = ora() - this.t0; this.chiudi(false);
+      const t = this.testo(); const durata = ora() - this.t0;
+      // Chrome a volte chiude il riconoscimento da solo: se Ema sta ancora parlando si riapre e la frase continua
+      const parlava = Orecchio.ok && !Orecchio.finto && ora() - Orecchio.ultimoSuono < 1200;
+      if (parlava && this.riavvii < 4 && this.modo !== "rilascio") {
+        this.riavvii++; this.finale = t ? t + " " : ""; this.parziale = ""; log("mic: Chrome ha chiuso mentre parlavi, riapro");
+        if (this.apriRec()) return;
+      }
+      this.chiudi(false);
       log("mic fine da solo, testo=" + (t ? "sì" : "no"));
       if (t) { this.corti = 0; ricevuto(t, true); return; }
       this.corti = durata < 1500 ? this.corti + 1 : 0;        // se muore subito più volte di fila, non insistere
       if (this.corti >= 4) { this.corti = 0; S.liveOn = false; avviso("Il microfono si chiude da solo: riprova tra un momento."); }
       fase("riposo"); riprendi();
     };
-    try { rec.start(); } catch (err) { this.chiudi(true); avviso("Non riesco ad aprire il microfono: " + err.message); return; }
-    log("mic avvia " + modo + " " + S.lingua);
-    fase("ascolto");
+    try { rec.start(); return true; } catch (err) { this.chiudi(true); avviso("Non riesco ad aprire il microfono: " + err.message); return false; }
   },
   testo() { return (this.finale + " " + this.parziale).replace(/\s+/g, " ").trim(); },
   aggiorna() {
     const t = this.testo(); if (!t) return;
     if (!this.el) this.el = riga("ema", "", "prov");
     if (this.el) { this.el.querySelector(".t").textContent = t; const box = $("#righe"); if (box) box.scrollTop = box.scrollHeight; }
-    const tenuto = this.modo === "tap" && premuto && ora() - premuto > 450;   // sta tenendo premuto: decide il rilascio
-    if (!tenuto) this.silenzio(this.modo === "rilascio" ? 350 : 900);
   },
-  silenzio(ms) { clearTimeout(this.timer); const io = this.giro; this.timer = setTimeout(() => { if (io === this.giro && this.attivo) this.consegna(); }, ms); },
-  rilascio() { if (!this.attivo) return; this.modo = "rilascio"; this.silenzio(350); },
+  /* Ogni 0,1 s: è ora di inviare? Sì quando c'è del testo e Ema tace DAVVERO da 1,7 s (lo dice il volume del microfono,
+     non le parole di Chrome). Senza misura del volume: 2 s dall'ultima parola. Tenuto premuto: decide il rilascio. */
+  controlla() {
+    if (!this.attivo || this.esterno) return;
+    const adesso = ora();
+    if (this.modo === "rilascio") { if (adesso - this.rilasciato > 350 && (adesso - this.ultimoRis > 300 || adesso - this.rilasciato > 1500)) this.consegna(); return; }
+    if (!this.testo()) return;
+    if (this.modo === "tap" && premuto && adesso - premuto > 450) return;
+    const daRis = adesso - this.ultimoRis;
+    if (Orecchio.ok) { if ((adesso - Orecchio.ultimoSuono > 1700 && daRis > 700) || daRis > 4500) this.consegna(); }
+    else if (daRis > 2000) this.consegna();
+  },
+  rilascio() { if (!this.attivo) return; this.modo = "rilascio"; this.rilasciato = ora(); },
   consegna() {
     if (!this.attivo) return;
     const t = this.testo(); this.chiudi(true);
@@ -353,9 +435,10 @@ const Mic = {
   },
   annulla() { if (!this.attivo) return; this.chiudi(true); if (S.fase === "ascolto") fase("riposo"); },
   chiudi(abort) {
-    clearTimeout(this.timer); this.giro++; this.attivo = false;
+    clearInterval(this.guardia); this.guardia = 0; this.giro++; this.attivo = false;
     togli(this.el); this.el = null;
     if (this.esterno) { try { if (CFG.fermaAscolto) CFG.fermaAscolto(); } catch (_) {} return; }
+    Orecchio.chiudi();
     const r = this.rec; this.rec = null;
     if (r && abort) { try { r.abort(); } catch (_) {} }
   },
@@ -521,6 +604,7 @@ function interrompi() {
 
 // ------------------------------------------------------------------ bocca e onde, a ogni fotogramma
 let bocca = 0, onda = 0;
+const Onde = { sx: [...ROOT.querySelectorAll(".barre.sx i")], dx: [...ROOT.querySelectorAll(".barre.dd i")], b: $("#parla"), h: new Array(9).fill(0), t: 0, liv: 0, acceso: false };
 (function ciclo(t) {
   if (!ROOT.hidden) {
     let b = 0;
@@ -528,16 +612,32 @@ let bocca = 0, onda = 0;
     bocca = b > bocca ? b : bocca * 0.7 + b * 0.3;
     Scena.bocca(Math.min(1, bocca));
     let m = 0;
-    if (S.fase === "ascolto") { m = Nativo.attivo ? audioMic() * 9 : Mic.impulso; }
+    if (S.fase === "ascolto") { m = Nativo.attivo ? audioMic() * 9 : Orecchio.ok ? Math.min(1, Orecchio.liv * 9) : Mic.impulso; }
     Mic.impulso *= 0.9;
     onda = m > onda ? m : onda * 0.85 + m * 0.15;
     Scena.livello(Math.min(1, onda));
+    // le onde attorno al tasto: quando registra entrano (da fuori verso il tasto), quando parla escono
+    const st = ROOT.dataset.st, vivo = st === "ascolto" || st === "parlo";
+    if ((vivo || Onde.acceso) && Onde.sx.length === 9 && Onde.dx.length === 9) {
+      const v = st === "ascolto" ? Math.max(0.07 + 0.04 * Math.sin(t / 260), Math.min(1, onda)) : st === "parlo" ? Math.min(1, bocca) : 0;
+      if (Math.abs(v - Onde.liv) > 0.02) { Onde.liv = v; Onde.b.style.setProperty("--liv", v.toFixed(2)); }
+      if (t - Onde.t > 55) {
+        Onde.t = t; Onde.h.unshift(v); Onde.h.pop();
+        const dentro = st !== "parlo"; let somma = 0;
+        for (let k = 0; k < 9; k++) {
+          const mossa = 0.72 + 0.28 * Math.sin(k * 1.9 + t / 80);
+          Onde.sx[k].style.transform = "scaleY(" + Math.max(0.05, Math.pow(Onde.h[dentro ? k : 8 - k], 0.7) * mossa).toFixed(3) + ")";
+          Onde.dx[k].style.transform = "scaleY(" + Math.max(0.05, Math.pow(Onde.h[dentro ? 8 - k : k], 0.7) * mossa).toFixed(3) + ")";
+          somma += Onde.h[k];
+        }
+        Onde.acceso = vivo || somma > 0.01;
+      }
+    }
   }
   requestAnimationFrame(ciclo);
 })(0);
 
 // ------------------------------------------------------------------ i comandi
-let premuto = 0;
 function giu(e) {
   if (e) e.preventDefault();
   if (ROOT.hidden) return;
@@ -550,11 +650,12 @@ function giu(e) {
   if (S.fase === "penso" || S.fase === "parlo") { interrompi(); fase("riposo"); return; }
   if (Mic.attivo) { Mic.consegna(); return; }                                       // secondo tocco: manda subito
   premuto = ora(); Mic.avvia("tap");
+  setTimeout(etichetta, 480);                                                       // se lo tiene premuto la scritta diventa "rilascia per inviare"
 }
 function su() {
   if (S.modo === "live" || !Mic.attivo || Mic.modo !== "tap" || !premuto) return;
   if (ora() - premuto > 450) Mic.rilascio();                                        // tenuto premuto: parte al rilascio
-  premuto = 0;
+  premuto = 0; etichetta();
 }
 function setModo(m) {
   interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false;
@@ -562,9 +663,26 @@ function setModo(m) {
   ROOT.querySelectorAll("[data-m]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"));
   ridisegnaStoria(); fase("riposo");
 }
+/* Quanto è occupata la scheda video: lo dice il programma della voce sul PC. Rossa = un altro programma la sta usando. */
+const Gpu = {
+  timer: 0, fallite: 0, salta: 0,
+  async giro() {
+    const el = $("#gpu"); if (!el || ROOT.hidden) return;
+    if (this.salta > 0) { this.salta--; return; }
+    try {
+      const g = await Hal.get("/gpu", 1500); if (!g || !(g.uso >= 0) || !g.totale_mb) throw new Error("niente");
+      this.fallite = 0;
+      const caldo = g.uso >= 85 || g.totale_mb - g.usata_mb < 700;
+      el.hidden = false; el.classList.toggle("caldo", caldo);
+      $("#gpu-n").textContent = g.uso + "%"; el.querySelector("u").style.setProperty("--g", (g.uso / 100).toFixed(2));
+      $("#gpu-m").textContent = (g.usata_mb / 1024).toFixed(1) + "/" + Math.round(g.totale_mb / 1024) + " GB" + (caldo ? " · occupata" : "");
+    } catch (_) { if (++this.fallite >= 2) { el.hidden = true; this.salta = 4; } }   // programma della voce spento: riprova ogni 15 s
+  },
+  avvia() { if (this.timer) return; this.giro(); this.timer = setInterval(() => this.giro(), 3000); },
+};
 function nascondi() { interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo"); ROOT.hidden = true; }
 function mostra() {
-  ROOT.hidden = false; etichetta();
+  ROOT.hidden = false; etichetta(); Gpu.salta = 0; Gpu.giro();
   if (S.hal) Hal.accendi(); else Hal.disegna();
 }
 
@@ -582,7 +700,7 @@ function avvia() {
   if (hb) hb.addEventListener("click", () => {
     interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo");
     S.hal = !S.hal; salva("voce.hal", S.hal ? "1" : "0");
-    if (S.hal) { riga("sys", "Voce HAL: la carico, ci vuole circa mezzo minuto. Intanto parla Claude.", "piano"); Hal.accendi(); }
+    if (S.hal) { riga("sys", "Carico la voce HAL: la barra sul tasto HAL mostra a che punto è (circa mezzo minuto). Intanto parla Claude.", "piano"); Hal.accendi(); }
     else { Hal.spegni(); riga("sys", "Voce di Claude.", "piano"); }
   });
   $("#zitto").addEventListener("click", () => {
@@ -606,6 +724,7 @@ function avvia() {
   ROOT.dataset.modo = S.modo;
   ROOT.querySelectorAll("[data-m]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.m === S.modo ? "true" : "false"));
   ridisegnaStoria(); Hal.disegna(); fase("riposo");
+  Gpu.avvia();
   S.avviato = true; log("avviato " + (window.VOCE_VERSIONE || "pagina") + " modo=" + S.modo + " hal=" + S.hal);
   if (!ROOT.hidden && S.hal) Hal.accendi();
 }
@@ -626,6 +745,7 @@ ROOT.addEventListener("voce-test", () => {
       this.abort = () => { timers.forEach(clearTimeout); timers = []; setTimeout(() => self.onend && self.onend(), 0); };
       this.stop = this.abort;
     };
+    Orecchio.finto = c.voceFino || 1;                         // volume finto: "parla" fino a voceFino ms, poi silenzio
     log("test: microfono finto");
   }
   if (c.audio) {
@@ -634,7 +754,7 @@ ROOT.addEventListener("voce-test", () => {
       .then((r) => r.blob()).then((bl) => new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(bl); }))
       .then((u) => { ROOT.dataset.testAudio = u; log("test: audio pronto " + u.length); }).catch((e) => log("test: audio errore " + e.message));
   }
-  if (c.micVero) { Mic.Classe = window.SpeechRecognition || window.webkitSpeechRecognition || null; log("test: microfono vero"); }
+  if (c.micVero) { Orecchio.finto = 0; Mic.Classe = window.SpeechRecognition || window.webkitSpeechRecognition || null; log("test: microfono vero"); }
   if (c.provaMic) {
     const R = window.SpeechRecognition || window.webkitSpeechRecognition; if (!R) { log("provaMic: assente"); return; }
     const r = new R(); r.lang = S.lingua; r.onstart = () => log("provaMic: onstart"); r.onaudiostart = () => log("provaMic: audio"); r.onerror = (e) => log("provaMic: errore " + e.error); r.onend = () => log("provaMic: fine");
