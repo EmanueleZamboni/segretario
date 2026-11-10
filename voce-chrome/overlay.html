@@ -23,8 +23,10 @@
     <div class="modi" role="group" aria-label="Modo">
       <button type="button" data-m="testo" aria-pressed="false">Voce → testo</button>
       <button type="button" data-m="voce" aria-pressed="true">Voce → voce</button>
-      <button type="button" data-m="live" aria-pressed="false">Live</button>
+      <button type="button" data-m="live" aria-pressed="false" title="Conversazione con la voce di Claude">Live</button>
       <button type="button" class="chatnorm" id="chatnorm" title="Nascondi la Voce e usa la chat normale">Chat normale</button>
+      <button type="button" id="lingua" title="Lingua in cui parli al microfono">MIC IT</button>
+      <button type="button" id="hal" title="Voce HAL (sul PC): accesa usa la scheda video, spenta parla la voce di Claude" aria-pressed="false">HAL</button>
     </div>
     <div class="cmd">
       <button id="parla" type="button" aria-label="Parla" aria-pressed="false">

@@ -58,6 +58,7 @@ body{margin:0;background:#000;overflow:hidden}
 .riga.seg .t{font-size:17px;color:#fff;text-shadow:0 0 10px rgba(255,255,255,.35),0 0 24px rgba(0,0,0,.9)}
 .riga.seg .chi{color:var(--acc)}
 .riga.ema .t{color:var(--dim)}
+.riga.prov .t{color:var(--ink);opacity:.85}
 .riga.err .t{color:#ff6b6b}.riga.piano .t{color:var(--faint)}.riga.vecchia{opacity:.45}
 .riga .fr{transition:color .3s,text-shadow .3s}
 .riga .fr.ora{color:#fff;text-shadow:0 0 12px var(--acc),0 0 24px rgba(0,0,0,.9)}
@@ -96,6 +97,10 @@ body{margin:0;background:#000;overflow:hidden}
 .modi{display:flex;gap:6px}
 .modi button,#zitto{appearance:none;border:1px solid var(--line);background:rgba(0,0,0,.45);color:var(--dim);padding:9px 12px;border-radius:2px;
  font:400 10px/1 "Space Mono",monospace;letter-spacing:.2em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(6px)}
+#lingua{min-width:40px}
+#hal[aria-pressed=true]{color:#ff3b3b;border-color:#ff3b3b;box-shadow:0 0 12px -2px #ff3b3b}
+#hal.carica{animation:halpulse 1s ease-in-out infinite}
+@keyframes halpulse{50%{opacity:.4}}
 .modi button[aria-pressed=true]{color:var(--acc);border-color:var(--acc);box-shadow:0 0 12px -2px var(--acc),inset 0 0 12px -8px var(--acc)}
 .modi button:hover,#zitto:hover{color:var(--ink)}
 #voce-root[data-muto="1"] #zitto{color:#ff3b3b;border-color:#ff3b3b;box-shadow:0 0 12px -2px #ff3b3b}
@@ -161,8 +166,10 @@ body{margin:0;background:#000;overflow:hidden}
     <div class="modi" role="group" aria-label="Modo">
       <button type="button" data-m="testo" aria-pressed="false">Voce → testo</button>
       <button type="button" data-m="voce" aria-pressed="true">Voce → voce</button>
-      <button type="button" data-m="live" aria-pressed="false">Live</button>
+      <button type="button" data-m="live" aria-pressed="false" title="Conversazione con la voce di Claude">Live</button>
       <button type="button" class="chatnorm" id="chatnorm" title="Nascondi la Voce e usa la chat normale">Chat normale</button>
+      <button type="button" id="lingua" title="Lingua in cui parli al microfono">MIC IT</button>
+      <button type="button" id="hal" title="Voce HAL (sul PC): accesa usa la scheda video, spenta parla la voce di Claude" aria-pressed="false">HAL</button>
     </div>
     <div class="cmd">
       <button id="parla" type="button" aria-label="Parla" aria-pressed="false">

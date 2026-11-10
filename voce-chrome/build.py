@@ -35,7 +35,15 @@ scena = (ROOT / "voce_mesh.js").read_text(encoding="utf-8") + "\n" + (ROOT / "vo
 logica = (ROOT / "voce_logica.js").read_text(encoding="utf-8")
 driver = (HERE / "driver.js").read_text(encoding="utf-8")
 
-versione = json.loads((HERE / "manifest.json").read_text(encoding="utf-8"))["version"]
+# La versione: Chrome ricarica l'estensione quando vede cambiare la versione del manifest, e in quel momento FOTOGRAFA
+# i file. Quindi il manifest si scrive per ultimo, dopo content.js e overlay.css (in fondo a questo script).
+# Uso: python build.py [versione]   (senza argomento: aumenta l'ultima cifra)
+import sys
+_manifest = json.loads((HERE / "manifest.json").read_text(encoding="utf-8"))
+if len(sys.argv) > 1:
+    versione = sys.argv[1]
+else:
+    _p = _manifest["version"].split("."); _p[-1] = str(int(_p[-1]) + 1); versione = ".".join(_p)
 content = f"""/* Generato da voce-chrome/build.py: non modificare a mano. Fonte: voce.html, voce_scena.js, voce_logica.js, driver.js */
 window.VOCE_VERSIONE = "v{versione}";
 (() => {{
@@ -76,4 +84,6 @@ def png(size: int, colore=(82, 255, 106)) -> bytes:
 
 
 (HERE / "icon128.png").write_bytes(png(128))
-print("estensione pronta in", HERE)
+_manifest["version"] = versione
+(HERE / "manifest.json").write_text(json.dumps(_manifest, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
+print("estensione", versione, "pronta in", HERE)

@@ -93,7 +93,7 @@ const TESTA = { zc: 1.5, su: 0.74, sv: 0.74, hs: 1.25 };
 
 function dimensiona() {
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  Q = (ROOT.clientWidth || innerWidth) * dpr > 2200 ? 2200 / (ROOT.clientWidth || innerWidth) : dpr;
+  Q = ((ROOT.clientWidth || innerWidth) * dpr > 2200 ? 2200 / (ROOT.clientWidth || innerWidth) : dpr) * (typeof QSCALA === "number" ? QSCALA : 1);
   const rw = ROOT.clientWidth || innerWidth || 1280, rh = ROOT.clientHeight || innerHeight || 720;
   W = Math.max(64, Math.round(rw * Q)); H = Math.max(64, Math.round(rh * Q));
   cv.width = W; cv.height = H; gc.width = W; gc.height = H;
@@ -385,7 +385,7 @@ float h1(float n){return fract(sin(n)*43758.5453);}
 float h2(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
  return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
-float fbm(vec2 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}
+float fbm(vec2 p){float a=.5,s=0.;for(int i=0;i<3;i++){s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}
 vec3 hsv(float h){return clamp(abs(mod(h*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.);}
 void main(){
   float t=uT;
@@ -513,8 +513,17 @@ function compila() {
 const pronto = compila();
 const fallback = !pronto ? cv.getContext("2d") : null; // senza WebGL: solo la griglia, verde
 let t0 = performance.now(), prima = t0;
+let lento = 0, QSCALA = 0.75, ultimoCambioQ = 0;
 function frame(t) {
+  if (ROOT.hidden) { prima = t; requestAnimationFrame(frame); return; }  // la Voce è chiusa: niente lavoro (ogni scheda di claude.ai ha la sua copia)
+  if (t - prima < 31) { requestAnimationFrame(frame); return; }  // tetto: 30 fotogrammi al secondo bastano per cielo e grana
   const dt = Math.min(100, t - prima); prima = t;
+  // se la macchina arranca (oltre 28 ms a fotogramma per un secondo), la scena si disegna più piccola e viene ingrandita
+  lento = lento * 0.9 + dt * 0.1;
+  if (t - ultimoCambioQ > 1500) {
+    if (lento > 28 && QSCALA > 0.5) { QSCALA = Math.max(0.5, QSCALA * 0.75); ultimoCambioQ = t; dimensiona(); }
+    else if (lento < 20 && QSCALA < 0.75) { QSCALA = Math.min(0.75, QSCALA * 1.25); ultimoCambioQ = t; dimensiona(); }
+  }
   segui(dt);
   volto(t, false);
   const secondi = (t - t0) / 1000 * (RIDOTTO ? 0.25 : 1);

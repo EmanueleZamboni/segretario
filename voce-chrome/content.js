@@ -1,130 +1,200 @@
 /* Generato da voce-chrome/build.py: non modificare a mano. Fonte: voce.html, voce_scena.js, voce_logica.js, driver.js */
-window.VOCE_VERSIONE = "v0.3.0";
+window.VOCE_VERSIONE = "v1.0.7";
 (() => {
   if (document.getElementById("voce-root")) return;
   const wrap = document.createElement("div");
-  wrap.innerHTML = "<div id=\"voce-root\" data-fase=\"riposo\" data-modo=\"voce\" data-look=\"verde\" data-host=\"claude\">\n<canvas id=\"scena\" aria-hidden=\"true\"></canvas>\n<i class=\"ang a\"></i><i class=\"ang b\"></i><i class=\"ang c\"></i><i class=\"ang d\"></i>\n<div class=\"hud\">\n  <header class=\"top\">\n    <div class=\"brand\"><b>SEGRETARI<i>O</i></b><span class=\"cap\" id=\"sotto\">voce \u00b7 canale privato</span></div>\n    <div class=\"clock\"><b id=\"ora\">--:--</b><span class=\"cap\" id=\"data\"></span></div>\n  </header>\n  <section class=\"mid\">\n    <div class=\"pan l\">\n      <div class=\"blk\" id=\"b-cal\"><h3>Calendario</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-oggi\"><h3>Oggi</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-tempo\"><h3>Se hai tempo</h3><ul></ul></div>\n    </div>\n    <div class=\"centro\"><div id=\"righe\" aria-live=\"polite\"></div></div>\n    <div class=\"pan r\">\n      <div class=\"blk\" id=\"b-att\"><h3>Claude aspetta te</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-lav\"><h3>Al lavoro</h3><ul></ul></div>\n      <div class=\"blk\" id=\"b-mail\"><h3>Email da leggere</h3><ul></ul></div>\n    </div>\n  </section>\n  <footer class=\"bot\">\n    <div class=\"modi\" role=\"group\" aria-label=\"Modo\">\n      <button type=\"button\" data-m=\"testo\" aria-pressed=\"false\">Voce \u2192 testo</button>\n      <button type=\"button\" data-m=\"voce\" aria-pressed=\"true\">Voce \u2192 voce</button>\n      <button type=\"button\" data-m=\"live\" aria-pressed=\"false\">Live</button>\n      <button type=\"button\" class=\"chatnorm\" id=\"chatnorm\" title=\"Nascondi la Voce e usa la chat normale\">Chat normale</button>\n    </div>\n    <div class=\"cmd\">\n      <button id=\"parla\" type=\"button\" aria-label=\"Parla\" aria-pressed=\"false\">\n        <svg viewBox=\"0 0 24 24\"><path d=\"M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z\"/><path d=\"M19 10v2a7 7 0 0 1-14 0v-2\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/></svg>\n      </button>\n      <span class=\"l\">tieni premuto e parla</span>\n    </div>\n    <div class=\"dx\">\n      <input id=\"scrivi\" type=\"text\" placeholder=\"oppure scrivi e premi Invio\" autocomplete=\"off\" spellcheck=\"false\">\n      <div class=\"sys\" id=\"sys\"></div>\n      <button id=\"zitto\" type=\"button\" title=\"Zitto finch\u00e9 non ti chiamo per nome\">Silenzio</button>\n    </div>\n  </footer>\n</div>\n</div>";
+  wrap.innerHTML = "<div id=\"voce-root\" data-fase=\"riposo\" data-modo=\"voce\" data-look=\"verde\" data-host=\"claude\">\n<canvas id=\"scena\" aria-hidden=\"true\"></canvas>\n<i class=\"ang a\"></i><i class=\"ang b\"></i><i class=\"ang c\"></i><i class=\"ang d\"></i>\n<div class=\"hud\">\n  <header class=\"top\">\n    <div class=\"brand\"><b>SEGRETARI<i>O</i></b><span class=\"cap\" id=\"sotto\">voce \u00b7 canale privato</span></div>\n    <div class=\"clock\"><b id=\"ora\">--:--</b><span class=\"cap\" id=\"data\"></span></div>\n  </header>\n  <section class=\"mid\">\n    <div class=\"pan l\">\n      <div class=\"blk\" id=\"b-cal\"><h3>Calendario</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-oggi\"><h3>Oggi</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-tempo\"><h3>Se hai tempo</h3><ul></ul></div>\n    </div>\n    <div class=\"centro\"><div id=\"righe\" aria-live=\"polite\"></div></div>\n    <div class=\"pan r\">\n      <div class=\"blk\" id=\"b-att\"><h3>Claude aspetta te</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-lav\"><h3>Al lavoro</h3><ul></ul></div>\n      <div class=\"blk\" id=\"b-mail\"><h3>Email da leggere</h3><ul></ul></div>\n    </div>\n  </section>\n  <footer class=\"bot\">\n    <div class=\"modi\" role=\"group\" aria-label=\"Modo\">\n      <button type=\"button\" data-m=\"testo\" aria-pressed=\"false\">Voce \u2192 testo</button>\n      <button type=\"button\" data-m=\"voce\" aria-pressed=\"true\">Voce \u2192 voce</button>\n      <button type=\"button\" data-m=\"live\" aria-pressed=\"false\" title=\"Conversazione con la voce di Claude\">Live</button>\n      <button type=\"button\" class=\"chatnorm\" id=\"chatnorm\" title=\"Nascondi la Voce e usa la chat normale\">Chat normale</button>\n      <button type=\"button\" id=\"lingua\" title=\"Lingua in cui parli al microfono\">MIC IT</button>\n      <button type=\"button\" id=\"hal\" title=\"Voce HAL (sul PC): accesa usa la scheda video, spenta parla la voce di Claude\" aria-pressed=\"false\">HAL</button>\n    </div>\n    <div class=\"cmd\">\n      <button id=\"parla\" type=\"button\" aria-label=\"Parla\" aria-pressed=\"false\">\n        <svg viewBox=\"0 0 24 24\"><path d=\"M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z\"/><path d=\"M19 10v2a7 7 0 0 1-14 0v-2\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/></svg>\n      </button>\n      <span class=\"l\">tieni premuto e parla</span>\n    </div>\n    <div class=\"dx\">\n      <input id=\"scrivi\" type=\"text\" placeholder=\"oppure scrivi e premi Invio\" autocomplete=\"off\" spellcheck=\"false\">\n      <div class=\"sys\" id=\"sys\"></div>\n      <button id=\"zitto\" type=\"button\" title=\"Zitto finch\u00e9 non ti chiamo per nome\">Silenzio</button>\n    </div>\n  </footer>\n</div>\n</div>";
   const root = wrap.firstElementChild;
   root.hidden = true;  // parte nascosta: la chat è quella di sempre finché Ema non preme VOCE
   document.body.appendChild(root);
 })();
-/* La Voce sopra claude.ai: questo pezzo guida la chat vera del progetto Secretary.
-   Niente API, niente chiavi: quello che Ema dice viene scritto nella casella della chat e inviato; la risposta
-   si legge dalla pagina mentre arriva, si pulisce dai segni di tono e si manda alla Voce (voce_logica.js), che la
-   legge ad alta voce e colora la scena. Il tasto "Chat normale" nasconde la Voce: sotto c'è la chat di sempre, con
-   la stessa conversazione.
+/* La Voce sopra claude.ai: questo pezzo sa come è fatta la pagina di claude.ai e la guida.
+   Niente API, niente chiavi: scrive nella casella della chat vera, legge la risposta mentre arriva, preme "Leggi ad
+   alta voce" (la voce di Claude), accende e spegne la modalità vocale. La logica (voce_logica.js) non tocca mai la
+   pagina: passa sempre da qui. Se claude.ai cambia, si aggiorna solo questo file.
 
-   Dipende da come è fatta la pagina di claude.ai (data-testid): se Anthropic la cambia, si aggiorna qui.
-   Usato dall'estensione Chrome (content.js) e, domani, dall'app Android (stessa pagina, stesso script). */
+   Com'è fatta la pagina (verificato il 10/11/2026):
+   - ogni messaggio è un [role="article"] con aria-posinset (numero) e aria-setsize (totale). La lista è VIRTUALE:
+     nella pagina ci sono solo gli ultimi ~20 messaggi, quindi non si contano mai le righe: si legge il totale;
+   - i messaggi di Ema contengono [data-testid="user-message"], quelli di Claude un [data-is-streaming] con il
+     testo dentro .standard-markdown;
+   - la casella è [data-testid="chat-input"], il tasto [data-testid="chat-input-send"];
+   - "Leggi ad alta voce" è [data-testid="action-bar-read-aloud"] sull'ultimo messaggio, data-state idle/playing/paused;
+   - la modalità vocale non ha testid: si riconosce dai tasti ("Avvia la modalità vocale", "Disattiva microfono",
+     "Interrompi") e dal segnaposto della casella ("In ascolto...", "Elaborazione..."). */
 (() => {
 "use strict";
 const SEL = {
-  input: '[data-testid="chat-input"]',
-  send: '[data-testid="chat-input-send"]',
-  righe: '[data-is-streaming]',
-  testo: '.standard-markdown',
+  input: '[data-testid="chat-input"]', send: '[data-testid="chat-input-send"]', art: '[role="article"]',
+  riga: "[data-is-streaming]", testo: ".standard-markdown", utente: '[data-testid="user-message"]',
+  leggi: '[data-testid="action-bar-read-aloud"]', annuncio: '[data-testid="response-status-announcer"]',
 };
-const PREFISSO = "[voce] ";
-const SEGNO = /\[([!?~+\-])\]/g;
-const TONI = { "!": "forte", "?": "domanda", "~": "calmo", "+": "bene", "-": "male" };
+const RE = {
+  avvia: /avvia la modalità vocale|start voice mode|use voice mode/i,
+  micOn: /^attiva microfono|^unmute/i, micOff: /^disattiva microfono|^mute/i,
+  stop: /^(interrompi|stop|termina|end)/i, risposta: /risposta|response/i,
+  stopRisposta: /interrompi la risposta|stop response/i,
+};
 const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// Dal testo con i segni di tono al pacchetto per la Voce (stessa logica di voce.py, in JS).
-function segmenta(grezzo) {
-  grezzo = (grezzo || "").trim();
-  if (/^\[silenzio(?::\s*finch[eé]\s*chiamato)?\]\.?$/i.test(grezzo)) return { silenzio: /finch/i.test(grezzo) ? "finche_chiamato" : "turno" };
-  const pezzi = []; let tono = "neutro", pos = 0, m;
-  while ((m = SEGNO.exec(grezzo))) { pezzi.push([tono, grezzo.slice(pos, m.index)]); tono = TONI[m[1]]; pos = m.index + m[0].length; }
-  pezzi.push([tono, grezzo.slice(pos)]);
-  const segmenti = [];
-  for (const [t0, blocco] of pezzi) {
-    const frasi = blocco.match(/[^.!?…\n]+[.!?…]*\s*/g) || [];
-    frasi.forEach((frase, n) => {
-      if (!frase.trim()) return;
-      const t = n ? "neutro" : t0;
-      const pulita = []; const enfasi = []; let i = 0;
-      for (const parte of frase.split(/(\*[^*\n]{1,80}\*)/)) {
-        if (parte.length >= 3 && parte.startsWith("*") && parte.endsWith("*")) { const w = parte.slice(1, -1); enfasi.push([i, i + w.length]); pulita.push(w); i += w.length; }
-        else { const q = parte.replace(/\*/g, ""); pulita.push(q); i += q.length; }
-      }
-      const tutto = pulita.join(""); const testo = tutto.trim(); const salto = tutto.length - tutto.trimStart().length;
-      if (testo) segmenti.push({ testo, tono: t, enfasi: enfasi.map(([a, b]) => [a - salto, b - salto]).filter(([, b]) => b > 0) });
-    });
-  }
-  return { testo: segmenti.map((x) => x.testo).join(" "), segmenti };
+const q = (s, r) => (r || document).querySelector(s);
+const qa = (s, r) => [...(r || document).querySelectorAll(s)];
+function bottone(re, no) {
+  return qa("button").find((b) => { const t = ((b.getAttribute("aria-label") || "") + " " + b.textContent).trim(); return re.test(t) && !(no && no.test(t)); }) || null;
 }
 
-function righe() { return [...document.querySelectorAll(SEL.righe)]; }
-function testoRiga(r) { const t = r.querySelector(SEL.testo); return (t ? t.innerText : "").trim(); }
-
-async function scrivi(testo) {
-  const box = document.querySelector(SEL.input);
-  if (!box) throw new Error("Non trovo la casella della chat: apri una chat del progetto Secretary.");
-  box.focus();
-  document.execCommand("selectAll", false, null); document.execCommand("delete", false, null);
-  if (!document.execCommand("insertText", false, testo)) {
-    box.dispatchEvent(new InputEvent("beforeinput", { inputType: "insertText", data: testo, bubbles: true, cancelable: true }));
-  }
-  for (let i = 0; i < 40; i++) {
-    const b = document.querySelector(SEL.send);
-    if (b && !b.disabled) { b.click(); return; }
-    await attesa(50);
-  }
-  throw new Error("Il tasto Invia non si è acceso.");
+// ------------------------------------------------------------------ i messaggi
+function info(a, i) {
+  if (!a) return null;
+  const pos = parseInt(a.getAttribute("aria-posinset") || "0", 10) || (i + 1);
+  const tot = parseInt(a.getAttribute("aria-setsize") || "0", 10) || 0;
+  return { el: a, pos, tot, utente: !!q(SEL.utente, a), riga: q(SEL.riga, a) };
 }
+function tutti() { return qa(SEL.art).map(info); }
+function totale() { const t = tutti(); const u = t[t.length - 1]; return u ? Math.max(u.tot, u.pos) : 0; }
+function ultimoDi(utente) { const t = tutti(); for (let i = t.length - 1; i >= 0; i--) { if (utente ? t[i].utente : (t[i].riga && !t[i].utente)) return t[i]; } return null; }
+const ultimoAssistente = () => ultimoDi(false);
+const ultimoUtente = () => ultimoDi(true);
+function scrive(x) { return !!(x && x.riga && x.riga.getAttribute("data-is-streaming") === "true"); }
+function testoDi(x) {
+  if (!x) return { testo: "", enfasi: [] };
+  if (x.utente) { const u = q(SEL.utente, x.el); return { testo: (u ? u.innerText : "").trim(), enfasi: [] }; }
+  const md = qa(SEL.testo, x.el);
+  const enfasi = [];
+  md.forEach((m) => qa("em,strong", m).forEach((e) => { const s = e.textContent.trim(); if (s && s.length < 80) enfasi.push(s); }));
+  return { testo: md.map((m) => m.innerText).join("\n").trim(), enfasi };
+}
+function occupata() { return !!q('[data-is-streaming="true"]') || !!bottone(RE.stopRisposta); }
+function fermaRisposta() { const b = bottone(RE.stopRisposta); if (b) b.click(); }
 
-/* Manda la frase di Ema alla chat vera e aspetta la risposta intera. Ritorna {testo, segmenti} | {silenzio} | {errore}. */
-async function parla(testo, storia, signal) {
-  const prima = righe().length;
-  try { await scrivi(PREFISSO + testo); } catch (err) { return { errore: err.message }; }
+// ------------------------------------------------------------------ scrivere e inviare
+async function invia(testo, signal) {
   const t0 = performance.now();
-  let riga = null;
-  // 1. aspetta la riga nuova di Claude (dopo quella di Ema)
-  while (performance.now() - t0 < 30000) {
-    if (signal && signal.aborted) return { errore: "annullato" };
-    const rs = righe();
-    if (rs.length >= prima + 2) { riga = rs[rs.length - 1]; break; }
-    if (rs.length === prima + 1 && rs[rs.length - 1].getAttribute("data-is-streaming") === "true") { riga = rs[rs.length - 1]; break; }
+  while (occupata()) {
+    if (signal && signal.aborted) throw new Error("annullato");
+    if (performance.now() - t0 > 60000) throw new Error("La chat è ancora occupata con la risposta di prima.");
     await attesa(120);
   }
-  if (!riga) return { errore: "Claude non ha iniziato a rispondere." };
-  // 2. aspetta che finisca di scrivere (e un attimo in più: l'ultimo pezzo arriva dopo il flag)
-  let fermo = 0, ultimo = "";
-  while (performance.now() - t0 < 240000) {
-    if (signal && signal.aborted) return { errore: "annullato" };
-    const streaming = riga.getAttribute("data-is-streaming") === "true";
-    const t = testoRiga(riga);
-    if (!streaming && t && t === ultimo) { fermo += 1; if (fermo >= 3) break; } else fermo = 0;
-    ultimo = t;
-    await attesa(150);
+  const box = q(SEL.input);
+  if (!box) throw new Error("Qui non c'è la casella dei messaggi: apri una chat di claude.ai.");
+  box.focus();
+  if (!(document.activeElement === box || box.contains(document.activeElement))) throw new Error("Non riesco a scrivere nella casella della chat.");
+  document.execCommand("selectAll", false, null); document.execCommand("delete", false, null);
+  document.execCommand("insertText", false, testo);
+  for (let i = 0; ; i++) {
+    const b = q(SEL.send);
+    if (b && !b.disabled) { b.click(); break; }
+    if (i >= 60) throw new Error("Il tasto Invia di claude.ai non si è acceso.");
+    await attesa(50);
   }
-  const grezzo = testoRiga(riga);
-  if (!grezzo) return { errore: "Risposta vuota (forse solo uno strumento, senza testo)." };
-  return segmenta(grezzo);
+  try { box.blur(); } catch (_) {}
 }
 
-// Un pulsantino sempre presente sulla pagina per richiamare la Voce quando è nascosta.
+/* Aspetta la risposta al messaggio appena inviato. `prima` = totale dei messaggi PRIMA dell'invio.
+   onParziale({testo, enfasi}) viene chiamato ogni volta che il testo cresce. Ritorna {testo, enfasi} oppure {errore}. */
+async function attendiRisposta(prima, onParziale, signal) {
+  const t0 = performance.now();
+  let x = null;
+  while (!x) {
+    if (signal && signal.aborted) return { errore: "annullato" };
+    const u = ultimoAssistente();
+    if (u && u.pos > prima) { x = u; break; }
+    if (performance.now() - t0 > 90000) return { errore: "Claude non ha iniziato a rispondere." };
+    await attesa(80);
+  }
+  let ultimo = "", enfasi = [], fermo = 0, vuoto = 0;
+  while (performance.now() - t0 < 300000) {
+    if (signal && signal.aborted) return { errore: "annullato" };
+    const u = ultimoAssistente() || x;
+    const st = scrive(u);
+    const d = testoDi(u);
+    if (d.testo && d.testo !== ultimo) { ultimo = d.testo; enfasi = d.enfasi; fermo = 0; if (onParziale) { try { onParziale(d); } catch (_) {} } }
+    else if (!st && d.testo) fermo++;
+    if (!st && d.testo && fermo >= 2) return { testo: ultimo, enfasi };
+    if (!st && !d.testo) { if (++vuoto > 60) return { errore: "Claude ha risposto senza testo." }; } else vuoto = 0;
+    await attesa(90);
+  }
+  return ultimo ? { testo: ultimo, enfasi } : { errore: "Tempo scaduto." };
+}
+
+// ------------------------------------------------------------------ "Leggi ad alta voce" (la voce di Claude)
+function bottoneLeggi() { const u = ultimoAssistente(); return (u && q(SEL.leggi, u.el)) || qa(SEL.leggi).pop() || null; }
+async function leggi() {
+  for (let i = 0; i < 40; i++) {
+    const b = bottoneLeggi();
+    if (b) { if (b.getAttribute("data-state") !== "playing") b.click(); return true; }
+    await attesa(80);
+  }
+  return false;
+}
+function leggiStato() { const b = bottoneLeggi(); return b ? (b.getAttribute("data-state") || "idle") : "assente"; }
+function leggiFerma() { const b = bottoneLeggi(); if (b && b.getAttribute("data-state") === "playing") b.click(); }
+
+// ------------------------------------------------------------------ la modalità vocale di claude.ai
+function segnaposto() { const box = q(SEL.input); if (!box) return ""; const p = box.getAttribute("data-placeholder") || (q("[data-placeholder]", box) || { getAttribute: () => "" }).getAttribute("data-placeholder"); return p || ""; }
+const vocale = {
+  attivo() { return !!(bottone(RE.micOn) || bottone(RE.micOff)); },
+  disponibile() { return !!bottone(RE.avvia) || this.attivo(); },
+  giro: 0,
+  avvia() { this.giro++; if (this.attivo()) return true; const b = bottone(RE.avvia); if (!b) return false; b.click(); return true; },
+  /* Chiude la modalità vocale e INSISTE finché è chiusa davvero: nel primo secondo dopo l'avvio claude.ai non ha
+     ancora il tasto "Interrompi" (o non lo ascolta), e un clic solo lascerebbe il microfono di Claude acceso. */
+  ferma() {
+    const io = ++this.giro, t0 = performance.now(); let visto = false;
+    const giro = () => {
+      if (io !== this.giro) return;                       // nel frattempo è stata riavviata: non toccarla
+      const dt = performance.now() - t0;
+      if (this.attivo()) { visto = true; const b = bottone(RE.stop, RE.risposta); if (b) b.click(); }
+      else if (visto || dt > 3000) return;                // chiusa (o mai partita)
+      if (dt < 12000) setTimeout(giro, 300);
+    };
+    giro();
+  },
+  microfono(on) { const b = bottone(on ? RE.micOn : RE.micOff); if (b) b.click(); },
+  micAcceso() { return !!bottone(RE.micOff); },
+  ascolta() { return /in ascolto|listening/i.test(segnaposto()); },
+  elabora() { return /elaborazione|processing|thinking/i.test(segnaposto()); },
+};
+
+// ------------------------------------------------------------------ pannelli (dati dell'hub, via service worker)
+function leggiPannelli(url) {
+  return new Promise((ok) => {
+    try { chrome.runtime.sendMessage({ tipo: "pannelli", url }, (r) => { if (chrome.runtime.lastError || !r || r.errore) ok(null); else ok(r.dati); }); }
+    catch (_) { ok(null); }
+  });
+}
+
+// ------------------------------------------------------------------ il tasto VOCE sulla pagina
 function bottoneRichiamo() {
   if (document.getElementById("voce-richiamo")) return;
   const b = document.createElement("button");
   b.id = "voce-richiamo"; b.type = "button"; b.title = "Apri la Voce del Segretario"; b.textContent = "VOCE";
-  b.addEventListener("click", () => { const r = document.getElementById("voce-root"); if (r) { if (r.hidden) window.Voce.mostra(); else window.Voce.nascondi(); } });
+  b.addEventListener("click", () => {
+    if (b.dataset.vecchia) { location.reload(); return; }
+    const r = document.getElementById("voce-root"); if (!r || !window.Voce) return;
+    if (r.hidden) window.Voce.mostra(); else window.Voce.nascondi();
+  });
   document.body.appendChild(b);
 }
+// Ogni 5 s un colpetto al service worker: lo tiene sveglio per accorgersi di una versione nuova. Se l'estensione è
+// stata ricaricata, questa pagina ha ancora la versione vecchia: il tasto lo dice e un clic ricarica la pagina.
+function vecchia() { const b = document.getElementById("voce-richiamo"); if (b && !b.dataset.vecchia) { b.dataset.vecchia = "1"; b.textContent = "↻ AGGIORNA"; b.title = "C'è una versione nuova della Voce: clic per ricaricare la pagina"; } }
+try {
+  if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+    setInterval(() => {
+      try { if (!chrome.runtime.id) { vecchia(); return; } chrome.runtime.sendMessage({ tipo: "ping" }, () => void chrome.runtime.lastError); }
+      catch (_) { vecchia(); }
+    }, 5000);
+  }
+} catch (_) {}
 
-function leggiPannelli(url) {
-  return new Promise((ok) => {
-    try {
-      chrome.runtime.sendMessage({ tipo: "pannelli", url }, (r) => { if (chrome.runtime.lastError || !r || r.errore) ok(null); else ok(r.dati); });
-    } catch (_) { ok(null); }
-  });
-}
 window.VoceConfig = Object.assign({
-  trasporto: parla, stt: "browser", lingua: navigator.language && navigator.language.startsWith("en") ? "en-GB" : "it-IT",
   pannelli: "https://hub.emazamboni.com/voce.json",
   leggiPannelli: (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) ? leggiPannelli : undefined,
 }, window.VoceConfig || {});
-window.VoceDriver = { parla, segmenta, scrivi, bottoneRichiamo };
+window.VoceDriver = {
+  totale, ultimoAssistente, ultimoUtente, testoDi, scrive, occupata, fermaRisposta,
+  invia, attendiRisposta, leggi, leggiStato, leggiFerma, vocale, bottoneRichiamo,
+};
 })();
 
 /* La testa del Segretario: scansione di un volto reale, "Lee Perry-Smith" di Infinite Realities (ir-ltd.net), licenza CC BY 3.0,
@@ -262,7 +332,7 @@ const MESH = (() => {
   const ord = Array.from(media).filter((v) => v > 0).sort((a, b) => a - b), mediana = ord[ord.length >> 1] || 1;
   for (let i = 0; i < n; i++) { const d = Math.min(1, Math.max(0.3, Math.pow(media[i] / mediana, 0.8))); const k = i * 3; vn[k] *= d; vn[k + 1] *= d; vn[k + 2] *= d; }
   // i bulbi oculari sono pezzi a sé (cornea, sclera, iride): li troviamo per connessione, vicino a dove ci aspettiamo gli occhi
-  const naso = m.naso, bocca = [naso[0], naso[1] - 0.26, naso[2] - 0.15];
+  const naso = m.naso, bocca = [naso[0], naso[1] - 0.205, naso[2] - 0.12];  // linea delle labbra misurata sul profilo mediano
   const par = new Int32Array(n); for (let i = 0; i < n; i++) par[i] = i;
   const trova = (a) => { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; };
   for (let t = 0; t < idx.length; t += 3) { const a = trova(idx[t]); par[trova(idx[t + 1])] = a; par[trova(idx[t + 2])] = a; }
@@ -287,12 +357,12 @@ const MESH = (() => {
     const front = sm(-0.35, 0.25, z);
     // mandibola: dal labbro inferiore al mento (y da +0.02 a -0.21), davanti, sfuma verso le orecchie e verso la gola
     const my = bocca[1];
-    wJaw[i] = sm(my + 0.01, my - 0.10, y) * sm(my - 0.36, my - 0.22, y) * (0.25 + 0.75 * front) * sm(0.70, 0.30, Math.abs(x));
+    wJaw[i] = sm(my - 0.01, my - 0.09, y) * sm(my - 0.33, my - 0.24, y) * (0.2 + 0.8 * front) * sm(0.62, 0.28, Math.abs(x));
     // labbra: due fasce strette intorno alla linea della bocca, larghe quanto la bocca
     const dx = x - bocca[0], dyU = y - bocca[1];
     const larg = Math.exp(-((dx / 0.20) ** 2)) * front;
-    wLipU[i] = larg * Math.exp(-(((dyU - 0.045) / 0.035) ** 2));
-    wLipD[i] = larg * Math.exp(-(((dyU + 0.045) / 0.04) ** 2));
+    wLipU[i] = larg * Math.exp(-(((dyU - 0.032) / 0.028) ** 2));
+    wLipD[i] = larg * Math.exp(-(((dyU + 0.032) / 0.032) ** 2));
     // palpebre: la pelle attorno all'apertura dell'occhio (non il bulbo). Peso pieno sul bordo, sfuma verso sopracciglio e zigomo
     if (!bulbo[i] && z > 0.15) for (const o of occhi) {
       const [ex, ey] = o.lid, de = Math.hypot(x - ex, (y - ey) * 0.85);
@@ -315,8 +385,8 @@ function costruisciMesh(A) {
   const j = A.bocca, bl = A.blink;
   for (let i = 0; i < n; i++) {
     const k = i * 3; let x = base[k], y = base[k + 1], z = base[k + 2];
-    y -= wJaw[i] * j * 0.09; z -= wJaw[i] * j * 0.025;             // la mascella scende e rientra un filo
-    y += wLipU[i] * j * 0.018; y -= wLipD[i] * j * 0.045;           // le labbra si separano
+    y -= wJaw[i] * j * 0.11; z -= wJaw[i] * j * 0.03;              // la mascella scende e rientra un filo
+    y += wLipU[i] * j * 0.022; y -= wLipD[i] * j * 0.06;            // le labbra si separano
     if (wLid[i] > 0) {                                               // il battito: la palpebra di sopra scende a coprire l'occhio, quella di sotto sale un po'
       const w = wLid[i] * bl * (lidUp[i] ? 1 : 0.3);
       y += (lidY[i] - y) * w; z += 0.02 * w;                         // e si porta davanti al bulbo
@@ -700,7 +770,7 @@ const TESTA = { zc: 1.5, su: 0.74, sv: 0.74, hs: 1.25 };
 
 function dimensiona() {
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  Q = (ROOT.clientWidth || innerWidth) * dpr > 2200 ? 2200 / (ROOT.clientWidth || innerWidth) : dpr;
+  Q = ((ROOT.clientWidth || innerWidth) * dpr > 2200 ? 2200 / (ROOT.clientWidth || innerWidth) : dpr) * (typeof QSCALA === "number" ? QSCALA : 1);
   const rw = ROOT.clientWidth || innerWidth || 1280, rh = ROOT.clientHeight || innerHeight || 720;
   W = Math.max(64, Math.round(rw * Q)); H = Math.max(64, Math.round(rh * Q));
   cv.width = W; cv.height = H; gc.width = W; gc.height = H;
@@ -992,7 +1062,7 @@ float h1(float n){return fract(sin(n)*43758.5453);}
 float h2(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
  return mix(mix(h2(i),h2(i+vec2(1,0)),f.x),mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x),f.y);}
-float fbm(vec2 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}
+float fbm(vec2 p){float a=.5,s=0.;for(int i=0;i<3;i++){s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}
 vec3 hsv(float h){return clamp(abs(mod(h*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.);}
 void main(){
   float t=uT;
@@ -1120,8 +1190,17 @@ function compila() {
 const pronto = compila();
 const fallback = !pronto ? cv.getContext("2d") : null; // senza WebGL: solo la griglia, verde
 let t0 = performance.now(), prima = t0;
+let lento = 0, QSCALA = 0.75, ultimoCambioQ = 0;
 function frame(t) {
+  if (ROOT.hidden) { prima = t; requestAnimationFrame(frame); return; }  // la Voce è chiusa: niente lavoro (ogni scheda di claude.ai ha la sua copia)
+  if (t - prima < 31) { requestAnimationFrame(frame); return; }  // tetto: 30 fotogrammi al secondo bastano per cielo e grana
   const dt = Math.min(100, t - prima); prima = t;
+  // se la macchina arranca (oltre 28 ms a fotogramma per un secondo), la scena si disegna più piccola e viene ingrandita
+  lento = lento * 0.9 + dt * 0.1;
+  if (t - ultimoCambioQ > 1500) {
+    if (lento > 28 && QSCALA > 0.5) { QSCALA = Math.max(0.5, QSCALA * 0.75); ultimoCambioQ = t; dimensiona(); }
+    else if (lento < 20 && QSCALA < 0.75) { QSCALA = Math.min(0.75, QSCALA * 1.25); ultimoCambioQ = t; dimensiona(); }
+  }
   segui(dt);
   volto(t, false);
   const secondi = (t - t0) / 1000 * (RIDOTTO ? 0.25 : 1);
@@ -1159,516 +1238,671 @@ requestAnimationFrame(frame);
 window.Scena._debug = { CAM, FACCIA, E, ridisegna: () => volto(performance.now(), true) };
 })();
 
-/* La Voce del Segretario: logica (modi, microfono, trascrizione, risposta, parlato, silenzio).
-   Questo file viene incollato dentro voce.html dal build (scripts/build_voce.py): la CSP permette solo script
-   inline con nonce. La grafica è in Scena (voce_scena.js), che espone: stato(fase), livello(0..1), bocca(0..1),
-   muto(bool). Qui niente grafica.
+/* La Voce del Segretario: la logica (riscritta il 10/11/2026, una macchina a stati sola).
 
-   Modi:   testo = parli, risponde scritto · voce = parli, risponde a voce · live = conversazione a mani libere.
-   Silenzio garantito dal codice:
-   - "stop", "basta", "zitto" da soli: la voce si interrompe e la frase NON va a Claude.
-   - se Claude decide di tacere (tool silenzio), il server butta il testo e qui non arriva niente.
-   - "finché non ti chiamo": quello che dici non lascia nemmeno il browser finché non dici "Segretario". */
+   MODI
+   - testo: parli (o scrivi), la risposta compare scritta mentre Claude la scrive. Nessuna voce.
+   - voce:  come sopra, e la risposta viene anche detta.
+   - live:  conversazione continua, a mani libere.
+   VOCI
+   - HAL spento (di norma): parla CLAUDE. In "voce" con il suo "Leggi ad alta voce", in "live" con la sua modalità
+     vocale (la più veloce: microfono e voce sono suoi, noi leggiamo la pagina e muoviamo il volto).
+   - HAL acceso: parla la voce HAL del PC (voce-pc), frase per frase mentre Claude scrive.
+   IL TASTO GRANDE
+   - testo / voce: un tocco e parli; smetti di parlare e parte da solo (0,9 s di silenzio), oppure tocca di nuovo per
+     mandare subito; tenendo premuto parte al rilascio. Mentre pensa o parla: un tocco lo ferma.
+   - live: un tocco avvia la conversazione, un tocco la chiude.
+   SILENZIO garantito dal codice: "stop", "basta", "zitto" fermano tutto e non arrivano a Claude; se Claude risponde
+   "[silenzio]" non esce niente; in "finché non ti chiamo" si riparte solo dicendo "Segretario".
+
+   La pagina di claude.ai la tocca solo il driver (window.VoceDriver). La grafica è la Scena (window.Scena). */
 (() => {
 "use strict";
 const ROOT = document.getElementById("voce-root") || document.body;
 const $ = (s) => ROOT.querySelector(s);
-const CFG = Object.assign({ trasporto: null, stt: "server", lingua: "it-IT" }, window.VoceConfig || {});
-const WAKE = /\b(segretari[oa]|secretar(?:y|io|ia)|segretà)\b/i;
+const CFG = window.VoceConfig || {};
+const D = window.VoceDriver || null;                       // la pagina di claude.ai (assente sulla pagina del Segretario)
+const Scena = window.Scena || { stato() {}, livello() {}, bocca() {}, muto() {}, tono() {}, colpo() {} };
+const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
+const ora = () => performance.now();
+const WAKE = /\b(segretari[oa]|secretar(?:y|io|ia))\b/i;
 const STOP = /^\s*(stop|basta|zitto|zitta|silenzio|sh+|shut up|quiet|fermati|ok basta|basta così)[\s.!,]*$/i;
-// Frasi che whisper inventa sul silenzio o sul rumore: non sono di Ema.
-const FANTASMI = /^(\s*(sottotitoli.*|grazie (per la visione|a tutti|per l'ascolto)[.!]*|thank you( for watching)?[.!]*|thanks for watching[.!]*|you|grazie[.!]?|\.+|…|amara\.org.*|ciao[.!]?)\s*)$/i;
+const SUFFISSO = " (rispondi subito e in breve; strumenti solo se indispensabili)";
+const SENZA_SEGNI = " (rispondi subito e in breve; strumenti solo se indispensabili; niente segni di tono tra parentesi quadre: ti legge la voce di Claude)";
 
-const S = {
-  modo: "voce",            // testo | voce | live
-  fase: "riposo",          // riposo | ascolto | trascrivo | penso | parlo
-  muto: false,             // false | "finche_chiamato"
-  storia: [],
-  mic: null, actx: null, an: null, buf: null,
-  rec: null, chunks: [], recStart: 0, recMode: "",
-  livello: 0, fondo: 0.01,
-  sopra: 0, sotto: 0,
-  richiesta: null,
-  voci: [],
-};
-const Scena = window.Scena || { stato() {}, livello() {}, bocca() {}, muto() {} };
-
-try { S.storia = JSON.parse(sessionStorage.getItem("voce.storia") || "[]").slice(-30); } catch (_) { S.storia = []; }
+const S = { modo: "voce", fase: "riposo", muto: false, hal: false, lingua: "it-IT", turno: 0, richiesta: null, liveOn: false, voce: "", storia: [], avviato: false };
 try { const m = localStorage.getItem("voce.modo"); if (["testo", "voce", "live"].includes(m)) S.modo = m; } catch (_) {}
+try { S.lingua = localStorage.getItem("voce.lingua") || CFG.lingua || "it-IT"; } catch (_) {}
+try { S.hal = localStorage.getItem("voce.hal") === "1"; } catch (_) {}
+try { S.storia = JSON.parse(sessionStorage.getItem("voce.storia") || "[]").slice(-30); } catch (_) { S.storia = []; }
+const salva = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+function ricorda(chi, testo) { S.storia.push({ chi, testo }); S.storia = S.storia.slice(-30); try { sessionStorage.setItem("voce.storia", JSON.stringify(S.storia)); } catch (_) {} }
 
-function salvaStoria() { try { sessionStorage.setItem("voce.storia", JSON.stringify(S.storia.slice(-30))); } catch (_) {} }
-function fase(f) { S.fase = f; ROOT.dataset.fase = f; Scena.stato(S.muto ? "dorme" : f); aggiornaTasto(); }
-function setMuto(m) { S.muto = m; ROOT.dataset.muto = m ? "1" : ""; Scena.muto(!!m); Scena.stato(m ? "dorme" : S.fase); aggiornaTasto(); }
+// ------------------------------------------------------------------ diario tecnico (lo legge chi fa i test)
+const diario = [];
+function log(s) { diario.push(Math.round(ora()) + " " + s); if (diario.length > 60) diario.shift(); ROOT.dataset.log = diario.join("\n"); }
 
-// ------------------------------------------------------------------ sottotitoli e diario a video
+// ------------------------------------------------------------------ stato a video
+function fase(f) {
+  if (S.fase !== f) log("fase " + f);
+  S.fase = f; ROOT.dataset.fase = f;
+  Scena.stato(S.muto ? "dorme" : f);
+  if (f !== "parlo") { S.voce = ""; Scena.tono("neutro"); }
+  etichetta();
+}
+function setMuto(m) { S.muto = !!m; ROOT.dataset.muto = m ? "1" : ""; Scena.muto(!!m); Scena.stato(m ? "dorme" : S.fase); etichetta(); }
+function etichetta(testo) {
+  const b = $("#parla"), l = $(".cmd .l"); if (!b || !l) return;
+  let t = testo;
+  if (!t) {
+    if (S.modo === "live") {
+      const on = Nativo.attivo || S.liveOn;
+      t = !on ? "TOCCA PER INIZIARE" : Nativo.micSpento ? "MICROFONO SPENTO · TOCCA PER CHIUDERE" : S.fase === "parlo" ? "PARLA · TOCCA PER CHIUDERE" : S.fase === "penso" ? "PENSA · TOCCA PER CHIUDERE" : "TI ASCOLTO · TOCCA PER CHIUDERE";
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    } else {
+      t = S.fase === "ascolto" ? "TI ASCOLTO · TOCCA PER INVIARE" : S.fase === "penso" ? "PENSA · TOCCA PER FERMARE" : S.fase === "parlo" ? "PARLA · TOCCA PER FERMARE" : "TOCCA E PARLA";
+      b.setAttribute("aria-pressed", S.fase === "ascolto" ? "true" : "false");
+    }
+    if (S.muto) t = "IN SILENZIO · DI' «SEGRETARIO»";
+  }
+  l.textContent = t;
+}
+
+// ------------------------------------------------------------------ le righe (sottotitoli / colonna di lettura)
 const righe = [];
-function riga(chi, testo, cls = "", segmenti = null) {
-  const box = $("#righe"); if (!box) return;
-  const el = document.createElement("p");
-  el.className = `riga ${chi} ${cls}`;
-  const tag = document.createElement("span"); tag.className = "chi";
-  tag.textContent = chi === "ema" ? "TU" : chi === "seg" ? "SEGRETARIO" : "·";
-  const t = document.createElement("span"); t.className = "t";
+function riga(chi, testo, cls) {
+  const box = $("#righe"); if (!box) return null;
+  const el = document.createElement("p"); el.className = `riga ${chi} ${cls || ""}`;
+  const tag = document.createElement("span"); tag.className = "chi"; tag.textContent = chi === "ema" ? "TU" : chi === "seg" ? "SEGRETARIO" : "·";
+  const t = document.createElement("span"); t.className = "t"; t.textContent = testo || "";
   el.append(tag, t); box.append(el); righe.push(el);
-  const max = S.modo === "testo" ? 40 : 6;
+  const max = S.modo === "testo" ? 40 : 5;
   while (righe.length > max) righe.shift().remove();
-  if (segmenti && segmenti.length) {
-    // le frasi con il loro tono e le parole con enfasi, già a fuoco (in modo testo si legge, non si guarda scrivere)
-    segmenti.forEach((sg, n) => {
-      const span = document.createElement("span"); span.className = `fr ${sg.tono || "neutro"}`; span.dataset.i = n;
-      let pos = 0;
-      for (const [a, b] of sg.enfasi || []) {
-        if (a > pos) span.append(sg.testo.slice(pos, a));
-        const em = document.createElement("em"); em.textContent = sg.testo.slice(a, b); span.append(em); pos = b;
-      }
-      span.append(sg.testo.slice(pos) + " ");
-      t.append(span);
-    });
-  } else if (S.modo === "testo") t.textContent = testo;
-  else scrivi(t, testo);
   box.scrollTop = box.scrollHeight;
   return el;
 }
-// Macchina da scrivere a scatti (14 al secondo, come il volto).
-function scrivi(el, testo) {
-  let i = 0; const passo = Math.max(1, Math.ceil(testo.length / 60));
-  const tic = () => { i = Math.min(testo.length, i + passo); el.textContent = testo.slice(0, i); if (i < testo.length) setTimeout(tic, 1000 / 14); };
-  tic();
-}
-
-// ------------------------------------------------------------------ riconoscimento nel browser (Chrome): niente server
-let rec2 = null, rec2Attivo = false, rec2Testo = "", rec2Timer = 0;
-function sttBrowser() { return CFG.stt === "browser" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window); }
-// Riconoscimento esterno (app Android): CFG.avviaAscolto(modo) e CFG.fermaAscolto() parlano con il telefono; il testo
-// torna con window.Voce.testoRiconosciuto(testo). Stesso contratto di rec2Avvia/rec2Ferma.
-function sttEsterno() { return CFG.stt === "esterno" && typeof CFG.avviaAscolto === "function"; }
-let estAttivo = false;
-function estAvvia(modo) { if (estAttivo) return; estAttivo = true; S.recMode = modo; S.recStart = performance.now(); fase("ascolto"); try { CFG.avviaAscolto(modo); } catch (_) { estAttivo = false; fase("riposo"); } }
-function estFerma() { if (!estAttivo) return; try { CFG.fermaAscolto && CFG.fermaAscolto(); } catch (_) {} }
-function testoRiconosciuto(t, parziale) {
-  if (parziale) { const l = $(".cmd .l"); if (l && t) l.textContent = String(t).slice(-60).toUpperCase(); return; }
-  estAttivo = false; t = String(t || "").trim();
-  if (t) gestisci(t, true); else fase("riposo");
-  if (S.modo === "live" && !S.muto && S.fase === "riposo") setTimeout(() => { if (S.modo === "live" && S.fase === "riposo") estAvvia("live"); }, 250);
-}
-function rec2Avvia(modo) {
-  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (rec2Attivo) return;
-  rec2 = new R(); rec2.lang = CFG.lingua; rec2.continuous = modo === "live"; rec2.interimResults = true; rec2.maxAlternatives = 1;
-  rec2Testo = ""; rec2Attivo = true; S.recMode = modo; S.recStart = performance.now();
-  rec2.onresult = (e) => {
-    let fin = "", tmp = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) { const r = e.results[i]; if (r.isFinal) fin += r[0].transcript + " "; else tmp += r[0].transcript; }
-    if (fin) rec2Testo += fin;
-    const anteprima = (rec2Testo + tmp).trim();
-    if (anteprima) { const l = $(".cmd .l"); if (l) l.textContent = anteprima.slice(-60).toUpperCase(); }
-    if (modo === "live" && fin) { clearTimeout(rec2Timer); rec2Timer = setTimeout(() => rec2Ferma(), 700); }
-  };
-  rec2.onerror = (e) => { if (e.error === "not-allowed") riga("sys", "Microfono negato: Chrome > icona a sinistra dell'indirizzo > Microfono > Consenti.", "err"); rec2Attivo = false; fase("riposo"); };
-  rec2.onend = () => {
-    const stava = rec2Attivo; rec2Attivo = false;
-    const t = rec2Testo.trim(); rec2Testo = "";
-    if (!stava) return;
-    if (t) gestisci(t, true); else fase("riposo");
-    if (S.modo === "live" && !S.muto && S.fase === "riposo") setTimeout(() => { if (S.modo === "live" && S.fase === "riposo") rec2Avvia("live"); }, 250);
-  };
-  try { rec2.start(); fase("ascolto"); } catch (_) { rec2Attivo = false; }
-}
-function rec2Ferma() { if (rec2 && rec2Attivo) { try { rec2.stop(); } catch (_) {} } }
-
-// ------------------------------------------------------------------ microfono
-async function apriMic() {
-  if (S.mic) return true;
-  try {
-    S.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-  } catch (err) {
-    riga("sys", "Microfono negato: Chrome > icona a sinistra dell'indirizzo > Microfono > Consenti.", "err");
-    return false;
-  }
-  S.actx = new (window.AudioContext || window.webkitAudioContext)();
-  const src = S.actx.createMediaStreamSource(S.mic);
-  S.an = S.actx.createAnalyser(); S.an.fftSize = 1024; S.buf = new Float32Array(S.an.fftSize);
-  src.connect(S.an); // solo analisi: niente esce dalle casse
-  requestAnimationFrame(ascoltaLivello);
-  return true;
-}
-
-let ultimoT = performance.now();
-function ascoltaLivello(t) {
-  const dt = Math.min(100, t - ultimoT); ultimoT = t;
-  S.an.getFloatTimeDomainData(S.buf);
-  let e = 0; for (let i = 0; i < S.buf.length; i++) e += S.buf[i] * S.buf[i];
-  const rms = Math.sqrt(e / S.buf.length);
-  S.livello = S.livello * 0.6 + rms * 0.4;
-  if (S.fase === "riposo" && !S.rec) S.fondo = S.fondo * 0.995 + Math.min(rms, 0.05) * 0.005; // rumore di fondo
-  Scena.livello(Math.min(1, S.livello * 9));
-  vad(dt);
-  requestAnimationFrame(ascoltaLivello);
-}
-
-// Soglie: parlare = 3x il fondo; interrompere mentre parla lui = 7x (la sua voce rientra nel microfono).
-function vad(dt) {
-  const soglia = Math.max(0.018, S.fondo * 3);
-  const interrompi = Math.max(0.06, S.fondo * 7);
-  if (S.modo === "live" && !S.rec) {
-    const puo = S.fase === "riposo" || (S.fase === "parlo" && S.livello > interrompi);
-    if (puo && S.livello > soglia) { S.sopra += dt; if (S.sopra > (S.fase === "parlo" ? 260 : 140)) { zittisci(); avviaRec("live"); } }
-    else S.sopra = 0;
-  }
-  if (S.rec && (S.recMode === "live" || S.recMode === "tap")) {
-    if (S.livello < soglia) { S.sotto += dt; if (S.sotto > (S.recMode === "live" ? 900 : 1400)) fermaRec(); }
-    else S.sotto = 0;
-  }
-}
-
-function avviaRec(modo) {
-  if (S.rec) return;
-  const tipo = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || "";
-  S.chunks = []; S.sotto = 0; S.sopra = 0; S.recMode = modo; S.recStart = performance.now();
-  S.rec = new MediaRecorder(S.mic, tipo ? { mimeType: tipo } : undefined);
-  S.rec.ondataavailable = (e) => { if (e.data.size) S.chunks.push(e.data); };
-  S.rec.onstop = () => {
-    const durata = performance.now() - S.recStart;
-    const blob = new Blob(S.chunks, { type: S.rec.mimeType || "audio/webm" });
-    S.rec = null;
-    if (durata < 380) { fase("riposo"); return; }
-    trascrivi(blob);
-  };
-  S.rec.start();
-  fase("ascolto");
-}
-function fermaRec() { if (S.rec && S.rec.state !== "inactive") S.rec.stop(); }
-
-async function trascrivi(blob) {
-  fase("trascrivo");
-  try {
-    const r = await fetch("voce/ascolta", { method: "POST", body: blob, headers: { "Content-Type": blob.type }, credentials: "same-origin" });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { riga("sys", j.errore || "Non ti ho sentito.", "err"); fase("riposo"); return; }
-    gestisci((j.testo || "").trim(), true);
-  } catch (_) { riga("sys", "Rete assente: non ti ho sentito.", "err"); fase("riposo"); }
-}
-
-// ------------------------------------------------------------------ cosa fare di una frase
-function gestisci(testo, daVoce) {
-  if (!testo || FANTASMI.test(testo)) { fase("riposo"); return; }
-  if (STOP.test(testo)) { zittisci(); riga("ema", testo, "piano"); fase("riposo"); return; }
-  if (S.muto) {
-    if (!WAKE.test(testo)) { riga("ema", testo, "piano"); fase("riposo"); return; } // resta qui, non parte niente
-    setMuto(false);
-    const resto = testo.replace(WAKE, "").replace(/^[\s,.!?:;-]+/, "").trim();
-    if (resto.split(/\s+/).length < 3) { riga("ema", testo); rispondi({ testo: "Sono qui." }, daVoce); return; }
-  }
-  riga("ema", testo);
-  chiedi(testo, daVoce);
-}
-
-async function chiedi(testo, daVoce) {
-  if (S.richiesta) S.richiesta.abort();
-  const ctl = new AbortController(); S.richiesta = ctl;
-  const storia = S.storia.slice(-16);
-  S.storia.push({ ruolo: "ema", testo }); salvaStoria();
-  fase("penso");
-  try {
-    let j;
-    if (CFG.trasporto) {
-      j = await CFG.trasporto(testo, storia, ctl.signal);
-    } else {
-      const r = await fetch("voce/parla", {
-        method: "POST", signal: ctl.signal, credentials: "same-origin",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ testo, storia }),
+function togli(el) { if (!el) return; const i = righe.indexOf(el); if (i >= 0) righe.splice(i, 1); el.remove(); }
+function avviso(testo) { log("avviso: " + testo); riga("sys", testo, "err"); }
+/* La riga di una risposta: si ridisegna a ogni pezzo di testo che arriva; ricorda la frase evidenziata. */
+function nuovaRisposta() {
+  let el = null, corrente = -1;
+  return {
+    mostra(segmenti) {
+      if (!segmenti || !segmenti.length) return;
+      if (!el) el = riga("seg", "");
+      if (!el) return;
+      const t = el.querySelector(".t"); t.textContent = "";
+      segmenti.forEach((sg, n) => {
+        const sp = document.createElement("span"); sp.className = `fr ${sg.tono}` + (n === corrente ? " ora" : ""); sp.dataset.i = n;
+        let pos = 0;
+        for (const [a, b] of sg.enfasi || []) { if (a > pos) sp.append(sg.testo.slice(pos, a)); const em = document.createElement("em"); em.textContent = sg.testo.slice(a, b); sp.append(em); pos = b; }
+        sp.append(sg.testo.slice(pos) + " "); t.append(sp);
       });
-      j = await r.json().catch(() => ({ errore: "Risposta illeggibile." }));
+      const box = $("#righe"); if (box) box.scrollTop = box.scrollHeight;
+    },
+    evidenzia(i) { corrente = i; if (el) el.querySelectorAll(".fr").forEach((f) => f.classList.toggle("ora", +f.dataset.i === i)); },
+    rimuovi() { togli(el); el = null; },
+  };
+}
+function ridisegnaStoria() {
+  const box = $("#righe"); if (!box) return;
+  box.textContent = ""; righe.length = 0;
+  S.storia.slice(S.modo === "testo" ? -20 : -2).forEach((x) => riga(x.chi, x.testo, "vecchia"));
+}
+
+// ------------------------------------------------------------------ dal testo di Claude alle frasi con il loro tono
+const TONI = { "!": "forte", "?": "domanda", "~": "calmo", "+": "bene", "-": "male" };
+function frasi(t) {
+  const out = []; let a = 0;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === "\n") { out.push(t.slice(a, i)); a = i + 1; }
+    else if (".!?…".includes(c)) {
+      let j = i; while (j + 1 < t.length && ".!?…".includes(t[j + 1])) j++;
+      const dopo = t[j + 1];
+      if (dopo === undefined || /\s/.test(dopo)) { out.push(t.slice(a, j + 1)); a = j + 1; }
+      i = j;
     }
-    if (S.richiesta !== ctl) return;
-    S.richiesta = null;
-    rispondi(j, daVoce);
-  } catch (err) {
-    if (err.name === "AbortError") return;
-    S.richiesta = null; riga("sys", "Rete assente: riprova.", "err"); fase("riposo");
   }
+  if (a < t.length) out.push(t.slice(a));
+  return out.filter((x) => x.trim());
 }
-
-function rispondi(j, daVoce) {
-  if (j.silenzio) {
-    if (j.silenzio === "finche_chiamato") setMuto("finche_chiamato");
-    fase("riposo"); // niente testo, niente voce: davvero zitto
-    if (S.modo === "live" && sttBrowser() && !S.muto) setTimeout(() => rec2Avvia("live"), 300);
-    return;
+function segmenta(grezzo, parole) {
+  let s = String(grezzo || "").replace(/ /g, " ").trim();
+  if (/^\[\s*silenzio[^\]]*\]\.?$/i.test(s)) return { silenzio: /finch/i.test(s) ? "finche_chiamato" : "turno", segmenti: [], testo: "" };
+  s = s.replace(/\[[^\]]{0,24}$/, "");                     // un segno ancora aperto in coda (testo che sta arrivando)
+  const pezzi = []; let tono = "neutro", pos = 0, m; const re = /\[([!?~+\-])\]/g;
+  while ((m = re.exec(s))) { pezzi.push([tono, s.slice(pos, m.index)]); tono = TONI[m[1]]; pos = re.lastIndex; }
+  pezzi.push([tono, s.slice(pos)]);
+  const segmenti = [];
+  for (const [t0, blocco] of pezzi) {
+    frasi(blocco).forEach((f, n) => {
+      const testo = f.replace(/\*/g, "").replace(/\s+/g, " ").trim(); if (!testo) return;
+      let t = n ? "neutro" : t0;
+      if (t === "neutro") t = /\?["»”)]*$/.test(testo) ? "domanda" : /!["»”)]*$/.test(testo) ? "forte" : "neutro";
+      let enf = [];
+      (parole || []).forEach((w) => { const i = testo.indexOf(w); if (i >= 0) enf.push([i, i + w.length]); });
+      enf.sort((x, y) => x[0] - y[0]); enf = enf.filter((x, i) => i === 0 || x[0] >= enf[i - 1][1]);
+      segmenti.push({ testo, tono: t, enfasi: enf });
+    });
   }
-  if (j.errore) { riga("sys", j.errore, "err"); fase("riposo"); return; }
-  const testo = (j.testo || "").trim();
-  if (!testo) { fase("riposo"); return; }
-  const segmenti = Array.isArray(j.segmenti) && j.segmenti.length ? j.segmenti : [{ testo, tono: "neutro", enfasi: [] }];
-  S.storia.push({ ruolo: "segretario", testo }); salvaStoria();
-  const el = riga("seg", testo, "", segmenti);
-  if (S.modo === "testo") { fase("riposo"); if (S.modo === "live" && sttBrowser()) rec2Avvia("live"); return; }
-  parla(segmenti, el);
+  return { segmenti, testo: segmenti.map((x) => x.testo).join(" ") };
 }
-
-// ------------------------------------------------------------------ parlato (sintesi del browser)
-function caricaVoci() { S.voci = speechSynthesis.getVoices(); }
-if ("speechSynthesis" in window) { caricaVoci(); speechSynthesis.onvoiceschanged = caricaVoci; }
-
-function scegliVoce(lang) {
-  const tutte = S.voci.filter((v) => v.lang && v.lang.toLowerCase().startsWith(lang));
-  const voto = (v) => (/natural|online/i.test(v.name) ? 4 : 0) + (/google/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
-  return tutte.sort((a, b) => voto(b) - voto(a))[0] || null;
-}
-function lingua(t) {
-  const it = (t.match(/\b(il|lo|la|che|di|non|sono|per|una|hai|alle|oggi|domani|è)\b/gi) || []).length;
-  const en = (t.match(/\b(the|you|is|are|have|to|and|of|today|tomorrow|your)\b/gi) || []).length;
+function linguaDi(t) {
+  const it = (t.match(/\b(il|lo|la|che|di|non|sono|per|una|hai|alle|oggi|domani|è|e|ti|mi)\b/gi) || []).length;
+  const en = (t.match(/\b(the|you|is|are|have|to|and|of|today|tomorrow|your|it|this)\b/gi) || []).length;
   return en > it ? "en" : "it";
 }
 
-let bocca = 0, boccaT = 0, parlaToken = 0;
-const NEURALE = { url: CFG.neurale || "http://127.0.0.1:8768", ok: null, controllato: 0, actx: null, an: null, buf: null, src: null };
-async function neuraleDisponibile() {
-  if (performance.now() - NEURALE.controllato < 20000 && NEURALE.ok !== null) return NEURALE.ok;
-  NEURALE.controllato = performance.now();
-  try { const r = await fetch(NEURALE.url + "/", { signal: AbortSignal.timeout(1200) }); const j = await r.json(); NEURALE.ok = !!j.ok; }
-  catch (_) { NEURALE.ok = false; }
-  return NEURALE.ok;
-}
-function neuraleAudio() {
-  if (!NEURALE.actx) { NEURALE.actx = new (window.AudioContext || window.webkitAudioContext)(); NEURALE.an = NEURALE.actx.createAnalyser(); NEURALE.an.fftSize = 512; NEURALE.buf = new Float32Array(512); NEURALE.an.connect(NEURALE.actx.destination); }
-  if (NEURALE.actx.state === "suspended") NEURALE.actx.resume();
-  return NEURALE.actx;
-}
-async function neuraleSintetizza(testo, lang, signal) {
-  const r = await fetch(NEURALE.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo, lingua: lang }), signal });
-  if (!r.ok) throw new Error("voce " + r.status);
-  return neuraleAudio().decodeAudioData(await r.arrayBuffer());
-}
-// Parla con la voce neurale: una frase alla volta, la prossima si prepara mentre questa suona; la bocca segue l'audio vero.
-async function parlaNeurale(segmenti, el, token) {
-  const lang = lingua(segmenti.map((x) => x.testo).join(" "));
-  const ctl = new AbortController(); NEURALE.ctl = ctl;
-  let prossima = neuraleSintetizza(segmenti[0].testo, lang, ctl.signal);
-  for (let i = 0; i < segmenti.length; i++) {
-    if (token !== parlaToken) return;
-    let audio;
-    try { audio = await prossima; } catch (err) { if (token === parlaToken) throw err; return; }
-    if (token !== parlaToken) return;
-    if (i + 1 < segmenti.length) prossima = neuraleSintetizza(segmenti[i + 1].testo, lang, ctl.signal);
-    const sg = segmenti[i];
-    Scena.tono(sg.tono || "neutro");
-    if (el) el.querySelectorAll(".fr").forEach((f) => f.classList.toggle("ora", f.dataset.i == i));
-    const ctx = neuraleAudio(); const src = ctx.createBufferSource(); src.buffer = audio; src.connect(NEURALE.an); NEURALE.src = src;
-    const durata = audio.duration * 1000;
-    (sg.enfasi || []).forEach(([a]) => setTimeout(() => { if (token === parlaToken) Scena.colpo(sg.tono === "forte" ? 1.0 : 0.7); }, durata * (a / Math.max(1, sg.testo.length))));
-    await new Promise((fine) => { src.onended = fine; src.start(); });
-    NEURALE.src = null;
-  }
-}
-let estFine = null;
-function parlatoFinito() { const f = estFine; estFine = null; if (f) f(); }
-async function parlaEsterno(segmenti, el, token) {
-  const lang = lingua(segmenti.map((x) => x.testo).join(" "));
-  for (let i = 0; i < segmenti.length; i++) {
-    if (token !== parlaToken) return;
-    const sg = segmenti[i];
-    Scena.tono(sg.tono || "neutro");
-    if (el) el.querySelectorAll(".fr").forEach((f) => f.classList.toggle("ora", f.dataset.i == i));
-    const durata = 900 + sg.testo.length * 55;
-    (sg.enfasi || []).forEach(([a]) => setTimeout(() => { if (token === parlaToken) Scena.colpo(sg.tono === "forte" ? 1.0 : 0.7); }, durata * (a / Math.max(1, sg.testo.length))));
-    await new Promise((fine) => { estFine = fine; try { CFG.parlaEsterno(sg.testo, lang); } catch (_) { fine(); } });
-  }
-}
-function parla(segmenti, el) {
-  if (typeof segmenti === "string") segmenti = [{ testo: segmenti, tono: "neutro", enfasi: [] }];
-  const token = ++parlaToken;
-  fase("parlo");
-  if (typeof CFG.parlaEsterno === "function") {
-    parlaEsterno(segmenti, el, token).then(() => {
-      if (token !== parlaToken) return;
-      fase("riposo"); if (el) el.querySelectorAll(".fr.ora").forEach((f) => f.classList.remove("ora"));
-      if (S.modo === "live" && sttEsterno() && !S.muto) setTimeout(() => { if (S.fase === "riposo") estAvvia("live"); }, 300);
+// ------------------------------------------------------------------ quanto forte parlano (misurato dal tap sulla pagina)
+const html = document.documentElement;
+const audioClaude = () => parseFloat(html.getAttribute("data-voce-out") || "0") || 0;
+const audioMic = () => parseFloat(html.getAttribute("data-voce-mic") || "0") || 0;
+
+// ------------------------------------------------------------------ HAL: la voce del PC (voce-pc, porta 8768)
+const Hal = {
+  url: CFG.neurale || "http://127.0.0.1:8768", pronto: false, giro: 0, actx: null, an: null, buf: null, src: null, ctl: null,
+  async get(via, ms) { const r = await fetch(this.url + via, { signal: AbortSignal.timeout(ms || 2000) }); return r.json(); },
+  disegna(stato) {
+    const b = $("#hal"); if (!b) return;
+    b.setAttribute("aria-pressed", S.hal ? "true" : "false");
+    b.classList.toggle("carica", stato === "carica");
+    b.textContent = stato === "carica" ? "HAL…" : "HAL";
+    ROOT.dataset.hal = !S.hal ? "spento" : stato === "carica" ? "carica" : this.pronto ? "pronto" : "spento";
+  },
+  async accendi() {
+    const io = ++this.giro; this.pronto = false; this.disegna("carica"); log("hal accendi");
+    try {
+      const p = await this.get("/pronto"); if (p.pronto) { if (io === this.giro) { this.pronto = true; this.disegna(); log("hal già pronto"); } return; }
+      const a = await this.get("/accendi", 6000);
+      if (a && a.acceso === false) {
+        if (io !== this.giro) return;
+        S.hal = false; salva("voce.hal", "0"); this.disegna(); log("hal rifiutato: " + a.motivo);
+        avviso("HAL non può partire adesso: la scheda video è quasi piena (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
+        return;
+      }
+    }
+    catch (_) {
+      if (io !== this.giro) return;
+      S.hal = false; salva("voce.hal", "0"); this.disegna();
+      avviso("La voce HAL sul PC è spenta: doppio clic su avvia_voce.cmd nella cartella voce-pc, poi premi di nuovo HAL. Intanto parla Claude.");
+      return;
+    }
+    for (let i = 0; i < 150; i++) {
+      if (io !== this.giro || !S.hal) return;
+      try {
+        const p = await this.get("/pronto", 1500);
+        if (p.pronto) { this.pronto = true; this.disegna(); log("hal pronto"); riga("sys", "HAL è pronto.", "piano"); return; }
+        if (p.motivo === "lento") {
+          S.hal = false; salva("voce.hal", "0"); this.disegna(); log("hal rifiutato: lento " + p.tempo_s + " s per " + p.voce_s + " s di voce");
+          avviso("HAL è troppo lento adesso: la scheda video è occupata (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
+          return;
+        }
+      } catch (_) {}
+      await attesa(1000);
+    }
+    if (io === this.giro) { S.hal = false; salva("voce.hal", "0"); this.disegna(); avviso("HAL non si è caricato. Intanto parla Claude."); }
+  },
+  spegni() { this.giro++; this.pronto = false; this.disegna(); fetch(this.url + "/spegni").catch(() => {}); log("hal spegni"); },
+  audio() {
+    if (!this.actx) {
+      this.actx = new (window.AudioContext || window.webkitAudioContext)(); this.an = this.actx.createAnalyser(); this.an.fftSize = 512; this.buf = new Float32Array(512);
+      let muto = false; try { muto = sessionStorage.getItem("voce.test.muto") === "1"; } catch (_) {}   // solo per le prove: HAL misurato ma non udibile
+      if (muto) { const z = this.actx.createGain(); z.gain.value = 0; this.an.connect(z); z.connect(this.actx.destination); } else this.an.connect(this.actx.destination);
+    }
+    if (this.actx.state === "suspended") this.actx.resume().catch(() => {});
+    return this.actx;
+  },
+  async sintetizza(testo, signal) {
+    const r = await fetch(this.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo, lingua: linguaDi(testo) }), signal });
+    if (!r.ok) throw new Error("HAL " + r.status);
+    return this.audio().decodeAudioData(await r.arrayBuffer());
+  },
+  suona(buffer) {
+    return new Promise((fine) => {
+      const ctx = this.audio(); const src = ctx.createBufferSource(); src.buffer = buffer; src.connect(this.an); this.src = src;
+      src.onended = () => { if (this.src === src) this.src = null; fine(); };
+      src.start();
     });
-    return;
-  }
-  neuraleDisponibile().then((ok) => {
-    if (token !== parlaToken) return;
-    const sotto = $("#sotto"); if (sotto) sotto.textContent = (ok ? "voce neurale (PC)" : "voce di Chrome") + " · " + (window.VOCE_VERSIONE || "pagina");
-    if (!ok) return parlaBrowser(segmenti, el, token);
-    parlaNeurale(segmenti, el, token).then(() => {
-      if (token !== parlaToken) return;
-      fase("riposo"); if (el) el.querySelectorAll(".fr.ora").forEach((f) => f.classList.remove("ora"));
-      if (S.modo === "live" && sttBrowser() && !S.muto) setTimeout(() => { if (S.fase === "riposo") rec2Avvia("live"); }, 300);
-    }).catch((err) => { console.warn("voce neurale:", err.message); NEURALE.ok = false; if (token === parlaToken) parlaBrowser(segmenti, el, token); });
-  });
-}
-function parlaBrowser(segmenti, el, token) {
-  if (!("speechSynthesis" in window)) { fase("riposo"); return; }
-  speechSynthesis.cancel();
-  const tutto = segmenti.map((x) => x.testo).join(" ");
-  const lang = lingua(tutto); const voce = scegliVoce(lang);
-  fase("parlo");
-  segmenti.forEach((sg, i) => {
-    const u = new SpeechSynthesisUtterance(sg.testo);
-    u.lang = lang === "en" ? "en-GB" : "it-IT"; if (voce) u.voice = voce;
-    // il tono si sente anche nella voce, appena: più lenta e bassa se calma, un filo più alta se è una domanda
-    u.rate = { forte: 0.98, calmo: 0.94, domanda: 1.02 }[sg.tono] || 1.0;
-    u.pitch = { forte: 0.9, calmo: 0.86, domanda: 1.0, male: 0.84 }[sg.tono] || 0.92;
-    const enf = sg.enfasi || [];
-    let colpiti = new Set();
-    u.onstart = () => { if (token !== parlaToken) return; Scena.tono(sg.tono || "neutro"); if (el) el.querySelectorAll(".fr").forEach((f) => f.classList.toggle("ora", f.dataset.i == i)); };
-    u.onboundary = (e) => {
-      if (token !== parlaToken) return; bocca = 1;
-      const c = e.charIndex || 0;
-      enf.forEach(([a, b], n) => { if (c >= a - 1 && c < b && !colpiti.has(n)) { colpiti.add(n); Scena.colpo(sg.tono === "forte" ? 1.0 : 0.7); } });
+  },
+  livello() { if (!this.src || !this.an) return 0; this.an.getFloatTimeDomainData(this.buf); let e = 0; for (let i = 0; i < this.buf.length; i += 2) e += this.buf[i] * this.buf[i]; return Math.sqrt(e / (this.buf.length / 2)); },
+  ferma() { if (this.ctl) { try { this.ctl.abort(); } catch (_) {} this.ctl = null; } if (this.src) { try { this.src.stop(); } catch (_) {} } },
+  /* Una risposta detta da HAL: le frasi entrano man mano (alimenta), escono in ordine; la prossima si prepara mentre
+     questa suona. `finito` si chiude con {parlato, errore}. */
+  sessione(mio, R) {
+    const coda = [], pronte = new Map(); let presi = 0, fine = false, n = 0, chiudi; const self = this;
+    const finito = new Promise((r) => (chiudi = r));
+    const ctl = new AbortController(); this.ctl = ctl;
+    const prepara = (k) => { if (k < coda.length && !pronte.has(k)) { const p = self.sintetizza(coda[k].testo, ctl.signal); p.catch(() => {}); pronte.set(k, p); } };
+    function spezza(sg, idx) {
+      // la prima frase, se lunga, si spezza alla prima virgola: la voce parte prima
+      if (idx === 0 && sg.testo.length > 70) { const m = sg.testo.match(/^(.{20,70}?[,;:])\s+(.{12,})$/); if (m) return [{ testo: m[1], tono: sg.tono, idx }, { testo: m[2], tono: sg.tono, idx }]; }
+      return [{ testo: sg.testo, tono: sg.tono, idx, enfasi: (sg.enfasi || []).length }];
+    }
+    (async () => {
+      let parlato = false;
+      try {
+        while (true) {
+          if (mio !== S.turno) break;
+          if (n >= coda.length) { if (fine) break; await attesa(40); continue; }
+          prepara(n); prepara(n + 1);
+          const audio = await Promise.race([pronte.get(n), attesa(parlato ? 20000 : 9000).then(() => { throw new Error("lento"); })]);
+          if (mio !== S.turno) break;
+          prepara(n + 1);
+          const c = coda[n];
+          parlato = true; S.voce = "hal"; if (S.fase !== "parlo") fase("parlo"); S.voce = "hal";
+          Scena.tono(c.tono); R.evidenzia(c.idx); if (c.enfasi || c.tono === "forte") Scena.colpo(c.tono === "forte" ? 1 : 0.7);
+          await self.suona(audio);
+          n++;
+        }
+        chiudi({ parlato });
+      } catch (err) { log("hal errore " + (err && err.message)); try { ctl.abort(); } catch (_) {} chiudi({ parlato, errore: true, lento: !!(err && err.message === "lento") }); }
+    })();
+    return {
+      alimenta(segmenti, ultimo) {
+        const fin = ultimo ? segmenti.length : segmenti.length - 1;
+        for (let i = presi; i < fin; i++) spezza(segmenti[i], i).forEach((c) => coda.push(c));
+        if (fin > presi) presi = fin;
+        if (ultimo) fine = true;
+        prepara(n); prepara(n + 1);
+      },
+      finito,
     };
-    if (i === segmenti.length - 1) u.onend = () => { if (token === parlaToken) { fase("riposo"); if (el) el.querySelectorAll(".fr.ora").forEach((f) => f.classList.remove("ora")); if (S.modo === "live" && sttBrowser() && !S.muto) setTimeout(() => { if (S.fase === "riposo") rec2Avvia("live"); }, 300); } };
-    u.onerror = () => { if (token === parlaToken && i === segmenti.length - 1) fase("riposo"); };
-    speechSynthesis.speak(u);
-  });
-}
-function zittisci() {
-  parlaToken++;
-  if ("speechSynthesis" in window) speechSynthesis.cancel();
-  if (NEURALE.ctl) { try { NEURALE.ctl.abort(); } catch (_) {} NEURALE.ctl = null; }
-  if (NEURALE.src) { try { NEURALE.src.onended = null; NEURALE.src.stop(); } catch (_) {} NEURALE.src = null; }
-  if (typeof CFG.zittisciEsterno === "function") { try { CFG.zittisciEsterno(); } catch (_) {} }
-  estFine = null;
-  if (S.fase === "parlo") fase("riposo");
+  },
+};
+
+// ------------------------------------------------------------------ la voce di Claude: "Leggi ad alta voce" sull'ultima risposta
+async function voceClaude(mio, R, segmenti) {
+  if (!D) return;
+  if (!(await D.leggi())) { log("leggi: tasto assente"); return; }
+  if (mio !== S.turno) { D.leggiFerma(); return; }
+  log("leggi: avviato");
+  const lettere = segmenti.reduce((s, x) => s + x.testo.length, 0) || 1;
+  const stima = lettere * 62;                                // ms: la voce di Claude legge ~16 caratteri al secondo
+  const t0 = ora(); let partito = 0, zitto = 0;
+  while (mio === S.turno) {
+    const st = D.leggiStato(), liv = audioClaude();
+    if (!partito && (liv > 0.01 || (st === "playing" && ora() - t0 > 1500))) { partito = ora(); S.voce = "claude"; fase("parlo"); S.voce = "claude"; }
+    if (partito) {
+      // la frase evidenziata e il colore seguono il tempo trascorso
+      const frazione = Math.min(0.999, (ora() - partito) / stima); let somma = 0, i = 0;
+      for (; i < segmenti.length - 1; i++) { somma += segmenti[i].testo.length; if (somma / lettere > frazione) break; }
+      R.evidenzia(i); Scena.tono(segmenti[i].tono);
+      if (liv < 0.008) zitto += 80; else zitto = 0;
+      if (st !== "playing" && zitto > 500) break;            // ha finito
+      if (ora() - partito > stima * 2 + 8000) break;
+    } else if (ora() - t0 > 8000) { log("leggi: nessun audio"); break; }
+    await attesa(80);
+  }
 }
 
-// La bocca: impulsi dalle parole più un'oscillazione da sillabe, letta dalla Scena.
-(function boccaLoop(t) {
-  if (S.fase === "parlo" && NEURALE.src && NEURALE.an) {
-    NEURALE.an.getFloatTimeDomainData(NEURALE.buf);
-    let e = 0; for (let i = 0; i < NEURALE.buf.length; i++) e += NEURALE.buf[i] * NEURALE.buf[i];
-    const rms = Math.sqrt(e / NEURALE.buf.length);
-    bocca = Math.min(1, Math.max(bocca * 0.7, rms * 9));
-  } else if (S.fase === "parlo") {
-    boccaT += 1;
-    const sill = 0.35 + 0.35 * Math.abs(Math.sin(t / 95)) * (0.6 + 0.4 * Math.sin(t / 37));
-    bocca = Math.max(bocca * 0.86, sill);
-  } else bocca *= 0.8;
-  Scena.bocca(Math.min(1, bocca));
-  requestAnimationFrame(boccaLoop);
+// ------------------------------------------------------------------ il microfono (riconoscimento vocale di Chrome)
+const Mic = {
+  Classe: window.SpeechRecognition || window.webkitSpeechRecognition || null,
+  rec: null, attivo: false, modo: "", finale: "", parziale: "", timer: 0, el: null, giro: 0, impulso: 0, corti: 0, t0: 0,
+  avvia(modo) {
+    if (this.attivo) return;
+    if (CFG.stt === "esterno" && typeof CFG.avviaAscolto === "function") { this.attivo = true; this.modo = modo; this.esterno = true; this.finale = ""; this.parziale = ""; this.el = null; fase("ascolto"); try { CFG.avviaAscolto(modo, S.lingua); } catch (_) { this.attivo = false; fase("riposo"); } return; }
+    if (!this.Classe) { avviso("Questo browser non ha il riconoscimento vocale: usa Chrome, oppure scrivi nel campo in basso."); return; }
+    const io = ++this.giro; const rec = new this.Classe();
+    rec.lang = S.lingua; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+    this.rec = rec; this.attivo = true; this.esterno = false; this.modo = modo; this.finale = ""; this.parziale = ""; this.el = null; this.t0 = ora();
+    rec.onresult = (e) => {
+      if (io !== this.giro) return;
+      let fin = "", tmp = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) { const r = e.results[i]; if (r.isFinal) fin += r[0].transcript + " "; else tmp += r[0].transcript; }
+      if (fin) this.finale += fin;
+      this.parziale = tmp; this.impulso = 1;
+      this.aggiorna();
+    };
+    rec.onerror = (e) => {
+      if (io !== this.giro) return;
+      log("mic errore " + e.error);
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") { S.liveOn = false; avviso("Microfono negato: in Chrome clicca l'icona a sinistra dell'indirizzo, poi Microfono, poi Consenti."); }
+      else if (e.error === "audio-capture") { S.liveOn = false; avviso("Non trovo nessun microfono collegato."); }
+      else if (e.error === "network") avviso("Il riconoscimento vocale di Chrome non risponde (rete).");
+    };
+    rec.onend = () => {
+      if (io !== this.giro) return;                          // chiuso da noi: già gestito
+      const t = this.testo(); const durata = ora() - this.t0; this.chiudi(false);
+      log("mic fine da solo, testo=" + (t ? "sì" : "no"));
+      if (t) { this.corti = 0; ricevuto(t, true); return; }
+      this.corti = durata < 1500 ? this.corti + 1 : 0;        // se muore subito più volte di fila, non insistere
+      if (this.corti >= 4) { this.corti = 0; S.liveOn = false; avviso("Il microfono si chiude da solo: riprova tra un momento."); }
+      fase("riposo"); riprendi();
+    };
+    try { rec.start(); } catch (err) { this.chiudi(true); avviso("Non riesco ad aprire il microfono: " + err.message); return; }
+    log("mic avvia " + modo + " " + S.lingua);
+    fase("ascolto");
+  },
+  testo() { return (this.finale + " " + this.parziale).replace(/\s+/g, " ").trim(); },
+  aggiorna() {
+    const t = this.testo(); if (!t) return;
+    if (!this.el) this.el = riga("ema", "", "prov");
+    if (this.el) { this.el.querySelector(".t").textContent = t; const box = $("#righe"); if (box) box.scrollTop = box.scrollHeight; }
+    const tenuto = this.modo === "tap" && premuto && ora() - premuto > 450;   // sta tenendo premuto: decide il rilascio
+    if (!tenuto) this.silenzio(this.modo === "rilascio" ? 350 : 900);
+  },
+  silenzio(ms) { clearTimeout(this.timer); const io = this.giro; this.timer = setTimeout(() => { if (io === this.giro && this.attivo) this.consegna(); }, ms); },
+  rilascio() { if (!this.attivo) return; this.modo = "rilascio"; this.silenzio(350); },
+  consegna() {
+    if (!this.attivo) return;
+    const t = this.testo(); this.chiudi(true);
+    log("mic consegna: " + t.length + " caratteri");
+    if (t) { this.corti = 0; ricevuto(t, true); } else { fase("riposo"); riprendi(); }
+  },
+  annulla() { if (!this.attivo) return; this.chiudi(true); if (S.fase === "ascolto") fase("riposo"); },
+  chiudi(abort) {
+    clearTimeout(this.timer); this.giro++; this.attivo = false;
+    togli(this.el); this.el = null;
+    if (this.esterno) { try { if (CFG.fermaAscolto) CFG.fermaAscolto(); } catch (_) {} return; }
+    const r = this.rec; this.rec = null;
+    if (r && abort) { try { r.abort(); } catch (_) {} }
+  },
+};
+/* Il riconoscimento esterno (app Android) consegna qui. */
+function testoRiconosciuto(t, parziale) {
+  if (!Mic.attivo || !Mic.esterno) return;
+  if (parziale) { Mic.finale = ""; Mic.parziale = String(t || ""); Mic.impulso = 1; if (!Mic.el && Mic.parziale) Mic.el = riga("ema", "", "prov"); if (Mic.el) Mic.el.querySelector(".t").textContent = Mic.parziale; return; }
+  Mic.attivo = false; togli(Mic.el); Mic.el = null;
+  t = String(t || "").trim(); if (t) ricevuto(t, true); else { fase("riposo"); riprendi(); }
+}
+/* In live con HAL il microfono riparte da solo dopo ogni scambio. */
+function riprendi() {
+  if (!(S.modo === "live" && S.liveOn && !Nativo.attivo)) return;
+  setTimeout(() => { if (S.modo === "live" && S.liveOn && !Nativo.attivo && !ROOT.hidden && S.fase === "riposo" && !Mic.attivo) Mic.avvia("live"); }, 300);
+}
+
+// ------------------------------------------------------------------ live con la modalità vocale di claude.ai
+const Nativo = {
+  attivo: false, timer: 0, base: 0, posUt: 0, elUt: null, testoUt: "", posAss: 0, R: null, testo: "", chiuso: true, t0: 0, parlaFino: 0, micSpento: false,
+  avvia() {
+    if (this.attivo || !D) return;
+    interrompi(); Mic.annulla();
+    if (!D.vocale.avvia()) { avviso("Non trovo il tasto della modalità vocale di claude.ai: apri una chat e riprova."); return; }
+    this.attivo = true; this.base = D.totale(); this.posUt = 0; this.elUt = null; this.posAss = 0; this.R = null; this.testo = ""; this.chiuso = true; this.t0 = ora(); this.micSpento = false;
+    log("nativo avvia, base=" + this.base);
+    fase("ascolto");
+    this.timer = setInterval(() => this.tick(), 150);
+  },
+  ferma() {
+    if (!this.attivo) return;
+    this.attivo = false; clearInterval(this.timer); log("nativo ferma");
+    try { D.vocale.ferma(); } catch (_) {}
+    fase("riposo");
+  },
+  mic() { if (!this.attivo) return; this.micSpento = !this.micSpento; D.vocale.microfono(!this.micSpento); etichetta(); },
+  tick() {
+    if (!this.attivo) return;
+    if (!D.vocale.attivo()) {
+      if (ora() - this.t0 > 2500) { this.attivo = false; clearInterval(this.timer); log("nativo: chiuso da claude.ai"); fase("riposo"); }
+      return;
+    }
+    // cosa ha detto Ema (la trascrizione compare come messaggio)
+    const uu = D.ultimoUtente();
+    if (uu && uu.pos > this.base) {
+      const t = D.testoDi(uu).testo;
+      if (uu.pos !== this.posUt) { this.posUt = uu.pos; this.testoUt = t; this.elUt = riga("ema", t); if (t) ricorda("ema", t); }
+      else if (t !== this.testoUt && this.elUt) { this.testoUt = t; this.elUt.querySelector(".t").textContent = t; }
+    }
+    // cosa risponde Claude
+    const ua = D.ultimoAssistente(); const scrive = D.scrive(ua);
+    if (ua && ua.pos > this.base) {
+      if (ua.pos !== this.posAss) { this.posAss = ua.pos; this.R = nuovaRisposta(); this.testo = ""; this.chiuso = false; }
+      if (!this.chiuso) {
+        const d = D.testoDi(ua);
+        if (d.testo && d.testo !== this.testo) { this.testo = d.testo; const s = segmenta(d.testo, d.enfasi); this.R.mostra(s.segmenti); const u = s.segmenti[s.segmenti.length - 1]; if (u) this.tono = u.tono; }
+        else if (!scrive && this.testo) { this.chiuso = true; ricorda("seg", segmenta(this.testo).testo); }
+      }
+    }
+    // chi parla: si sente dall'audio vero di Claude
+    const liv = audioClaude();
+    if (liv > 0.012) this.parlaFino = ora() + 1200;   // le pause tra una frase e l'altra non sono "pensare"
+    if (ora() < this.parlaFino) { if (S.fase !== "parlo") fase("parlo"); S.voce = "claude"; Scena.tono(this.tono || "neutro"); }
+    else if (scrive || D.vocale.elabora()) { if (S.fase !== "penso") fase("penso"); }
+    else if (S.fase !== "ascolto") fase("ascolto");
+  },
+};
+
+// ------------------------------------------------------------------ una frase di Ema (dal microfono o dalla tastiera)
+function ricevuto(testo, daVoce) {
+  testo = String(testo || "").trim();
+  if (!testo) { fase("riposo"); riprendi(); return; }
+  log("ricevuto (" + (daVoce ? "voce" : "tastiera") + "): " + testo.slice(0, 60));
+  if (STOP.test(testo)) { interrompi(); riga("ema", testo, "piano"); fase("riposo"); riprendi(); return; }
+  if (S.muto) {
+    if (!WAKE.test(testo)) { riga("ema", testo, "piano"); fase("riposo"); riprendi(); return; }   // resta qui: non parte niente
+    setMuto(false);
+    const resto = testo.replace(WAKE, "").replace(/^[\s,.!?:;-]+/, "").trim();
+    if (resto.split(/\s+/).filter(Boolean).length < 3) { riga("ema", testo); locale("Sono qui."); return; }
+  }
+  domanda(testo);
+}
+/* Una risposta che non passa da Claude ("Sono qui."). */
+async function locale(testo) {
+  interrompi(); const mio = S.turno; const R = nuovaRisposta(); const seg = segmenta(testo).segmenti; R.mostra(seg);
+  if (S.modo !== "testo" && S.hal && Hal.pronto) { const s = Hal.sessione(mio, R); s.alimenta(seg, true); await s.finito; }
+  else Scena.colpo(0.8);
+  if (mio === S.turno) fineTurno();
+}
+async function domanda(testo) {
+  if (Nativo.attivo) Nativo.ferma();
+  interrompi(); Mic.annulla();
+  const mio = S.turno; const ctl = new AbortController(); S.richiesta = ctl;
+  riga("ema", testo); ricorda("ema", testo);
+  fase("penso");
+  const R = nuovaRisposta();
+  const parla = S.modo !== "testo";
+  const conHal = parla && S.hal && Hal.pronto;
+  const hal = conHal ? Hal.sessione(mio, R) : null;
+  let esito;
+  try {
+    if (D) {
+      const prima = D.totale();
+      await D.invia("[voce] " + testo + (parla && !conHal ? SENZA_SEGNI : SUFFISSO), ctl.signal);
+      log("inviato, prima=" + prima);
+      esito = await D.attendiRisposta(prima, (d) => {
+        if (mio !== S.turno) return;
+        const s = segmenta(d.testo, d.enfasi); if (s.silenzio || !s.segmenti.length) return;
+        R.mostra(s.segmenti); if (hal) hal.alimenta(s.segmenti, false);
+      }, ctl.signal);
+    } else {
+      const r = await fetch("voce/parla", { method: "POST", signal: ctl.signal, credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ testo, storia: [] }) });
+      const j = await r.json().catch(() => ({ errore: "Risposta illeggibile." }));
+      esito = j.silenzio ? { testo: "[silenzio" + (j.silenzio === "finche_chiamato" ? ": finché chiamato" : "") + "]" } : j;
+    }
+  } catch (err) { esito = { errore: err && err.name === "AbortError" ? "annullato" : (err && err.message) || "Errore." }; }
+  if (mio !== S.turno) return;
+  S.richiesta = null;
+  if (esito.errore) { if (esito.errore !== "annullato") avviso(esito.errore); Hal.ferma(); fineTurno(); return; }
+  const s = segmenta(esito.testo, esito.enfasi);
+  log("risposta: " + s.testo.length + " caratteri" + (s.silenzio ? " (silenzio)" : ""));
+  if (s.silenzio) { R.rimuovi(); Hal.ferma(); if (s.silenzio === "finche_chiamato") setMuto(true); fineTurno(); return; }   // davvero zitto
+  if (!s.segmenti.length) { fineTurno(); return; }
+  R.mostra(s.segmenti); ricorda("seg", s.testo);
+  if (!parla) { fineTurno(); return; }
+  let detto = false;
+  if (hal) {
+    hal.alimenta(s.segmenti, true); const f = await hal.finito; detto = f.parlato; if (mio !== S.turno) return;
+    if (f.errore && !f.parlato) {
+      // HAL non ce la fa (scheda video occupata o programma fermo): si spegne da solo e parla Claude, subito
+      S.hal = false; salva("voce.hal", "0"); Hal.spegni();
+      avviso(f.lento ? "HAL è troppo lento adesso: la scheda video è occupata (di solito è Resolve). L'ho spento, parla Claude." : "HAL non risponde: l'ho spento, parla Claude.");
+    }
+  }
+  if (!detto) {
+    if (typeof CFG.parlaEsterno === "function") await voceEsterna(mio, R, s.segmenti);
+    else await voceClaude(mio, R, s.segmenti);
+    if (mio !== S.turno) return;
+  }
+  R.evidenzia(-1);
+  fineTurno();
+}
+function fineTurno() { fase("riposo"); riprendi(); }
+/* La voce di un'app che ospita la Voce (Android): una frase alla volta, l'app chiama Voce.parlatoFinito(). */
+let esternoFine = null;
+function parlatoFinito() { const f = esternoFine; esternoFine = null; if (f) f(); }
+async function voceEsterna(mio, R, segmenti) {
+  S.voce = "esterna"; fase("parlo"); S.voce = "esterna";
+  for (let i = 0; i < segmenti.length && mio === S.turno; i++) {
+    R.evidenzia(i); Scena.tono(segmenti[i].tono);
+    await new Promise((fine) => { esternoFine = fine; try { CFG.parlaEsterno(segmenti[i].testo, linguaDi(segmenti[i].testo)); } catch (_) { fine(); } });
+  }
+}
+/* Ferma tutto quello che è in corso: richiesta, generazione, voce. Non tocca il microfono né la modalità vocale. */
+function interrompi() {
+  S.turno++;
+  if (S.richiesta) { try { S.richiesta.abort(); } catch (_) {} S.richiesta = null; }
+  Hal.ferma();
+  if (D) { try { D.leggiFerma(); D.fermaRisposta(); } catch (_) {} }
+  if (typeof CFG.zittisciEsterno === "function") { try { CFG.zittisciEsterno(); } catch (_) {} }
+  if (esternoFine) parlatoFinito();
+}
+
+// ------------------------------------------------------------------ bocca e onde, a ogni fotogramma
+let bocca = 0, onda = 0;
+(function ciclo(t) {
+  if (!ROOT.hidden) {
+    let b = 0;
+    if (S.fase === "parlo") b = S.voce === "hal" ? Hal.livello() * 8 : S.voce === "claude" ? audioClaude() * 9 : 0.3 + 0.4 * Math.abs(Math.sin(t / 95));
+    bocca = b > bocca ? b : bocca * 0.7 + b * 0.3;
+    Scena.bocca(Math.min(1, bocca));
+    let m = 0;
+    if (S.fase === "ascolto") { m = Nativo.attivo ? audioMic() * 9 : Mic.impulso; }
+    Mic.impulso *= 0.9;
+    onda = m > onda ? m : onda * 0.85 + m * 0.15;
+    Scena.livello(Math.min(1, onda));
+  }
+  requestAnimationFrame(ciclo);
 })(0);
 
-// ------------------------------------------------------------------ comandi: tasto, spazio, testo, modi
-const tasto = () => $("#parla");
-function aggiornaTasto() {
-  const b = tasto(); if (!b) return;
-  const l = document.querySelector(".cmd .l");
-  const testi = {
-    riposo: S.modo === "live" ? (S.mic ? "TI ASCOLTO" : "ATTIVA LIVE") : "TIENI PREMUTO E PARLA",
-    ascolto: S.modo === "live" ? "TI SENTO…" : "RILASCIA PER MANDARE",
-    trascrivo: "TRASCRIVO…", penso: "PENSO…", parlo: "TOCCA PER INTERROMPERE",
-  };
-  l.textContent = S.muto ? "IN SILENZIO · CHIAMAMI PER NOME" : (testi[S.fase] || "");
-  b.setAttribute("aria-pressed", S.rec ? "true" : "false");
-}
-
+// ------------------------------------------------------------------ i comandi
 let premuto = 0;
-async function giu(e) {
+function giu(e) {
   if (e) e.preventDefault();
-  if (S.fase === "parlo") { zittisci(); if (S.modo === "live" && sttBrowser()) setTimeout(() => rec2Avvia("live"), 200); return; }
-  if (sttEsterno()) {
-    if (S.modo === "live") { if (!estAttivo) estAvvia("live"); return; }
-    if (estAttivo) { estFerma(); return; }
-    premuto = performance.now(); estAvvia("hold"); return;
+  if (ROOT.hidden) return;
+  if (S.modo === "live") {
+    if (Nativo.attivo) { Nativo.ferma(); etichetta(); return; }
+    if (S.liveOn) { S.liveOn = false; interrompi(); Mic.annulla(); fase("riposo"); return; }
+    if (D && !(S.hal && Hal.pronto)) { Nativo.avvia(); etichetta(); return; }       // voce di Claude: la sua modalità vocale
+    S.liveOn = true; Mic.avvia("live"); etichetta(); return;                        // HAL: il nostro giro
   }
-  if (sttBrowser()) {
-    if (S.modo === "live") { if (!rec2Attivo) rec2Avvia("live"); return; }
-    if (rec2Attivo) { rec2Ferma(); return; }
-    premuto = performance.now(); rec2Avvia("hold"); return;
-  }
-  if (!(await apriMic())) return;
-  if (S.actx.state === "suspended") S.actx.resume();
-  if (S.modo === "live") { fase("riposo"); return; } // live: basta aprire il microfono
-  if (S.rec) { fermaRec(); return; }               // secondo tocco: manda
-  premuto = performance.now();
-  avviaRec("hold");
+  if (S.fase === "penso" || S.fase === "parlo") { interrompi(); fase("riposo"); return; }
+  if (Mic.attivo) { Mic.consegna(); return; }                                       // secondo tocco: manda subito
+  premuto = ora(); Mic.avvia("tap");
 }
 function su() {
-  if (sttEsterno()) { if (estAttivo && S.recMode === "hold" && performance.now() - premuto >= 350) estFerma(); return; }
-  if (sttBrowser()) { if (rec2Attivo && S.recMode === "hold" && performance.now() - premuto >= 350) rec2Ferma(); return; }
-  if (!S.rec || S.recMode !== "hold") return;
-  if (performance.now() - premuto < 350) { S.recMode = "tap"; return; } // tocco breve: resta aperto, si ferma da solo sul silenzio
-  fermaRec();
+  if (S.modo === "live" || !Mic.attivo || Mic.modo !== "tap" || !premuto) return;
+  if (ora() - premuto > 450) Mic.rilascio();                                        // tenuto premuto: parte al rilascio
+  premuto = 0;
 }
-
 function setModo(m) {
-  S.modo = m; try { localStorage.setItem("voce.modo", m); } catch (_) {}
-  ROOT.dataset.modo = m;
-  document.querySelectorAll("[data-m]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"));
-  if (m === "testo") zittisci();
-  // la storia a video segue il modo: lunga e leggibile in testo, due righe in voce
-  const box = $("#righe");
-  if (box) { box.textContent = ""; righe.length = 0; S.storia.slice(m === "testo" ? -20 : -2).forEach((x) => riga(x.ruolo === "ema" ? "ema" : "seg", x.testo, "vecchia")); }
-  if (m === "live") { if (sttBrowser()) { if (!rec2Attivo && !S.muto) rec2Avvia("live"); } else apriMic().then((ok) => { if (ok && S.actx.state === "suspended") S.actx.resume(); fase(S.fase); }); }
-  else if (sttBrowser() && rec2Attivo && S.recMode === "live") { rec2Attivo = false; try { rec2.stop(); } catch (_) {} }
-  aggiornaTasto();
+  interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false;
+  S.modo = m; salva("voce.modo", m); ROOT.dataset.modo = m;
+  ROOT.querySelectorAll("[data-m]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"));
+  ridisegnaStoria(); fase("riposo");
+}
+function nascondi() { interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo"); ROOT.hidden = true; }
+function mostra() {
+  ROOT.hidden = false; etichetta();
+  if (S.hal) Hal.accendi(); else Hal.disegna();
 }
 
-const avvia = () => {
-  const b = tasto();
+function avvia() {
+  const b = $("#parla"); if (!b) return;
   b.addEventListener("pointerdown", giu);
-  window.addEventListener("pointerup", su);
-  window.addEventListener("pointercancel", su);
-  document.querySelectorAll("[data-m]").forEach((x) => x.addEventListener("click", () => setModo(x.dataset.m)));
-  const cn = $("#chatnorm"); if (cn) cn.addEventListener("click", () => window.Voce.nascondi());
-  $("#zitto").addEventListener("click", () => { if (S.muto) { setMuto(false); } else { zittisci(); setMuto("finche_chiamato"); } });
+  window.addEventListener("pointerup", su); window.addEventListener("pointercancel", su);
+  ROOT.querySelectorAll("[data-m]").forEach((x) => x.addEventListener("click", () => setModo(x.dataset.m)));
+  const cn = $("#chatnorm"); if (cn) cn.addEventListener("click", nascondi);
+  const lb = $("#lingua");
+  const mostraLingua = () => { if (lb) { lb.textContent = S.lingua.startsWith("en") ? "MIC EN" : "MIC IT"; lb.title = "Lingua in cui parli al microfono: ora " + (S.lingua.startsWith("en") ? "inglese" : "italiano") + ". Clic per cambiare."; } };
+  if (lb) lb.addEventListener("click", () => { S.lingua = S.lingua.startsWith("en") ? "it-IT" : "en-GB"; salva("voce.lingua", S.lingua); mostraLingua(); const era = Mic.attivo ? Mic.modo : ""; Mic.annulla(); if (era === "live") riprendi(); riga("sys", S.lingua.startsWith("en") ? "Ora ti ascolto in inglese." : "Ora ti ascolto in italiano.", "piano"); });
+  mostraLingua();
+  const hb = $("#hal");
+  if (hb) hb.addEventListener("click", () => {
+    interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo");
+    S.hal = !S.hal; salva("voce.hal", S.hal ? "1" : "0");
+    if (S.hal) { riga("sys", "Voce HAL: la carico, ci vuole circa mezzo minuto. Intanto parla Claude.", "piano"); Hal.accendi(); }
+    else { Hal.spegni(); riga("sys", "Voce di Claude.", "piano"); }
+  });
+  $("#zitto").addEventListener("click", () => {
+    if (Nativo.attivo) { Nativo.mic(); return; }
+    if (S.muto) { setMuto(false); return; }
+    interrompi(); fase("riposo"); setMuto(true); riprendi();
+  });
   const campo = $("#scrivi");
   campo.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && campo.value.trim()) { const t = campo.value.trim(); campo.value = ""; if (S.muto) setMuto(false); gestisci(t, false); }
+    e.stopPropagation();
+    if (e.key === "Enter" && campo.value.trim()) { const t = campo.value.trim(); campo.value = ""; if (S.muto) setMuto(false); Mic.annulla(); ricevuto(t, false); }
   });
   let spazio = false;
+  const libero = (e) => !ROOT.hidden && e.target !== campo && !(e.target && e.target.isContentEditable) && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "");
   window.addEventListener("keydown", (e) => {
-    if (e.code !== "Space" || e.target === campo || spazio || e.repeat) return;
-    spazio = true; e.preventDefault(); giu(null);
-  });
-  window.addEventListener("keyup", (e) => {
-    if (e.code !== "Space" || e.target === campo) return;
-    spazio = false; e.preventDefault(); if (S.rec && S.recMode === "hold" && performance.now() - premuto >= 350) fermaRec(); else su();
-  });
-  window.addEventListener("keydown", (e) => { if (e.key === "Escape") { zittisci(); if (S.rec) { S.chunks = []; S.recStart = performance.now(); fermaRec(); } } });
-  setModo(S.modo);
-  fase("riposo");
-};
-// nella pagina del Segretario la pagina sta ancora caricando; nell'estensione è già pronta
+    if (!libero(e)) return;
+    if (e.code === "Space" && !e.repeat && !spazio) { spazio = true; e.preventDefault(); giu(null); }
+    else if (e.key === "Escape") { interrompi(); Mic.annulla(); fase("riposo"); }
+  }, true);
+  window.addEventListener("keyup", (e) => { if (e.code === "Space" && spazio) { spazio = false; if (libero(e)) { e.preventDefault(); su(); } } }, true);
+  ROOT.dataset.modo = S.modo;
+  ROOT.querySelectorAll("[data-m]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.m === S.modo ? "true" : "false"));
+  ridisegnaStoria(); Hal.disegna(); fase("riposo");
+  S.avviato = true; log("avviato " + (window.VOCE_VERSIONE || "pagina") + " modo=" + S.modo + " hal=" + S.hal);
+  if (!ROOT.hidden && S.hal) Hal.accendi();
+}
+
+// ------------------------------------------------------------------ prove (le usa chi sviluppa: un microfono finto con un copione)
+ROOT.addEventListener("voce-test", () => {
+  let c; try { c = JSON.parse(ROOT.dataset.test || "{}"); } catch (_) { return; }
+  if (c.mic) {
+    // copione: [{t: ms dall'avvio, testo, finale}] ; il riconoscitore finto li emette come farebbe Chrome
+    Mic.Classe = function () {
+      const self = this; let timers = [], finali = [];
+      this.start = () => { c.mic.forEach((p) => timers.push(setTimeout(() => {
+        const results = finali.map((f) => Object.assign([{ transcript: f }], { isFinal: true }));
+        results.push(Object.assign([{ transcript: p.testo }], { isFinal: !!p.finale }));
+        if (self.onresult) self.onresult({ resultIndex: finali.length, results });
+        if (p.finale) finali.push(p.testo);
+      }, p.t))); };
+      this.abort = () => { timers.forEach(clearTimeout); timers = []; setTimeout(() => self.onend && self.onend(), 0); };
+      this.stop = this.abort;
+    };
+    log("test: microfono finto");
+  }
+  if (c.audio) {
+    // una frase detta da HAL, consegnata alla pagina come dati: serve a simulare la voce di Ema nella modalità vocale
+    fetch(Hal.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo: c.audio, lingua: c.lingua || "en" }) })
+      .then((r) => r.blob()).then((bl) => new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(bl); }))
+      .then((u) => { ROOT.dataset.testAudio = u; log("test: audio pronto " + u.length); }).catch((e) => log("test: audio errore " + e.message));
+  }
+  if (c.micVero) { Mic.Classe = window.SpeechRecognition || window.webkitSpeechRecognition || null; log("test: microfono vero"); }
+  if (c.provaMic) {
+    const R = window.SpeechRecognition || window.webkitSpeechRecognition; if (!R) { log("provaMic: assente"); return; }
+    const r = new R(); r.lang = S.lingua; r.onstart = () => log("provaMic: onstart"); r.onaudiostart = () => log("provaMic: audio"); r.onerror = (e) => log("provaMic: errore " + e.error); r.onend = () => log("provaMic: fine");
+    try { r.start(); setTimeout(() => { try { r.abort(); } catch (_) {} }, 1500); } catch (err) { log("provaMic: eccezione " + err.message); }
+  }
+});
+
 if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", avvia); else avvia();
+window.Voce = { S, mostra, nascondi, setModo, ricevuto, interrompi, testoRiconosciuto, parlatoFinito, segmenta };
 
-function nascondi() { zittisci(); if (rec2Attivo) { rec2Attivo = false; try { rec2.stop(); } catch (_) {} } if (S.rec) fermaRec(); ROOT.hidden = true; }
-function mostra() { ROOT.hidden = false; if (S.modo === "live" && sttBrowser() && !S.muto) rec2Avvia("live"); }
-window.Voce = { S, gestisci, setModo, parla, zittisci, setMuto, nascondi, mostra, riga, testoRiconosciuto, parlatoFinito };
-
-// ------------------------------------------------------------------ demo silenziosa (?demo=1): si vede come parla, senza audio
-if (new URLSearchParams(location.search).get("demo")) {
+// ------------------------------------------------------------------ dimostrazione muta sulla pagina del Segretario (?demo=1)
+if (!D && new URLSearchParams(location.search).get("demo")) {
   const BATTUTE = [
-    { ema: "Cosa ho oggi?", seg: [{ testo: "Alle dieci e mezza hai la call con Stostudio.", tono: "neutro", enfasi: [[5, 17]] }, { testo: "Alle tre il ritiro della camcorder in via Zamboni.", tono: "neutro", enfasi: [[5, 8]] }, { testo: "Fra venti minuti parte la prima: ti conviene prepararti.", tono: "forte", enfasi: [[4, 16]] }] },
-    { ema: "Chi mi aspetta?", seg: [{ testo: "Una sola sessione Claude aspetta te: EASY RAVE SEO.", tono: "neutro", enfasi: [[37, 50]] }, { testo: "Chiede se va bene il footer con i link alle guide.", tono: "neutro", enfasi: [] }, { testo: "Vuoi che ti legga anche le email?", tono: "domanda", enfasi: [[22, 27]] }] },
-    { ema: "Sì, vai.", seg: [{ testo: "Anna Rossi manda un preventivo video per il lancio di primavera.", tono: "bene", enfasi: [[0, 10]] }, { testo: "Netflix chiede di rivedere un addendum al contratto entro venerdì.", tono: "male", enfasi: [[52, 65]] }, { testo: "Niente di urgente per stasera: puoi staccare.", tono: "calmo", enfasi: [] }] },
+    ["Cosa ho oggi?", "Alle dieci e mezza hai la call con Stostudio. Alle tre il ritiro della camcorder in via Zamboni. [!] Fra venti minuti parte la prima: ti conviene prepararti."],
+    ["Chi mi aspetta?", "Una sola sessione Claude aspetta te: EASY RAVE. Chiede se va bene il footer con i link alle guide. [?] Vuoi che ti legga anche le email?"],
+    ["Sì, vai.", "[+] Anna Rossi manda un preventivo per il lancio di primavera. [-] Netflix chiede di rivedere un addendum entro venerdì. [~] Niente di urgente per stasera: puoi staccare."],
   ];
   let i = 0;
-  const parlaSilenzioso = (segmenti, el) => new Promise((fine) => {
-    fase("parlo"); let n = 0;
-    const prossima = () => {
-      if (n >= segmenti.length) { fase("riposo"); if (el) el.querySelectorAll(".fr.ora").forEach((f) => f.classList.remove("ora")); fine(); return; }
-      const sg = segmenti[n]; Scena.tono(sg.tono);
-      if (el) el.querySelectorAll(".fr").forEach((f) => f.classList.toggle("ora", f.dataset.i == n));
-      const durata = 900 + sg.testo.length * 55;
-      (sg.enfasi || []).forEach(([a]) => setTimeout(() => Scena.colpo(sg.tono === "forte" ? 1.0 : 0.7), durata * (a / Math.max(1, sg.testo.length))));
-      n++; setTimeout(prossima, durata + 350);
-    };
-    prossima();
-  });
   const giro = async () => {
-    const b = BATTUTE[i++ % BATTUTE.length];
-    fase("ascolto"); const t0 = performance.now();
-    await new Promise((r) => { const tic = () => { Scena.livello(0.3 + 0.5 * Math.abs(Math.sin(performance.now() / 90)) * Math.random()); if (performance.now() - t0 < 1800) requestAnimationFrame(tic); else { Scena.livello(0); r(); } }; tic(); });
-    riga("ema", b.ema); fase("penso"); await new Promise((r) => setTimeout(r, 2200));
-    const el = riga("seg", b.seg.map((x) => x.testo).join(" "), "", b.seg);
-    await parlaSilenzioso(b.seg, el);
-    await new Promise((r) => setTimeout(r, 2500));
-    giro();
+    const [d, r] = BATTUTE[i++ % BATTUTE.length];
+    fase("ascolto"); const t0 = ora(); while (ora() - t0 < 1800) { Mic.impulso = 0.4 + 0.5 * Math.random(); await attesa(120); }
+    riga("ema", d); fase("penso"); await attesa(2200);
+    const seg = segmenta(r).segmenti; const R = nuovaRisposta(); R.mostra(seg);
+    S.voce = "esterna"; fase("parlo"); S.voce = "esterna";
+    for (let n = 0; n < seg.length; n++) { R.evidenzia(n); Scena.tono(seg[n].tono); if (seg[n].tono === "forte") Scena.colpo(1); await attesa(900 + seg[n].testo.length * 55); }
+    R.evidenzia(-1); fase("riposo"); await attesa(2500); giro();
   };
-  const viaDemo = () => { setModo("voce"); setTimeout(giro, 1500); };
-  if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", viaDemo); else viaDemo();
+  setTimeout(() => { setModo("voce"); giro(); }, 1500);
 }
 })();
 

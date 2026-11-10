@@ -1,14 +1,25 @@
 {
   "manifest_version": 3,
   "name": "Segretario · Voce",
-  "version": "0.3.0",
+  "version": "1.0.7",
   "description": "La Voce del Segretario sopra la chat Secretary di claude.ai: parli, lui risponde a voce, con la scena. Un tasto e torni alla chat normale.",
   "permissions": [],
   "host_permissions": [
     "https://hub.emazamboni.com/*",
-    "http://127.0.0.1:8768/*"
+    "http://127.0.0.1:8768/*",
+    "https://claude.ai/*"
   ],
   "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": [
+        "tap.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": [
         "https://claude.ai/*"

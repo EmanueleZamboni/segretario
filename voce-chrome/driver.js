@@ -1,118 +1,188 @@
-/* La Voce sopra claude.ai: questo pezzo guida la chat vera del progetto Secretary.
-   Niente API, niente chiavi: quello che Ema dice viene scritto nella casella della chat e inviato; la risposta
-   si legge dalla pagina mentre arriva, si pulisce dai segni di tono e si manda alla Voce (voce_logica.js), che la
-   legge ad alta voce e colora la scena. Il tasto "Chat normale" nasconde la Voce: sotto c'è la chat di sempre, con
-   la stessa conversazione.
+/* La Voce sopra claude.ai: questo pezzo sa come è fatta la pagina di claude.ai e la guida.
+   Niente API, niente chiavi: scrive nella casella della chat vera, legge la risposta mentre arriva, preme "Leggi ad
+   alta voce" (la voce di Claude), accende e spegne la modalità vocale. La logica (voce_logica.js) non tocca mai la
+   pagina: passa sempre da qui. Se claude.ai cambia, si aggiorna solo questo file.
 
-   Dipende da come è fatta la pagina di claude.ai (data-testid): se Anthropic la cambia, si aggiorna qui.
-   Usato dall'estensione Chrome (content.js) e, domani, dall'app Android (stessa pagina, stesso script). */
+   Com'è fatta la pagina (verificato il 10/11/2026):
+   - ogni messaggio è un [role="article"] con aria-posinset (numero) e aria-setsize (totale). La lista è VIRTUALE:
+     nella pagina ci sono solo gli ultimi ~20 messaggi, quindi non si contano mai le righe: si legge il totale;
+   - i messaggi di Ema contengono [data-testid="user-message"], quelli di Claude un [data-is-streaming] con il
+     testo dentro .standard-markdown;
+   - la casella è [data-testid="chat-input"], il tasto [data-testid="chat-input-send"];
+   - "Leggi ad alta voce" è [data-testid="action-bar-read-aloud"] sull'ultimo messaggio, data-state idle/playing/paused;
+   - la modalità vocale non ha testid: si riconosce dai tasti ("Avvia la modalità vocale", "Disattiva microfono",
+     "Interrompi") e dal segnaposto della casella ("In ascolto...", "Elaborazione..."). */
 (() => {
 "use strict";
 const SEL = {
-  input: '[data-testid="chat-input"]',
-  send: '[data-testid="chat-input-send"]',
-  righe: '[data-is-streaming]',
-  testo: '.standard-markdown',
+  input: '[data-testid="chat-input"]', send: '[data-testid="chat-input-send"]', art: '[role="article"]',
+  riga: "[data-is-streaming]", testo: ".standard-markdown", utente: '[data-testid="user-message"]',
+  leggi: '[data-testid="action-bar-read-aloud"]', annuncio: '[data-testid="response-status-announcer"]',
 };
-const PREFISSO = "[voce] ";
-const SEGNO = /\[([!?~+\-])\]/g;
-const TONI = { "!": "forte", "?": "domanda", "~": "calmo", "+": "bene", "-": "male" };
+const RE = {
+  avvia: /avvia la modalità vocale|start voice mode|use voice mode/i,
+  micOn: /^attiva microfono|^unmute/i, micOff: /^disattiva microfono|^mute/i,
+  stop: /^(interrompi|stop|termina|end)/i, risposta: /risposta|response/i,
+  stopRisposta: /interrompi la risposta|stop response/i,
+};
 const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// Dal testo con i segni di tono al pacchetto per la Voce (stessa logica di voce.py, in JS).
-function segmenta(grezzo) {
-  grezzo = (grezzo || "").trim();
-  if (/^\[silenzio(?::\s*finch[eé]\s*chiamato)?\]\.?$/i.test(grezzo)) return { silenzio: /finch/i.test(grezzo) ? "finche_chiamato" : "turno" };
-  const pezzi = []; let tono = "neutro", pos = 0, m;
-  while ((m = SEGNO.exec(grezzo))) { pezzi.push([tono, grezzo.slice(pos, m.index)]); tono = TONI[m[1]]; pos = m.index + m[0].length; }
-  pezzi.push([tono, grezzo.slice(pos)]);
-  const segmenti = [];
-  for (const [t0, blocco] of pezzi) {
-    const frasi = blocco.match(/[^.!?…\n]+[.!?…]*\s*/g) || [];
-    frasi.forEach((frase, n) => {
-      if (!frase.trim()) return;
-      const t = n ? "neutro" : t0;
-      const pulita = []; const enfasi = []; let i = 0;
-      for (const parte of frase.split(/(\*[^*\n]{1,80}\*)/)) {
-        if (parte.length >= 3 && parte.startsWith("*") && parte.endsWith("*")) { const w = parte.slice(1, -1); enfasi.push([i, i + w.length]); pulita.push(w); i += w.length; }
-        else { const q = parte.replace(/\*/g, ""); pulita.push(q); i += q.length; }
-      }
-      const tutto = pulita.join(""); const testo = tutto.trim(); const salto = tutto.length - tutto.trimStart().length;
-      if (testo) segmenti.push({ testo, tono: t, enfasi: enfasi.map(([a, b]) => [a - salto, b - salto]).filter(([, b]) => b > 0) });
-    });
-  }
-  return { testo: segmenti.map((x) => x.testo).join(" "), segmenti };
+const q = (s, r) => (r || document).querySelector(s);
+const qa = (s, r) => [...(r || document).querySelectorAll(s)];
+function bottone(re, no) {
+  return qa("button").find((b) => { const t = ((b.getAttribute("aria-label") || "") + " " + b.textContent).trim(); return re.test(t) && !(no && no.test(t)); }) || null;
 }
 
-function righe() { return [...document.querySelectorAll(SEL.righe)]; }
-function testoRiga(r) { const t = r.querySelector(SEL.testo); return (t ? t.innerText : "").trim(); }
-
-async function scrivi(testo) {
-  const box = document.querySelector(SEL.input);
-  if (!box) throw new Error("Non trovo la casella della chat: apri una chat del progetto Secretary.");
-  box.focus();
-  document.execCommand("selectAll", false, null); document.execCommand("delete", false, null);
-  if (!document.execCommand("insertText", false, testo)) {
-    box.dispatchEvent(new InputEvent("beforeinput", { inputType: "insertText", data: testo, bubbles: true, cancelable: true }));
-  }
-  for (let i = 0; i < 40; i++) {
-    const b = document.querySelector(SEL.send);
-    if (b && !b.disabled) { b.click(); return; }
-    await attesa(50);
-  }
-  throw new Error("Il tasto Invia non si è acceso.");
+// ------------------------------------------------------------------ i messaggi
+function info(a, i) {
+  if (!a) return null;
+  const pos = parseInt(a.getAttribute("aria-posinset") || "0", 10) || (i + 1);
+  const tot = parseInt(a.getAttribute("aria-setsize") || "0", 10) || 0;
+  return { el: a, pos, tot, utente: !!q(SEL.utente, a), riga: q(SEL.riga, a) };
 }
+function tutti() { return qa(SEL.art).map(info); }
+function totale() { const t = tutti(); const u = t[t.length - 1]; return u ? Math.max(u.tot, u.pos) : 0; }
+function ultimoDi(utente) { const t = tutti(); for (let i = t.length - 1; i >= 0; i--) { if (utente ? t[i].utente : (t[i].riga && !t[i].utente)) return t[i]; } return null; }
+const ultimoAssistente = () => ultimoDi(false);
+const ultimoUtente = () => ultimoDi(true);
+function scrive(x) { return !!(x && x.riga && x.riga.getAttribute("data-is-streaming") === "true"); }
+function testoDi(x) {
+  if (!x) return { testo: "", enfasi: [] };
+  if (x.utente) { const u = q(SEL.utente, x.el); return { testo: (u ? u.innerText : "").trim(), enfasi: [] }; }
+  const md = qa(SEL.testo, x.el);
+  const enfasi = [];
+  md.forEach((m) => qa("em,strong", m).forEach((e) => { const s = e.textContent.trim(); if (s && s.length < 80) enfasi.push(s); }));
+  return { testo: md.map((m) => m.innerText).join("\n").trim(), enfasi };
+}
+function occupata() { return !!q('[data-is-streaming="true"]') || !!bottone(RE.stopRisposta); }
+function fermaRisposta() { const b = bottone(RE.stopRisposta); if (b) b.click(); }
 
-/* Manda la frase di Ema alla chat vera e aspetta la risposta intera. Ritorna {testo, segmenti} | {silenzio} | {errore}. */
-async function parla(testo, storia, signal) {
-  const prima = righe().length;
-  try { await scrivi(PREFISSO + testo); } catch (err) { return { errore: err.message }; }
+// ------------------------------------------------------------------ scrivere e inviare
+async function invia(testo, signal) {
   const t0 = performance.now();
-  let riga = null;
-  // 1. aspetta la riga nuova di Claude (dopo quella di Ema)
-  while (performance.now() - t0 < 30000) {
-    if (signal && signal.aborted) return { errore: "annullato" };
-    const rs = righe();
-    if (rs.length >= prima + 2) { riga = rs[rs.length - 1]; break; }
-    if (rs.length === prima + 1 && rs[rs.length - 1].getAttribute("data-is-streaming") === "true") { riga = rs[rs.length - 1]; break; }
+  while (occupata()) {
+    if (signal && signal.aborted) throw new Error("annullato");
+    if (performance.now() - t0 > 60000) throw new Error("La chat è ancora occupata con la risposta di prima.");
     await attesa(120);
   }
-  if (!riga) return { errore: "Claude non ha iniziato a rispondere." };
-  // 2. aspetta che finisca di scrivere (e un attimo in più: l'ultimo pezzo arriva dopo il flag)
-  let fermo = 0, ultimo = "";
-  while (performance.now() - t0 < 240000) {
-    if (signal && signal.aborted) return { errore: "annullato" };
-    const streaming = riga.getAttribute("data-is-streaming") === "true";
-    const t = testoRiga(riga);
-    if (!streaming && t && t === ultimo) { fermo += 1; if (fermo >= 3) break; } else fermo = 0;
-    ultimo = t;
-    await attesa(150);
+  const box = q(SEL.input);
+  if (!box) throw new Error("Qui non c'è la casella dei messaggi: apri una chat di claude.ai.");
+  box.focus();
+  if (!(document.activeElement === box || box.contains(document.activeElement))) throw new Error("Non riesco a scrivere nella casella della chat.");
+  document.execCommand("selectAll", false, null); document.execCommand("delete", false, null);
+  document.execCommand("insertText", false, testo);
+  for (let i = 0; ; i++) {
+    const b = q(SEL.send);
+    if (b && !b.disabled) { b.click(); break; }
+    if (i >= 60) throw new Error("Il tasto Invia di claude.ai non si è acceso.");
+    await attesa(50);
   }
-  const grezzo = testoRiga(riga);
-  if (!grezzo) return { errore: "Risposta vuota (forse solo uno strumento, senza testo)." };
-  return segmenta(grezzo);
+  try { box.blur(); } catch (_) {}
 }
 
-// Un pulsantino sempre presente sulla pagina per richiamare la Voce quando è nascosta.
+/* Aspetta la risposta al messaggio appena inviato. `prima` = totale dei messaggi PRIMA dell'invio.
+   onParziale({testo, enfasi}) viene chiamato ogni volta che il testo cresce. Ritorna {testo, enfasi} oppure {errore}. */
+async function attendiRisposta(prima, onParziale, signal) {
+  const t0 = performance.now();
+  let x = null;
+  while (!x) {
+    if (signal && signal.aborted) return { errore: "annullato" };
+    const u = ultimoAssistente();
+    if (u && u.pos > prima) { x = u; break; }
+    if (performance.now() - t0 > 90000) return { errore: "Claude non ha iniziato a rispondere." };
+    await attesa(80);
+  }
+  let ultimo = "", enfasi = [], fermo = 0, vuoto = 0;
+  while (performance.now() - t0 < 300000) {
+    if (signal && signal.aborted) return { errore: "annullato" };
+    const u = ultimoAssistente() || x;
+    const st = scrive(u);
+    const d = testoDi(u);
+    if (d.testo && d.testo !== ultimo) { ultimo = d.testo; enfasi = d.enfasi; fermo = 0; if (onParziale) { try { onParziale(d); } catch (_) {} } }
+    else if (!st && d.testo) fermo++;
+    if (!st && d.testo && fermo >= 2) return { testo: ultimo, enfasi };
+    if (!st && !d.testo) { if (++vuoto > 60) return { errore: "Claude ha risposto senza testo." }; } else vuoto = 0;
+    await attesa(90);
+  }
+  return ultimo ? { testo: ultimo, enfasi } : { errore: "Tempo scaduto." };
+}
+
+// ------------------------------------------------------------------ "Leggi ad alta voce" (la voce di Claude)
+function bottoneLeggi() { const u = ultimoAssistente(); return (u && q(SEL.leggi, u.el)) || qa(SEL.leggi).pop() || null; }
+async function leggi() {
+  for (let i = 0; i < 40; i++) {
+    const b = bottoneLeggi();
+    if (b) { if (b.getAttribute("data-state") !== "playing") b.click(); return true; }
+    await attesa(80);
+  }
+  return false;
+}
+function leggiStato() { const b = bottoneLeggi(); return b ? (b.getAttribute("data-state") || "idle") : "assente"; }
+function leggiFerma() { const b = bottoneLeggi(); if (b && b.getAttribute("data-state") === "playing") b.click(); }
+
+// ------------------------------------------------------------------ la modalità vocale di claude.ai
+function segnaposto() { const box = q(SEL.input); if (!box) return ""; const p = box.getAttribute("data-placeholder") || (q("[data-placeholder]", box) || { getAttribute: () => "" }).getAttribute("data-placeholder"); return p || ""; }
+const vocale = {
+  attivo() { return !!(bottone(RE.micOn) || bottone(RE.micOff)); },
+  disponibile() { return !!bottone(RE.avvia) || this.attivo(); },
+  giro: 0,
+  avvia() { this.giro++; if (this.attivo()) return true; const b = bottone(RE.avvia); if (!b) return false; b.click(); return true; },
+  /* Chiude la modalità vocale e INSISTE finché è chiusa davvero: nel primo secondo dopo l'avvio claude.ai non ha
+     ancora il tasto "Interrompi" (o non lo ascolta), e un clic solo lascerebbe il microfono di Claude acceso. */
+  ferma() {
+    const io = ++this.giro, t0 = performance.now(); let visto = false;
+    const giro = () => {
+      if (io !== this.giro) return;                       // nel frattempo è stata riavviata: non toccarla
+      const dt = performance.now() - t0;
+      if (this.attivo()) { visto = true; const b = bottone(RE.stop, RE.risposta); if (b) b.click(); }
+      else if (visto || dt > 3000) return;                // chiusa (o mai partita)
+      if (dt < 12000) setTimeout(giro, 300);
+    };
+    giro();
+  },
+  microfono(on) { const b = bottone(on ? RE.micOn : RE.micOff); if (b) b.click(); },
+  micAcceso() { return !!bottone(RE.micOff); },
+  ascolta() { return /in ascolto|listening/i.test(segnaposto()); },
+  elabora() { return /elaborazione|processing|thinking/i.test(segnaposto()); },
+};
+
+// ------------------------------------------------------------------ pannelli (dati dell'hub, via service worker)
+function leggiPannelli(url) {
+  return new Promise((ok) => {
+    try { chrome.runtime.sendMessage({ tipo: "pannelli", url }, (r) => { if (chrome.runtime.lastError || !r || r.errore) ok(null); else ok(r.dati); }); }
+    catch (_) { ok(null); }
+  });
+}
+
+// ------------------------------------------------------------------ il tasto VOCE sulla pagina
 function bottoneRichiamo() {
   if (document.getElementById("voce-richiamo")) return;
   const b = document.createElement("button");
   b.id = "voce-richiamo"; b.type = "button"; b.title = "Apri la Voce del Segretario"; b.textContent = "VOCE";
-  b.addEventListener("click", () => { const r = document.getElementById("voce-root"); if (r) { if (r.hidden) window.Voce.mostra(); else window.Voce.nascondi(); } });
+  b.addEventListener("click", () => {
+    if (b.dataset.vecchia) { location.reload(); return; }
+    const r = document.getElementById("voce-root"); if (!r || !window.Voce) return;
+    if (r.hidden) window.Voce.mostra(); else window.Voce.nascondi();
+  });
   document.body.appendChild(b);
 }
+// Ogni 5 s un colpetto al service worker: lo tiene sveglio per accorgersi di una versione nuova. Se l'estensione è
+// stata ricaricata, questa pagina ha ancora la versione vecchia: il tasto lo dice e un clic ricarica la pagina.
+function vecchia() { const b = document.getElementById("voce-richiamo"); if (b && !b.dataset.vecchia) { b.dataset.vecchia = "1"; b.textContent = "↻ AGGIORNA"; b.title = "C'è una versione nuova della Voce: clic per ricaricare la pagina"; } }
+try {
+  if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+    setInterval(() => {
+      try { if (!chrome.runtime.id) { vecchia(); return; } chrome.runtime.sendMessage({ tipo: "ping" }, () => void chrome.runtime.lastError); }
+      catch (_) { vecchia(); }
+    }, 5000);
+  }
+} catch (_) {}
 
-function leggiPannelli(url) {
-  return new Promise((ok) => {
-    try {
-      chrome.runtime.sendMessage({ tipo: "pannelli", url }, (r) => { if (chrome.runtime.lastError || !r || r.errore) ok(null); else ok(r.dati); });
-    } catch (_) { ok(null); }
-  });
-}
 window.VoceConfig = Object.assign({
-  trasporto: parla, stt: "browser", lingua: navigator.language && navigator.language.startsWith("en") ? "en-GB" : "it-IT",
   pannelli: "https://hub.emazamboni.com/voce.json",
   leggiPannelli: (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) ? leggiPannelli : undefined,
 }, window.VoceConfig || {});
-window.VoceDriver = { parla, segmenta, scrivi, bottoneRichiamo };
+window.VoceDriver = {
+  totale, ultimoAssistente, ultimoUtente, testoDi, scrive, occupata, fermaRisposta,
+  invia, attendiRisposta, leggi, leggiStato, leggiFerma, vocale, bottoneRichiamo,
+};
 })();
