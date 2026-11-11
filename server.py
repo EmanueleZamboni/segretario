@@ -1924,6 +1924,7 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
     ultimi = backup_mod.elenco(DATA)
     sicurezza = {"blocco": BLOCCO.descrivi(), "browser": len(_devices()), "app": PROVIDER.collegamenti(),
                  "tentativi": list(reversed(_tentativi_reg)),
+                 "connettore": f"https://{PUBLIC_HOST}{PUBLIC_PREFIX}/{secret}/mcp",
                  "backup": ultimi[-1].name.replace("segretario-", "").replace(".tar.gz.age", "") if ultimi else ""}
     return pagine.impostazioni([(sez, ic, righe) for sez, (ic, righe) in sezioni.items()], stato_righe, msg_ok, msg_err, sicurezza)
 
@@ -2310,6 +2311,17 @@ inner.add_route("/blocco", blocco_json, methods=["GET"])
 inner.add_route(f"/{secret}/backup", backup_scarica, methods=["GET"])
 inner.add_route("/t/{tok}/trascrivi", trascrivi_endpoint, methods=["POST"])
 inner.add_route(f"/{secret}/cruscotto.json", cruscotto_json, methods=["GET"])
+
+# Le stesse pagine anche sotto /pagine/, SENZA il segreto: le protegge il codice Telegram / il browser fidato (che
+# fallisce chiuso), come già succedeva da hub.emazamboni.com. Così l'hub non deve conoscere il segreto del connettore e
+# il segreto si può cambiare senza rompere le pagine. Il connettore (/mcp) e /trascrivi restano solo con il segreto.
+for _nome, _h, _m in (("hub", hub_page, ["GET", "POST"]), ("manager", manager_page, ["GET", "POST"]),
+                      ("cruscotto", cruscotto_page, ["GET", "POST"]), ("cruscotto.json", cruscotto_json, ["GET"]),
+                      ("whatsapp", whatsapp_pagina, ["GET"]), ("whatsapp/{sub}", whatsapp_pagina, ["GET", "POST"]),
+                      ("backup", backup_scarica, ["GET"]), ("voce", voce_page, ["GET", "POST"]),
+                      ("voce.json", voce_json, ["GET"]), ("voce/ascolta", voce_ascolta, ["POST"]),
+                      ("voce/parla", voce_parla, ["POST"])):
+    inner.add_route(f"/pagine/{_nome}", _h, methods=_m)
 
 
 SEMPRE_APERTI = ("/health", "/blocco")

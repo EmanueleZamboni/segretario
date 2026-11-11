@@ -25,6 +25,7 @@ def main():
     s = server.secret
     # le pagine si aprono solo a un browser fidato (senza Telegram restano chiuse a tutti gli altri)
     assert c.get(f"/{s}/manager").status_code == 503
+    assert c.get("/pagine/manager").status_code == 503 and c.get("/pagine/backup").status_code == 503  # senza segreto: chiuso uguale
     import time
     server._write_json(server.DATA / "dispositivi.json", {"fidato": {"dal": time.time()}})
     c.cookies.set(server.DEVICE_COOKIE, "fidato")
@@ -33,6 +34,9 @@ def main():
     r = c.get(f"/{s}/manager")
     assert r.status_code == 200 and "<script" not in r.text and "Vocali in testo" in r.text and "da impostare" in r.text
     assert "form-action 'self'" in r.headers["content-security-policy"]
+    r2 = c.get("/pagine/manager")  # stessa pagina senza segreto, per l'hub; mostra l'indirizzo del connettore da copiare
+    assert r2.status_code == 200 and "Vocali in testo" in r2.text and f"/{s}/mcp" in r2.text
+    assert c.get("/pagine/hub").status_code == 200 and c.post("/pagine/mcp").status_code in (404, 405)
     # 2. salvare una chiave dal modulo: validata, applicata, mai mostrata se è una password
     r = c.post(f"/{s}/manager", data={"chiave": "GROQ_API_KEY", "valore": "sbagliata", "azione": "salva"})
     assert "inizia con gsk_" in r.text and not os.environ.get("GROQ_API_KEY")

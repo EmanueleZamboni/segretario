@@ -233,6 +233,9 @@ def impostazioni(sezioni: list[tuple[str, str, list[dict]]], stato_righe: list[t
             + (f"<p><b>Backup cifrato:</b> l'ultimo è del {esc(sicurezza['backup'])}. <a href=\"backup\">Scarica</a> "
                "(si apre solo con la tua chiave privata).</p>" if sicurezza.get("backup") else
                "<p><b>Backup cifrato:</b> il primo arriva pochi minuti dopo l'avvio, poi ogni notte.</p>")
+            + (f"<p><b>Indirizzo del connettore</b> (da incollare in claude.ai > Settings > Connectors > Add custom connector, "
+               f"solo se te lo chiede Claude):</p><p><input readonly value=\"{esc(sicurezza['connettore'])}\" "
+               "style=\"width:100%\" aria-label=\"Indirizzo del connettore\"></p>" if sicurezza.get("connettore") else "")
             + ("<details class=\"set\"><summary><div class=\"t\"><b>Ultimi tentativi di collegamento</b></div><span class=\"chev\">›</span></summary><div class=\"body\"><ul>"
                + "".join(f"<li>{esc(t.get('quando', ''))} · {esc(t.get('esito', '?'))} · {esc(t.get('nome', ''))} · {esc(', '.join(t.get('redirect') or []))}"
                          + (f" · <span class=\"muted\">{esc(t.get('motivo', ''))}</span>" if t.get('motivo') else "") + "</li>"
