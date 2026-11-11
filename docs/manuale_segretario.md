@@ -46,6 +46,16 @@ Per aggiungere un tasto all'hub: `hub_link_aggiungi(nome, url, gruppo, nota)`; p
 - **Ogni cosa decisa o fatta** va in `diario_scrivi(testo, origine="chat", progetto=...)`, una riga, fatti.
 - **A fine giornata** non devi mandare niente: il task "domani" non esiste più.
 
+## 4b. File tra chat (la via di default)
+
+Per passare un testo da una chat o sessione Claude a un'altra (un handoff, un CLAUDE.md, delle note, uno script) non
+si carica niente e non si copia-incolla: chi scrive chiama `documento_salva(progetto, nome, testo)` (fino a 400.000
+caratteri, ogni salvataggio è una versione), chi legge chiama `documento_leggi(progetto, nome)`. Se il testo riguarda
+un progetto, va in quel progetto; se non riguarda nessun progetto, va nel progetto **Scambio**, e le istruzioni del
+connettore elencano a ogni chat i file lasciati lì. Quando Ema dice "salva questo per l'altra chat", "passa questo a
+Claude Code", "leggi il file che ha scritto l'altra chat", intende questo. Se non ricordi il nome: `memoria_cerca`.
+Esempio: l'handoff completo del sistema è il documento `handoff-completo` del progetto Segretario.
+
 ## 5. Gli strumenti, uno per uno (connettore "Segretario", 35 tool)
 
 Manuale: `manuale()` è questo testo, una chiamata sola, da fare per prima.

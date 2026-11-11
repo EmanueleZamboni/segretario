@@ -164,10 +164,20 @@ function segmenta(grezzo, parole) {
   }
   return { segmenti, testo: segmenti.map((x) => x.testo).join(" ") };
 }
-function linguaDi(t) {
-  const it = (t.match(/\b(il|lo|la|che|di|non|sono|per|una|hai|alle|oggi|domani|è|e|ti|mi)\b/gi) || []).length;
-  const en = (t.match(/\b(the|you|is|are|have|to|and|of|today|tomorrow|your|it|this)\b/gi) || []).length;
-  return en > it ? "en" : "it";
+/* In che lingua è un testo, per far pronunciare a HAL le parole giuste. Si decide sulla FRASE intera (non sul pezzo,
+   che può essere "Sure, done," senza parole riconoscibili) e, se non c'è modo di capirlo, vale la lingua di prima:
+   prima il pareggio dava sempre italiano, e i pezzi corti in inglese venivano letti con la pronuncia italiana. */
+const PAROLE_IT = /\b(il|lo|la|le|gli|un|una|uno|che|di|da|del|della|dei|delle|non|sono|sei|era|hai|ho|ha|per|con|su|nel|nella|alla|alle|al|ai|oggi|domani|ieri|ti|mi|si|ci|ma|anche|come|cosa|questo|questa|quello|perché|perche|più|molto|tutto|fatto|ecco|bene|sì|grazie|poi|ancora|ciao|vuoi|puoi|sto|stai|fare|dove|quando|niente|tutti|ogni|tra|fra|mio|tuo|suo)\b/gi;
+const PAROLE_EN = /\b(the|an|you|your|is|are|was|were|have|has|had|to|and|of|on|for|with|today|tomorrow|yesterday|it|this|that|what|how|why|not|but|also|there|here|done|sure|okay|yes|thanks|will|would|can|just|got|my|me|we|they|he|she|from|at|by|about|be|do|does|did|so|if|all|one|some|any|get|let|want|need|know|think|right|good|great|call|meeting|email)\b/gi;
+function linguaDi(t, prima) {
+  const testo = String(t || "");
+  let it = (testo.match(PAROLE_IT) || []).length, en = (testo.match(PAROLE_EN) || []).length;
+  if (/[àèéìòù]/i.test(testo)) it += 2;                                   // lettere accentate: italiano
+  if (/\b\w+'(s|t|re|ll|ve|d|m)\b/i.test(testo)) en += 2;              // it's, don't, you're, I'll: inglese
+  if (/\b(l|un|dell|nell|all|c|d|quest|sull)'\w/i.test(testo)) it += 2;  // l'ultima, un'idea, c'è: italiano
+  if (en > it) return "en";
+  if (it > en) return "it";
+  return prima || (S.lingua && S.lingua.startsWith("en") ? "en" : "it");
 }
 
 // ------------------------------------------------------------------ quanto forte parlano (misurato dal tap sulla pagina)
@@ -271,8 +281,8 @@ const Hal = {
     if (this.actx.state === "suspended") this.actx.resume().catch(() => {});
     return this.actx;
   },
-  async sintetizza(testo, signal, primo) {
-    const r = await fetch(this.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo, lingua: linguaDi(testo), velocita: halVel, primo: !!primo }), signal });
+  async sintetizza(testo, signal, primo, lingua) {
+    const r = await fetch(this.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo, lingua: lingua || linguaDi(testo), velocita: halVel, primo: !!primo }), signal });
     if (!r.ok) throw new Error("HAL " + r.status);
     return this.audio().decodeAudioData(await r.arrayBuffer());
   },
@@ -291,7 +301,7 @@ const Hal = {
     const coda = [], pronte = new Map(); let presi = 0, fine = false, n = 0, chiudi; const self = this;
     const finito = new Promise((r) => (chiudi = r));
     const ctl = new AbortController(); this.ctl = ctl;
-    const prepara = (k) => { if (k < coda.length && !pronte.has(k)) { const p = self.sintetizza(coda[k].testo, ctl.signal, k === 0); p.catch(() => {}); pronte.set(k, p); } };
+    const prepara = (k) => { if (k < coda.length && !pronte.has(k)) { const p = self.sintetizza(coda[k].testo, ctl.signal, k === 0, coda[k].lingua); p.catch(() => {}); pronte.set(k, p); } };
     function spezza(sg, idx) {
       // I pezzi crescono: il primo corto (la voce parte subito), il secondo medio (pronto prima che il primo finisca),
       // poi lunghi (meno giunture). Si taglia alle virgole. Misurato l'11/11/2026: a 1,5x restano pochi vuoti brevi.
@@ -304,7 +314,8 @@ const Hal = {
         pezzi.push(m[1]); resto = m[2];
       }
       pezzi.push(resto);
-      return pezzi.map((testo, k) => ({ testo, tono: sg.tono, idx, enfasi: k === 0 ? (sg.enfasi || []).length : 0 }));
+      const lingua = linguaDi(sg.testo, coda.length ? coda[coda.length - 1].lingua : undefined);
+      return pezzi.map((testo, k) => ({ testo, lingua, tono: sg.tono, idx, enfasi: k === 0 ? (sg.enfasi || []).length : 0 }));
     }
     (async () => {
       let parlato = false;
