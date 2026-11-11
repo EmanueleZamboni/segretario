@@ -1,5 +1,5 @@
 /* Generato da voce-chrome/build.py: non modificare a mano. Fonte: voce.html, voce_scena.js, voce_logica.js, driver.js */
-window.VOCE_VERSIONE = "v1.0.12";
+window.VOCE_VERSIONE = "v1.0.14";
 (() => {
   if (document.getElementById("voce-root")) return;
   const wrap = document.createElement("div");
@@ -1436,7 +1436,9 @@ const Hal = {
   /* A che punto è il caricamento (0..1): il programma della voce dice in che fase è e da quanti secondi. */
   progresso(p) {
     const d = +p.da_s || 0;
-    return p.carico === "modello" ? Math.min(0.6, d / 14 * 0.6) : p.carico === "riscaldamento" ? 0.6 + Math.min(0.2, d / 6 * 0.2) : p.carico === "prova" ? 0.8 + Math.min(0.19, d / 5 * 0.19) : 0.04;
+    // tempi misurati l'11/11/2026: librerie ~13 s, modello ~3 s, riscaldamento ~3 s
+    return p.carico === "librerie" ? 0.04 + Math.min(0.6, d / 13 * 0.6) : p.carico === "modello" ? 0.64 + Math.min(0.2, d / 3 * 0.2)
+      : p.carico === "riscaldamento" ? 0.84 + Math.min(0.15, d / 3 * 0.15) : 0.04;
   },
   /* HAL ON: avvia il programma della voce (attraverso l'estensione), aspetta che risponda, carica il modello. */
   async accendi() {
@@ -1464,8 +1466,9 @@ const Hal = {
     }
     try {
       const p = await this.get("/pronto"); if (p.pronto) { if (io === this.giro) { this.pronto = true; this.disegna(); log("hal già pronto"); } return; }
-      const a = await this.get("/accendi", 6000);
-      if (a && a.acceso === false) {
+      // avviato adesso dal tasto: il programma sta già caricando da solo. Acceso a mano o già acceso: va chiesto.
+      const a = (avvio && avvio.ok && avvio.stato === "avviato") || p.carico || p.motivo ? p : await this.get("/accendi", 6000);
+      if (a && a.acceso === false && a.motivo === "vram") {   // rifiutato per poco spazio sulla scheda video
         log("hal rifiutato: " + a.motivo);
         rinuncia("HAL non può partire adesso: la scheda video è quasi piena (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
         return;
@@ -1477,6 +1480,11 @@ const Hal = {
         const p = await this.get("/pronto", 1500);
         if (p.pronto) { this.pronto = true; this.disegna(); log("hal pronto"); riga("sys", "HAL è pronto.", "piano"); return; }
         this.disegna("carica", this.progresso(p));
+        if (p.motivo === "vram") {
+          log("hal rifiutato: vram " + p.libera_mb + " MB liberi");
+          rinuncia("HAL non può partire adesso: la scheda video è quasi piena (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
+          return;
+        }
         if (p.motivo === "lento") {
           log("hal rifiutato: lento " + p.tempo_s + " s per " + p.voce_s + " s di voce");
           rinuncia("HAL è troppo lento adesso: la scheda video è occupata (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
