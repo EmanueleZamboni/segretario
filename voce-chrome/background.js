@@ -1,7 +1,46 @@
 /* Il service worker dell'estensione: l'unico che può chiedere i pannelli a hub.emazamboni.com con i cookie
    (dal content script la richiesta è cross-site e il cookie del codice Telegram non parte). */
+/* HAL: il programma della voce sul PC si accende e si spegne da qui, attraverso il "ponte" it.segretario.hal
+   (voce-pc/hal_host.py, registrato in Chrome). Finché il collegamento è aperto il programma vive; a HAL OFF il
+   collegamento si chiude e il ponte spegne il programma del tutto. Se Chrome si chiude, si spegne anche lui. */
+let halPorta = null, halId = 0;
+const halAttese = new Map();
+function halCollega() {
+  if (halPorta) return halPorta;
+  const p = chrome.runtime.connectNative("it.segretario.hal");
+  halPorta = p;
+  p.onMessage.addListener((m) => { const f = halAttese.get(m && m.id); if (f) { halAttese.delete(m.id); f(m); } });
+  p.onDisconnect.addListener(() => {
+    const e = (chrome.runtime.lastError && chrome.runtime.lastError.message) || "collegamento chiuso";
+    if (halPorta === p) halPorta = null;
+    for (const [id, f] of halAttese) { halAttese.delete(id); f({ ok: false, errore: e }); }
+  });
+  return p;
+}
+function halChiedi(cmd, ms) {
+  return new Promise((ok) => {
+    let p;
+    try { p = halCollega(); } catch (err) { ok({ ok: false, errore: String(err && err.message || err) }); return; }
+    const id = ++halId;
+    const t = setTimeout(() => { if (halAttese.delete(id)) ok({ ok: false, errore: "nessuna risposta dal ponte" }); }, ms || 8000);
+    halAttese.set(id, (m) => { clearTimeout(t); ok(m); });
+    try { p.postMessage({ id, cmd }); } catch (err) { halAttese.delete(id); clearTimeout(t); ok({ ok: false, errore: String(err && err.message || err) }); }
+  });
+}
+async function halFerma() {
+  if (!halPorta) return { ok: true, gia: true };
+  const r = await halChiedi("ferma", 8000);
+  const p = halPorta; halPorta = null;
+  try { if (p) p.disconnect(); } catch (_) {}
+  return r;
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, rispondi) => {
   if (msg && msg.tipo === "ping") { controlla(); rispondi({ ok: true }); return false; }  // il content script ci sveglia: il service worker da solo si addormenta
+  if (msg && msg.tipo === "hal") {
+    (msg.cmd === "ferma" ? halFerma() : halChiedi(msg.cmd === "stato" ? "stato" : "avvia")).then(rispondi);
+    return true;
+  }
   if (!msg || msg.tipo !== "pannelli") return false;
   const url = String(msg.url || "");
   if (!url.startsWith("https://hub.emazamboni.com/")) { rispondi({ errore: "indirizzo non permesso" }); return false; }

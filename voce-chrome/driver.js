@@ -177,7 +177,16 @@ try {
   }
 } catch (_) {}
 
+function halComando(cmd) {
+  return new Promise((ok) => {
+    try { chrome.runtime.sendMessage({ tipo: "hal", cmd }, (r) => { if (chrome.runtime.lastError) ok({ ok: false, errore: chrome.runtime.lastError.message }); else ok(r || { ok: false, errore: "nessuna risposta" }); }); }
+    catch (err) { ok({ ok: false, errore: String(err && err.message || err) }); }
+  });
+}
+const conEstensione = typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage;
 window.VoceConfig = Object.assign({
+  halAvvia: conEstensione ? () => halComando("avvia") : undefined,     // HAL ON: avvia il programma della voce sul PC
+  halFerma: conEstensione ? () => halComando("ferma") : undefined,     // HAL OFF: lo spegne del tutto
   pannelli: "https://hub.emazamboni.com/voce.json",
   leggiPannelli: (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) ? leggiPannelli : undefined,
 }, window.VoceConfig || {});

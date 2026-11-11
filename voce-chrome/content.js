@@ -1,5 +1,5 @@
 /* Generato da voce-chrome/build.py: non modificare a mano. Fonte: voce.html, voce_scena.js, voce_logica.js, driver.js */
-window.VOCE_VERSIONE = "v1.0.11";
+window.VOCE_VERSIONE = "v1.0.12";
 (() => {
   if (document.getElementById("voce-root")) return;
   const wrap = document.createElement("div");
@@ -187,7 +187,16 @@ try {
   }
 } catch (_) {}
 
+function halComando(cmd) {
+  return new Promise((ok) => {
+    try { chrome.runtime.sendMessage({ tipo: "hal", cmd }, (r) => { if (chrome.runtime.lastError) ok({ ok: false, errore: chrome.runtime.lastError.message }); else ok(r || { ok: false, errore: "nessuna risposta" }); }); }
+    catch (err) { ok({ ok: false, errore: String(err && err.message || err) }); }
+  });
+}
+const conEstensione = typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage;
 window.VoceConfig = Object.assign({
+  halAvvia: conEstensione ? () => halComando("avvia") : undefined,     // HAL ON: avvia il programma della voce sul PC
+  halFerma: conEstensione ? () => halComando("ferma") : undefined,     // HAL OFF: lo spegne del tutto
   pannelli: "https://hub.emazamboni.com/voce.json",
   leggiPannelli: (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) ? leggiPannelli : undefined,
 }, window.VoceConfig || {});
@@ -1429,24 +1438,39 @@ const Hal = {
     const d = +p.da_s || 0;
     return p.carico === "modello" ? Math.min(0.6, d / 14 * 0.6) : p.carico === "riscaldamento" ? 0.6 + Math.min(0.2, d / 6 * 0.2) : p.carico === "prova" ? 0.8 + Math.min(0.19, d / 5 * 0.19) : 0.04;
   },
+  /* HAL ON: avvia il programma della voce (attraverso l'estensione), aspetta che risponda, carica il modello. */
   async accendi() {
-    const io = ++this.giro; this.pronto = false; this.disegna("carica"); log("hal accendi");
+    const io = ++this.giro; this.pronto = false; this.disegna("carica", 0.02); log("hal accendi");
+    const rinuncia = (msg) => { if (io !== this.giro) return; S.hal = false; salva("voce.hal", "0"); this.spegni(); avviso(msg); };
+    let avvio = null;
+    if (typeof CFG.halAvvia === "function") {
+      avvio = await CFG.halAvvia(); log("hal programma: " + JSON.stringify(avvio));
+      if (io !== this.giro || !S.hal) return;
+    }
+    // il programma impiega 2-5 s a rispondere dopo l'avvio
+    const t0 = ora(); let su = false;
+    while (ora() - t0 < (avvio && avvio.ok ? 30000 : 2500)) {
+      try { await this.get("/pronto", 1500); su = true; break; } catch (_) {}
+      if (io !== this.giro || !S.hal) return;
+      this.disegna("carica", 0.02 + Math.min(0.03, (ora() - t0) / 30000 * 0.03));
+      await attesa(400);
+    }
+    if (!su) {
+      const nonInstallato = avvio && !avvio.ok && /not found|non trovat|forbidden|not allowed|native messaging/i.test(avvio.errore || "");
+      rinuncia(nonInstallato
+        ? "HAL non riesce ad avviarsi: il collegamento tra Chrome e il programma della voce non è installato. Intanto parla Claude."
+        : "HAL non riesce ad avviarsi" + (avvio && avvio.errore ? " (" + avvio.errore + ")" : "") + ". Intanto parla Claude.");
+      return;
+    }
     try {
       const p = await this.get("/pronto"); if (p.pronto) { if (io === this.giro) { this.pronto = true; this.disegna(); log("hal già pronto"); } return; }
       const a = await this.get("/accendi", 6000);
       if (a && a.acceso === false) {
-        if (io !== this.giro) return;
-        S.hal = false; salva("voce.hal", "0"); this.disegna(); log("hal rifiutato: " + a.motivo);
-        avviso("HAL non può partire adesso: la scheda video è quasi piena (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
+        log("hal rifiutato: " + a.motivo);
+        rinuncia("HAL non può partire adesso: la scheda video è quasi piena (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
         return;
       }
-    }
-    catch (_) {
-      if (io !== this.giro) return;
-      S.hal = false; salva("voce.hal", "0"); this.disegna();
-      avviso("La voce HAL sul PC è spenta: doppio clic su avvia_voce.cmd nella cartella voce-pc, poi premi di nuovo HAL. Intanto parla Claude.");
-      return;
-    }
+    } catch (_) { rinuncia("Il programma della voce HAL si è fermato. Intanto parla Claude."); return; }
     for (let i = 0; i < 200; i++) {
       if (io !== this.giro || !S.hal) return;
       try {
@@ -1454,16 +1478,21 @@ const Hal = {
         if (p.pronto) { this.pronto = true; this.disegna(); log("hal pronto"); riga("sys", "HAL è pronto.", "piano"); return; }
         this.disegna("carica", this.progresso(p));
         if (p.motivo === "lento") {
-          S.hal = false; salva("voce.hal", "0"); this.disegna(); log("hal rifiutato: lento " + p.tempo_s + " s per " + p.voce_s + " s di voce");
-          avviso("HAL è troppo lento adesso: la scheda video è occupata (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
+          log("hal rifiutato: lento " + p.tempo_s + " s per " + p.voce_s + " s di voce");
+          rinuncia("HAL è troppo lento adesso: la scheda video è occupata (di solito è Resolve aperto). Parla Claude. Riprova quando chiudi Resolve.");
           return;
         }
       } catch (_) {}
       await attesa(700);
     }
-    if (io === this.giro) { S.hal = false; salva("voce.hal", "0"); this.disegna(); avviso("HAL non si è caricato. Intanto parla Claude."); }
+    rinuncia("HAL non si è caricato. Intanto parla Claude.");
   },
-  spegni() { this.giro++; this.pronto = false; this.disegna(); fetch(this.url + "/spegni").catch(() => {}); log("hal spegni"); },
+  /* HAL OFF: il programma della voce si chiude del tutto (non resta niente in memoria né sulla scheda video). */
+  spegni() {
+    this.giro++; this.pronto = false; this.ferma(); this.disegna(); log("hal spegni");
+    if (typeof CFG.halFerma === "function") CFG.halFerma().then((r) => { log("hal fermato: " + JSON.stringify(r)); if (!r || !r.ok) fetch(this.url + "/esci").catch(() => {}); });
+    else fetch(this.url + "/esci").catch(() => {});
+  },
   audio() {
     if (!this.actx) {
       this.actx = new (window.AudioContext || window.webkitAudioContext)(); this.an = this.actx.createAnalyser(); this.an.fftSize = 512; this.buf = new Float32Array(512);
@@ -1943,8 +1972,8 @@ function avvia() {
   if (hb) hb.addEventListener("click", () => {
     interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo");
     S.hal = !S.hal; salva("voce.hal", S.hal ? "1" : "0");
-    if (S.hal) { riga("sys", "Carico la voce HAL: la barra sul tasto HAL mostra a che punto è (circa mezzo minuto). Intanto parla Claude.", "piano"); Hal.accendi(); }
-    else { Hal.spegni(); riga("sys", "Voce di Claude.", "piano"); }
+    if (S.hal) { riga("sys", "Accendo la voce HAL: la barra sul tasto mostra a che punto è (circa mezzo minuto). Intanto parla Claude.", "piano"); Hal.accendi(); }
+    else { Hal.spegni(); riga("sys", "HAL spento del tutto. Parla Claude.", "piano"); }
   });
   $("#zitto").addEventListener("click", () => {
     if (Nativo.attivo) { Nativo.mic(); return; }
