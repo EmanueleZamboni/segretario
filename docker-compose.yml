@@ -22,6 +22,8 @@ services:
       - TRASCRIVI_TOKEN=${TRASCRIVI_TOKEN:-}
       # Reti in più da trattare come Anthropic, se un giorno Anthropic ne aggiunge (separate da virgola)
       - SEGRETARIO_IP_FIDATI=${SEGRETARIO_IP_FIDATI:-}
+      # Backup notturno cifrato con la chiave PUBBLICA di Ema (la privata ce l'ha solo lui, sul PC)
+      - BACKUP_DESTINATARIO=${BACKUP_DESTINATARIO:-age1dapewg2v7qdnf42hsn8szw9jrgcnadrupa2lu5tg7z44j42664uq7wrc86}
       # Solo per mostrare nel manager il link della pagina WhatsApp (il servizio è whatsapp/)
       - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
       # Keep letto dal server per il brief del mattino (li scrive ops/run.sh di Various nel .env)
@@ -42,6 +44,8 @@ services:
       - ROUTINE_FIRE_TOKEN=${ROUTINE_FIRE_TOKEN:-}
     volumes:
       - segretario_data:/data
+      # la copia di WhatsApp, in sola lettura, solo per metterla nel backup cifrato
+      - whatsapp_data:/wa:ro
       - ${POSTINO_DATA_DIR:-/nonexistent}:/postino:ro
     read_only: true
     tmpfs:

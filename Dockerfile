@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
-COPY server.py guardia.py oauth.py remoti.py telegram_bot.py keep.py brief.py fonti.py pagine.py icone.py voce.py voce.html voce_mesh.js voce_testa.js voce_scena.js voce_logica.js .
+COPY server.py guardia.py oauth.py remoti.py backup.py telegram_bot.py keep.py brief.py fonti.py pagine.py icone.py voce.py voce.html voce_mesh.js voce_testa.js voce_scena.js voce_logica.js .
 COPY docs/istruzioni_progetto_secretary.md docs/manuale_segretario.md docs/
 # Stesso uid di Postino (node = 1000): il volume /data è suo.
 RUN useradd --uid 1000 --system --shell /usr/sbin/nologin segretario && mkdir /data && chown 1000:1000 /data

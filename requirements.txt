@@ -6,3 +6,4 @@ python-multipart==0.0.33
 icalendar==7.3.0
 recurring-ical-events==3.8.2
 httpx==0.28.1
+pyrage==1.4.0

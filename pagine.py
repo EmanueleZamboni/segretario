@@ -230,7 +230,10 @@ def impostazioni(sezioni: list[tuple[str, str, list[dict]]], stato_righe: list[t
             "<h2>Sicurezza</h2><div class=\"card\">"
             f"<p><b>Stato:</b> {esc(sicurezza.get('blocco', ''))}</p>"
             f"<p><b>Browser fidati:</b> {int(sicurezza.get('browser', 0))}. <b>App di Claude collegate:</b></p><ul>{elenco}</ul>"
-            "<form method=\"post\"><div class=\"actions\">"
+            + (f"<p><b>Backup cifrato:</b> l'ultimo è del {esc(sicurezza['backup'])}. <a href=\"backup\">Scarica</a> "
+               "(si apre solo con la tua chiave privata).</p>" if sicurezza.get("backup") else
+               "<p><b>Backup cifrato:</b> il primo arriva pochi minuti dopo l'avvio, poi ogni notte.</p>")
+            + "<form method=\"post\"><div class=\"actions\">"
             "<button class=\"btn quiet\" type=\"submit\" name=\"azione\" value=\"scollega_app\">Scollega tutte le app di Claude</button>"
             "<button class=\"btn quiet\" type=\"submit\" name=\"azione\" value=\"scollega_browser\">Scollega tutti i browser</button>"
             "</div></form></div>" + EMERGENZA)

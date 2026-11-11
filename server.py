@@ -47,6 +47,7 @@ import voce as voce_mod
 import guardia
 import oauth as oauth_mod
 import remoti
+import backup as backup_mod
 
 DATA = Path(os.environ.get("SEGRETARIO_DATA", "/data"))
 MEMORIA = DATA / "memoria"
@@ -1216,6 +1217,27 @@ def _brief_loop() -> None:
         time.sleep(60)
 
 
+WA_DATA = Path(os.environ.get("SEGRETARIO_WA_DATA", "/wa"))
+
+
+def _backup_loop() -> None:
+    """Un backup cifrato al giorno, dopo le 03:30 (e subito il primo, se non ce n'è nessuno)."""
+    time.sleep(120)
+    while True:
+        try:
+            if backup_mod.destinatario():
+                t = now()
+                nome = f"segretario-{t:%Y-%m-%d}"
+                fatti = {p.name for p in backup_mod.elenco(DATA)}
+                primo = not fatti
+                if f"{nome}.tar.gz.age" not in fatti and (primo or (t.hour, t.minute) >= (3, 30)):
+                    out = backup_mod.crea(DATA, WA_DATA if WA_DATA.exists() else None, nome, lock)
+                    log.info("backup cifrato: %s (%d KB)", out.name, out.stat().st_size // 1024)
+        except Exception as err:  # noqa: BLE001
+            log.warning("backup: %s", err)
+        time.sleep(300)
+
+
 # ---------- oggetti (tag unico ovunque) e compiti passati tra progetti ----------
 def _tag(s: str) -> str:
     s = (s or "").strip().lstrip("#").lower()
@@ -1366,6 +1388,7 @@ def stato() -> dict:
         "calendario": bool(os.environ.get("CALENDAR_ICS_URL", "").strip()),
         "email_nel_brief": bool(os.environ.get("POSTINO_DB", "").strip()),
         "blocco": BLOCCO.descrivi(),
+        "ultimo_backup": (backup_mod.elenco(DATA)[-1].name if backup_mod.elenco(DATA) else "nessuno"),
         "login_connettore": OAUTH_ON,
         "app_collegate": len(PROVIDER.collegamenti()),
         "whatsapp_keep_dal_segretario": {r.nome: (r.errore or "ok") for r in REMOTI if r.configurato()},
@@ -1689,6 +1712,19 @@ async def accesso_page(request):
     return HTMLResponse(pagine.accesso(req.get("app") or "Claude", msg, rid), headers=head)
 
 
+async def backup_scarica(request):
+    """L'ultimo backup cifrato, da scaricare (solo un browser fidato). Si apre solo con la chiave privata di Ema."""
+    from starlette.responses import FileResponse
+    gate = await _gate(request)
+    if gate is not None:
+        return gate
+    ultimi = backup_mod.elenco(DATA)
+    if not ultimi:
+        return _pagina_chiusa("Nessun backup ancora: il primo si fa da solo pochi minuti dopo l'avvio, poi ogni notte.", 404)
+    return FileResponse(ultimi[-1], filename=ultimi[-1].name, media_type="application/octet-stream",
+                        headers={"Cache-Control": "no-store"})
+
+
 async def blocco_json(request):
     """Pubblico, solo un sì o un no: Postino e il link manager lo chiedono e chiudono tutto quando è sì."""
     return JSONResponse({"bloccato": BLOCCO.attivo}, headers={"Cache-Control": "no-store"})
@@ -1833,7 +1869,9 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
         ("Keep (per il riepilogo)", "collegato" if st["keep"] else "non collegato"), ("Regole", st["regole"]),
         ("Proposte in attesa", st["proposte_in_attesa"]), ("Richieste aperte", st["richieste_aperte"]),
     ]
-    sicurezza = {"blocco": BLOCCO.descrivi(), "browser": len(_devices()), "app": PROVIDER.collegamenti()}
+    ultimi = backup_mod.elenco(DATA)
+    sicurezza = {"blocco": BLOCCO.descrivi(), "browser": len(_devices()), "app": PROVIDER.collegamenti(),
+                 "backup": ultimi[-1].name.replace("segretario-", "").replace(".tar.gz.age", "") if ultimi else ""}
     return pagine.impostazioni([(sez, ic, righe) for sez, (ic, righe) in sezioni.items()], stato_righe, msg_ok, msg_err, sicurezza)
 
 
@@ -2216,6 +2254,7 @@ inner.add_route(f"/{secret}/whatsapp", whatsapp_pagina, methods=["GET"])
 inner.add_route(f"/{secret}/whatsapp/{{sub}}", whatsapp_pagina, methods=["GET", "POST"])
 inner.add_route("/accesso", accesso_page, methods=["GET", "POST"])
 inner.add_route("/blocco", blocco_json, methods=["GET"])
+inner.add_route(f"/{secret}/backup", backup_scarica, methods=["GET"])
 inner.add_route("/t/{tok}/trascrivi", trascrivi_endpoint, methods=["POST"])
 inner.add_route(f"/{secret}/cruscotto.json", cruscotto_json, methods=["GET"])
 
@@ -2268,6 +2307,7 @@ if __name__ == "__main__":
     else:
         print("Telegram: non configurato (TELEGRAM_BOT_TOKEN vuoto): nessuna consegna al telefono", flush=True)
     threading.Thread(target=_brief_loop, name="brief", daemon=True).start()
+    threading.Thread(target=_backup_loop, name="backup", daemon=True).start()
     uvicorn.run(
         app,
         host=BIND,
