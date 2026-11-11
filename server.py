@@ -1690,7 +1690,9 @@ def _avvii_recenti() -> dict:
 
 
 async def health(_request):
-    return JSONResponse({"ok": True, "name": "segretario", "avviato": AVVIATO})
+    r = _avvii_recenti()  # solo orari e memoria, niente dati: serve a capire i riavvii senza il connettore
+    return JSONResponse({"ok": True, "name": "segretario", "avviato": AVVIATO, "avvii_ultima_ora": r.get("avvii_ultima_ora"),
+                         "memoria": _mem_mb(), "vita_prima": (r.get("ultimi") or [{}])[-1].get("vita_prima")})
 
 
 def _tutti(request) -> bool:
