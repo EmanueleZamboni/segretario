@@ -93,6 +93,7 @@ segretario/
   tests/                test_manager, test_otp, test_brief, test_instagram, test_oggetti, test_telegram, test_avvio, smoke
   docs/                 manuale_segretario.md, istruzioni_progetto_secretary.md, handoff_secretary_2026-11-07.md, task_cloud.md, questo file
   whatsapp/             il servizio WhatsApp (vedi capitolo 7)
+  voce-chrome/          l'estensione Chrome "Voce" (vedi 15.1)
 ```
 
 ### 3.2 `EmanueleZamboni/Various` (pubblico)
@@ -397,6 +398,10 @@ Ema voleva pagine "super cool", coerenti, con le icone vere delle app, un'animaz
 - Verificato in Chrome su telefono (375 px) e desktop, chiaro e scuro, prima di mostrarlo a Ema. Regola sua: tutto ciò che è nuovo segue il design system esistente ed è controllato su PC e telefono prima che lo veda.
 - Nomi: "manager" → **Impostazioni**, "cruscotto" → **Claude Dashboard**, mai "Chiave Groq".
 
+### 15.1 La Voce (`voce-chrome/`, estensione Chrome, costruita da un'altra sessione Claude Code, 8-11 novembre)
+
+Un'estensione Chrome (Manifest V3, non pubblicata, caricata "unpacked") che si appoggia **sopra la chat Secretary di claude.ai**: un tasto VOCE sulla pagina apre un pannello a schermo intero con una testa 3D stilizzata; Ema parla, il riconoscimento vocale di Chrome scrive il testo nella chat vera di claude.ai e lo invia, la risposta viene letta ad alta voce. Due voci: quella di claude.ai ("Leggi ad alta voce") di default, oppure **HAL**, una voce locale generata sul PC di Ema (Chatterbox TTS sulla sua GPU, servizio Python su `127.0.0.1:8768`, nella cartella `voce-pc/`, non in git), accesa e spenta dall'estensione tramite un host di messaggistica nativa di Chrome (`it.segretario.hal`). Regole di Ema: nessuna API a pagamento (solo il suo abbonamento Claude attraverso la chat vera), mai test udibili, niente avvio automatico con Windows. Nel pacchetto c'è solo la parte Chrome (`voce-chrome/`): `content.js` (logica e scena), `driver.js` (guida la pagina di claude.ai: scrive, invia, legge, apre la modalità vocale), `tap.js` (misura l'audio), `background.js` (il ponte verso HAL), `build.py` (impacchetta e aggiorna la versione). È un esperimento avanzato, utile come esempio di come "guidare" claude.ai da un'estensione; non serve al resto del sistema.
+
 ---
 
 ## 16. Il metodo di lavoro con Claude Code (cosa abbiamo imparato costruendolo)
@@ -493,7 +498,7 @@ STILE. Risposte brevi, una domanda per volta quando è in giro. Mai dare per fat
 ## Appendice F. Contenuto del pacchetto `segretario_codice.zip`
 
 ```
-segretario/            il repo EmanueleZamboni/segretario completo (HEAD dell'11/11/2026, senza .git, senza segreti)
+segretario/            il repo EmanueleZamboni/segretario completo (HEAD dell'11/11/2026, senza .git, senza segreti), compresi whatsapp/ e voce-chrome/
 various/keep-mcp/      il connettore Keep, con ops/run.sh
 various/postino/       Caddyfile, docker-compose.yml, scripts/ (auto-update, install) e README: il resto di Postino è su GitHub
 links/cloudflare/      hub.js, wrangler-hub.toml, worker_ig_dm_excerpt.js (solo gli endpoint /ig/* dei DM)
