@@ -1435,6 +1435,7 @@ def stato() -> dict:
         "login_connettore": OAUTH_ON,
         "app_collegate": len(PROVIDER.collegamenti()),
         "whatsapp_keep_dal_segretario": {r.nome: (r.errore or "ok") for r in REMOTI if r.configurato()},
+        "processo": {"avviato": AVVIATO, **_mem_mb(), **_avvii_recenti()},
     }
 
 
@@ -1614,6 +1615,78 @@ inner = mcp.streamable_http_app()
 
 
 AVVIATO = now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+# ---------- salute del processo: ogni avvio, la memoria, come si è fermato (per capire i riavvii senza vedere i log) ----------
+def _mem_mb() -> dict:
+    out = {}
+    try:
+        for riga in open("/proc/self/status", encoding="utf-8"):
+            if riga.startswith(("VmRSS:", "VmHWM:")):
+                out[riga.split(":")[0]] = int(riga.split()[1]) // 1024
+    except OSError:
+        pass
+    for nome, f in (("cgroup_mb", "/sys/fs/cgroup/memory.current"), ("cgroup_max_mb", "/sys/fs/cgroup/memory.max")):
+        try:
+            v = open(f, encoding="utf-8").read().strip()
+            out[nome] = int(v) // (1 << 20) if v.isdigit() else v
+        except OSError:
+            pass
+    try:
+        for riga in open("/sys/fs/cgroup/memory.events", encoding="utf-8"):
+            k, v = riga.split()
+            if k in ("oom", "oom_kill"):
+                out[k] = int(v)
+    except (OSError, ValueError):
+        pass
+    out["thread"] = threading.active_count()
+    return out
+
+
+def _salute_avvio() -> None:
+    """All'avvio: annota l'avvio e conserva l'ultima fotografia della vita precedente (se è finita male, si vede)."""
+    f, a = DATA / "salute.json", DATA / "avvii.json"
+    try:
+        prima = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        prima = {}
+    try:
+        avvii = json.loads(a.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        avvii = []
+    avvii = (avvii + [{"avvio": AVVIATO, "vita_prima": prima}])[-30:]
+    try:
+        _write_json(a, avvii)
+    except Exception:  # noqa: BLE001
+        pass
+
+    def giro():
+        while True:
+            try:
+                _write_json(f, {"ultimo": now().strftime("%Y-%m-%d %H:%M:%S"), "avvio": AVVIATO, **_mem_mb()})
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(5)
+    threading.Thread(target=giro, name="salute", daemon=True).start()
+
+
+def _fermato(signum, frame):  # noqa: ARG001
+    try:
+        d = json.loads((DATA / "salute.json").read_text(encoding="utf-8"))
+        d["fermato_da"] = f"segnale {signum}"
+        _write_json(DATA / "salute.json", d)
+    except Exception:  # noqa: BLE001
+        pass
+    raise SystemExit(0)
+
+
+def _avvii_recenti() -> dict:
+    try:
+        avvii = json.loads((DATA / "avvii.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    ultima_ora = [x for x in avvii if x.get("avvio", "") >= (now() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")]
+    return {"avvii_ultima_ora": len(ultima_ora), "ultimi": avvii[-3:]}
 
 
 async def health(_request):
@@ -2419,6 +2492,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     print(f"Segretario pronto: memoria in {MEMORIA}, URL del connettore in {DATA / 'connector-url'}", flush=True)
     started = True
+    _salute_avvio()
+    import signal
+    signal.signal(signal.SIGTERM, _fermato)
     if bot is not None:
         bot.start()
     else:
