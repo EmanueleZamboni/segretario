@@ -8,3 +8,4 @@ CONNECTOR_URL.txt
 whatsapp/node_modules/
 whatsapp/data/
 .claude/
+*.zip
