@@ -1635,7 +1635,13 @@ COOKIE_PATH = PUBLIC_PREFIX or "/"
 
 
 def _origine_ok(request) -> bool:
-    """Un modulo mandato da un altro sito (anche un sottodominio di emazamboni.com) viene rifiutato."""
+    """Un modulo mandato da un altro sito (anche un sottodominio di emazamboni.com) viene rifiutato.
+    Prima si guarda Sec-Fetch-Site, che il browser mette da solo e nessuna pagina può falsare: le nostre pagine
+    hanno Referrer-Policy no-referrer, quindi il browser manda "Origin: null" anche per i NOSTRI moduli (11/11:
+    Ema bloccato sulla pagina di accesso). Origin resta il controllo per i browser che non mandano Sec-Fetch-Site."""
+    sfs = request.headers.get("sec-fetch-site")
+    if sfs is not None:
+        return sfs in ("same-origin", "none")
     o = request.headers.get("origin")
     return o is None or o in ORIGINI_OK
 
@@ -1871,6 +1877,7 @@ def manager_html(msg_ok: str = "", msg_err: str = "") -> str:
     ]
     ultimi = backup_mod.elenco(DATA)
     sicurezza = {"blocco": BLOCCO.descrivi(), "browser": len(_devices()), "app": PROVIDER.collegamenti(),
+                 "tentativi": list(reversed(_tentativi_reg)),
                  "backup": ultimi[-1].name.replace("segretario-", "").replace(".tar.gz.age", "") if ultimi else ""}
     return pagine.impostazioni([(sez, ic, righe) for sez, (ic, righe) in sezioni.items()], stato_righe, msg_ok, msg_err, sicurezza)
 
@@ -2260,6 +2267,56 @@ inner.add_route(f"/{secret}/cruscotto.json", cruscotto_json, methods=["GET"])
 
 
 SEMPRE_APERTI = ("/health", "/blocco")
+_tentativi_reg: list[dict] = []  # ultime registrazioni OAuth: chi (IP), cosa chiedeva, com'è andata (Impostazioni)
+
+
+async def _registrazione(scope, receive, send) -> None:
+    """POST /register: se il client chiede solo authorization_code aggiunge refresh_token (l'SDK li vuole tutti e due,
+    e claude.ai rinnova i token comunque), poi annota il tentativo e l'esito."""
+    body = b""
+    while True:
+        msg = await receive()
+        body += msg.get("body", b"")
+        if not msg.get("more_body"):
+            break
+    info: dict = {"quando": now().strftime("%d/%m %H:%M")}
+    try:
+        meta = json.loads(body or b"{}")
+        gt = meta.get("grant_types")
+        if isinstance(gt, list) and "authorization_code" in gt and "refresh_token" not in gt:
+            meta["grant_types"] = [*gt, "refresh_token"]
+            body = json.dumps(meta).encode()
+        info["redirect"] = [str(u)[:80] for u in (meta.get("redirect_uris") or [])][:4]
+        info["grant_types"] = meta.get("grant_types")
+        info["metodo"] = meta.get("token_endpoint_auth_method")
+        info["nome"] = str(meta.get("client_name") or "")[:40]
+    except (ValueError, AttributeError):
+        info["errore"] = "corpo non JSON"
+    sent = {"done": False}
+
+    async def receive2():
+        if sent["done"]:
+            return {"type": "http.disconnect"}
+        sent["done"] = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send2(message):
+        if message["type"] == "http.response.start":
+            info["esito"] = message["status"]
+        elif message["type"] == "http.response.body" and info.get("esito", 200) >= 400:
+            info["motivo"] = message.get("body", b"")[:200].decode("utf-8", "replace")
+        await send(message)
+
+    hdrs = dict(scope.get("headers") or [])
+    scope = {**scope, "headers": [(k, v) for k, v in scope.get("headers", []) if k.lower() != b"content-length"]
+             + [(b"content-length", str(len(body)).encode())]}
+    try:
+        await inner(scope, receive2, send2)
+    finally:
+        info["ip"] = guardia.ip_cliente({k.decode("latin-1").lower(): v.decode("latin-1") for k, v in hdrs.items()},
+                                        (scope.get("client") or ("", 0))[0])
+        _tentativi_reg.append(info)
+        del _tentativi_reg[:-10]
 
 
 async def _rispondi(send, status: int, body: bytes, ctype: str) -> None:
@@ -2280,6 +2337,8 @@ async def app(scope, receive, send):
                     return await _rispondi(send, 503, b'{"errore": "Segretario spento da Ema"}', "application/json")
                 return await _rispondi(send, 503, pagine.chiuso(
                     f"{BLOCCO.descrivi()}. Per riaccendere: /riaccendi al bot Telegram.").encode(), "text/html; charset=utf-8")
+            if path == "/register" and scope.get("method") == "POST":
+                return await _registrazione(scope, receive, send)
             if path == f"/{secret}/mcp":
                 headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
                 ip = guardia.ip_cliente(headers, (scope.get("client") or ("", 0))[0])

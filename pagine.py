@@ -233,6 +233,11 @@ def impostazioni(sezioni: list[tuple[str, str, list[dict]]], stato_righe: list[t
             + (f"<p><b>Backup cifrato:</b> l'ultimo è del {esc(sicurezza['backup'])}. <a href=\"backup\">Scarica</a> "
                "(si apre solo con la tua chiave privata).</p>" if sicurezza.get("backup") else
                "<p><b>Backup cifrato:</b> il primo arriva pochi minuti dopo l'avvio, poi ogni notte.</p>")
+            + ("<details class=\"set\"><summary><div class=\"t\"><b>Ultimi tentativi di collegamento</b></div><span class=\"chev\">›</span></summary><div class=\"body\"><ul>"
+               + "".join(f"<li>{esc(t.get('quando', ''))} · {esc(t.get('esito', '?'))} · {esc(t.get('nome', ''))} · {esc(', '.join(t.get('redirect') or []))}"
+                         + (f" · <span class=\"muted\">{esc(t.get('motivo', ''))}</span>" if t.get('motivo') else "") + "</li>"
+                         for t in sicurezza.get("tentativi") or [])
+               + "</ul></div></details>" if sicurezza.get("tentativi") else "")
             + "<form method=\"post\"><div class=\"actions\">"
             "<button class=\"btn quiet\" type=\"submit\" name=\"azione\" value=\"scollega_app\">Scollega tutte le app di Claude</button>"
             "<button class=\"btn quiet\" type=\"submit\" name=\"azione\" value=\"scollega_browser\">Scollega tutti i browser</button>"

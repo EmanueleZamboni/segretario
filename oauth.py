@@ -44,9 +44,15 @@ def _h(token: str) -> str:
 
 
 def ritorno_ammesso(uri: str) -> bool:
+    """claude.ai / claude.com in https, le app Claude (schema claude:) e il ritorno locale delle app desktop
+    (http://localhost o 127.0.0.1, RFC 8252). Senza il codice dal Telegram di Ema nessuno arriva comunque al codice."""
     p = urlparse(str(uri))
     host = (p.hostname or "").lower()
-    return p.scheme == "https" and any(host == h or host.endswith("." + h) for h in HOST_RITORNO)
+    if p.scheme == "https":
+        return any(host == h or host.endswith("." + h) for h in HOST_RITORNO)
+    if p.scheme == "http":
+        return host in ("localhost", "127.0.0.1", "::1")
+    return p.scheme.startswith("claude")
 
 
 class Provider:

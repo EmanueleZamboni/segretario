@@ -78,6 +78,11 @@ def prove(bot, c, s):
     bad = c.post("/register", json={"redirect_uris": ["https://evil.example/cb"], "client_name": "x",
                                     "token_endpoint_auth_method": "none", "grant_types": ["authorization_code", "refresh_token"]})
     assert bad.status_code == 400, bad.text
+    # solo authorization_code: completato con refresh_token invece di rifiutare; il ritorno locale delle app desktop va bene
+    ok1 = c.post("/register", json={"redirect_uris": ["http://localhost:33418/callback"], "client_name": "Claude Desktop",
+                                    "token_endpoint_auth_method": "none", "grant_types": ["authorization_code"]})
+    assert ok1.status_code == 201 and "refresh_token" in ok1.json()["grant_types"], ok1.text
+    assert server._tentativi_reg[-1]["esito"] == 201 and server._tentativi_reg[-2]["esito"] == 400
     reg = c.post("/register", json={"redirect_uris": ["https://claude.ai/api/mcp/auth_callback"], "client_name": "Claude",
                                     "token_endpoint_auth_method": "none", "grant_types": ["authorization_code", "refresh_token"],
                                     "response_types": ["code"]})
@@ -96,9 +101,16 @@ def prove(bot, c, s):
     # codice sbagliato: niente
     p = c.post("/accesso", data={"r": rid, "azione": "consenti", "codice": "000000"}, follow_redirects=False)
     assert p.status_code == 200 and "sbagliato" in p.text
-    # da un altro sito: rifiutato
+    # da un altro sito: rifiutato (anche un sottodominio fratello), con o senza Sec-Fetch-Site
     p = c.post("/accesso", data={"r": rid, "azione": "consenti", "codice": "000000"}, headers={"origin": "https://evil.example"})
     assert p.status_code == 403
+    p = c.post("/accesso", data={"r": rid, "azione": "consenti", "codice": "000000"},
+               headers={"origin": "null", "sec-fetch-site": "same-site"})
+    assert p.status_code == 403
+    # il NOSTRO modulo: con no-referrer il browser manda Origin null, ma Sec-Fetch-Site dice same-origin
+    p = c.post("/accesso", data={"r": rid, "azione": "consenti", "codice": "000000"},
+               headers={"origin": "null", "sec-fetch-site": "same-origin"})
+    assert p.status_code == 200 and "sbagliato" in p.text
     # il codice vero arriva SOLO da /codice su Telegram
     tg(bot, "/codice")
     code6 = bot.ultimo().split("<b>")[1].split("</b>")[0]
