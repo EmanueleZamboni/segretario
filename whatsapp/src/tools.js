@@ -12,6 +12,8 @@ const LABELS = { image: 'photo', video: 'video', audio: 'audio', voice: 'voice n
   location: 'location', contact: 'contact card', poll: 'poll', event: 'event' };
 
 export const SEND_LIMIT = { max: 5, windowMs: 60_000 };
+export const SEND_PER_DAY = 30; // tetto giornaliero che resiste ai riavvii (contato nello store)
+export const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 export const MAX_SEND_CHARS = 4000;
 
 const text = s => ({ content: [{ type: 'text', text: s }] });
@@ -310,16 +312,24 @@ class Tools {
   async downloadMedia({ chat, message_id }) {
     const jid = await this.resolveChat(chat);
     const id = message_id.replace(/^#/, '');
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) throw new Error('Invalid message id.');
     const m = this.store.message(jid, id);
     if (!m) throw new Error(`No message ${id} in ${this.store.displayName(jid)}.`);
     if (!m.raw || !['image', 'video', 'audio', 'voice', 'document', 'sticker'].includes(m.type)) {
       throw new Error('That message has no downloadable media.');
     }
+    const msg = JSON.parse(m.raw)?.message || {};
+    const fl = msg[Object.keys(msg)[0]]?.fileLength;
+    const declared = typeof fl === 'object' && fl ? (fl.low >>> 0) + (fl.high >>> 0) * 4294967296 : Number(fl || 0);
+    if (declared > MAX_MEDIA_BYTES) throw new Error(`File too large to download here (${Math.round(declared / 1048576)} MB).`);
     const buffer = await this.liveWa.download(m.raw);
     const ext = m.file_name ? extname(m.file_name) : `.${(m.mime || 'application/octet-stream').split('/')[1].split(';')[0].replace('mpeg', 'mp3')}`;
-    const dir = join(this.dataDir, 'media', jid.split('@')[0]);
+    const mediaRoot = resolve(this.dataDir, 'media');
+    const dir = resolve(mediaRoot, jid.split('@')[0].replace(/[^A-Za-z0-9._-]/g, '_'));
+    if (!dir.startsWith(mediaRoot)) throw new Error('Invalid chat.');
     await mkdir(dir, { recursive: true });
-    const path = join(dir, `${id}${ext}`);
+    const path = resolve(dir, `${id}${ext.replace(/[^A-Za-z0-9.]/g, '')}`);
+    if (!path.startsWith(dir)) throw new Error('Invalid file name.');
     await writeFile(path, buffer);
     const content = [{ type: 'text', text: `Saved ${LABELS[m.type]} (${m.mime || '?'}, ${Math.round(buffer.length / 1024)} KB) to ${path}` }];
     const imageMime = m.mime?.split(';')[0];
@@ -364,8 +374,12 @@ class Tools {
     if (!message) throw new Error('text is empty');
     const wait = this.sendLimiter.retryAfter();
     if (wait > 0) throw new Error(`Send limit reached (${SEND_LIMIT.max} messages per minute). Try again in ${wait} s.`);
+    const dayKey = `sent:${new Date().toISOString().slice(0, 10)}`;
+    const today = Number(this.store.getMeta(dayKey) || 0);
+    if (today >= SEND_PER_DAY) throw new Error(`Daily send limit reached (${SEND_PER_DAY}). Ema can send from the phone.`);
     wa.requireConnection();
     this.sendLimiter.take();
+    this.store.setMeta(dayKey, today + 1);
     const id = await wa.sendText(jid, message);
     return text(`Sent to ${this.store.displayName(jid)} (${this.describeJid(jid)})${id ? `  #${id}` : ''}`);
   }

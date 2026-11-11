@@ -120,6 +120,7 @@ export function describeMessage(message) {
       mime: inner.mimetype || undefined,
       fileName: inner.fileName || undefined,
       seconds: inner.seconds || undefined,
+      bytes: Number(inner.fileLength || 0) || undefined,
       quotedId,
       media: true,
     };

@@ -9,6 +9,8 @@
 import { TRANSCRIPT_PREFIX } from './util.js';
 
 export const MAX_VOICE_SECONDS = 10 * 60;
+export const MAX_VOICE_BYTES = 8 * 1024 * 1024;
+export const MAX_PER_ORA = 60; // vocali trascritti da soli in un'ora: oltre, si aspetta (costi, memoria)
 
 export class Transcriber {
   /**
@@ -31,6 +33,7 @@ export class Transcriber {
     this.timeoutMs = timeoutMs;
     this.chain = Promise.resolve(); // la coda: un vocale alla volta
     this.stats = { done: 0, failed: 0, skipped: 0 };
+    this.ora = [];
   }
 
   get enabled() {
@@ -43,6 +46,19 @@ export class Transcriber {
    */
   handle(record) {
     if (!this.enabled || !record || record.type !== 'voice' || !record.raw) return Promise.resolve(false);
+    if (record.bytes && record.bytes > MAX_VOICE_BYTES) {
+      this.stats.skipped++;
+      this.log(`vocale ${record.id} saltato: ${record.bytes} byte`);
+      return Promise.resolve(false);
+    }
+    const now = Date.now();
+    this.ora = this.ora.filter(t => now - t < 3_600_000);
+    if (this.ora.length >= MAX_PER_ORA) {
+      this.stats.skipped++;
+      this.log(`vocale ${record.id} saltato: più di ${MAX_PER_ORA} vocali in un'ora`);
+      return Promise.resolve(false);
+    }
+    this.ora.push(now);
     if (record.seconds && record.seconds > this.maxSeconds) {
       this.stats.skipped++;
       this.log(`vocale ${record.id} saltato: ${record.seconds}s > ${this.maxSeconds}s`);

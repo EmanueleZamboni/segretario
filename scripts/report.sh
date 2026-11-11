@@ -1,8 +1,6 @@
 #!/bin/bash
-# Scrive lo stato del Segretario (container, ultime righe di log, URL del connettore) dove Ema e Claude
-# possono leggerlo senza entrare nella VM: in STATUS.txt qui accanto e, se Postino è sulla stessa macchina,
-# in postino/data/ops/keep-url, che Postino mostra in Impostazioni > Claude e serve su /api/ops/keep/url.
-# Postino cancella quel file da solo dopo 24 ore. Contiene l'URL del connettore (un segreto): va letto e tolto.
+# Scrive lo stato del Segretario (container, ultime righe di log) in STATUS.txt qui accanto. NESSUN segreto:
+# niente URL del connettore, e niente copia in Postino (prima finiva in postino/data/ops/keep-url, leggibile da Postino).
 set -uo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -23,16 +21,6 @@ OUT="$HERE/STATUS.txt"
   crontab -l 2>/dev/null | grep -c segretario
   echo "== chiavi in .env (solo nomi)"
   grep -oE '^[A-Z_]+=' "$HERE/.env" 2>/dev/null | tr -d '=' | tr '\n' ' '; echo
-  echo "== connettore (dal container: /data/connector-url)"
-  (cd "$HERE" && $DOCKER compose exec -T segretario cat /data/connector-url 2>&1 | tail -n 3)
-  if [ -f "$HERE/CONNECTOR_URL.txt" ]; then
-    echo "== connettore (da .env)"
-    cat "$HERE/CONNECTOR_URL.txt"
-  fi
 } > "$OUT" 2>&1
 chmod 600 "$OUT"
-OPS="$HOME/various/postino/data/ops"
-if [ -d "$OPS" ] && [ -w "$OPS" ]; then
-  install -m 600 "$OUT" "$OPS/keep-url" && echo "segretario: stato scritto in $OPS/keep-url (Postino > Impostazioni > Claude)"
-fi
 echo "segretario: stato scritto in $OUT"

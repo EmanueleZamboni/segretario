@@ -190,13 +190,15 @@ def hub(gruppi: list[tuple[str, list[tuple[str, str, str, str, str]]]], stato: d
     parts = ["<h1>Hub</h1><p class=\"sub\">Tutto in un posto. Pagina privata.</p>"]
     for titolo, items in gruppi:
         parts.append(f"<h2>{esc(titolo)}</h2><div class=\"keys\">" + "".join(key(*it) for it in items) + "</div>")
-    parts.append("<h2>Codice di approvazione</h2><div class=\"card\"><p>Quando il Segretario propone una regola, in chat scrivi \"approva\" e questo codice. Vale anche per \"approva tutte le regole proposte\".</p>"
-                 f'<span class="code">{esc(codice)}</span>'
-                 "<p class=\"muted\" style=\"margin-top:12px\">Per aggiungere un tasto qui: dillo al Segretario in chat, \"aggiungi all'hub il sito X, indirizzo https://...\".</p></div>")
+    parts.append("<h2>Regole e pulsanti</h2><div class=\"card\"><p>Quando il Segretario propone una regola, scrivi "
+                 "<b>/approva</b> al bot Telegram: ti manda un codice di 6 cifre che vale 10 minuti. Dallo a Claude in chat, "
+                 "\"approva, codice ...\". Lo stesso codice serve per aggiungere un tasto a questa pagina.</p></div>")
+    parts.append(EMERGENZA)
     return shell("Hub · Segretario", "".join(parts), current="hub")
 
 
-def impostazioni(sezioni: list[tuple[str, str, list[dict]]], stato_righe: list[tuple[str, str]], msg_ok: str, msg_err: str) -> str:
+def impostazioni(sezioni: list[tuple[str, str, list[dict]]], stato_righe: list[tuple[str, str]], msg_ok: str, msg_err: str,
+                 sicurezza: dict | None = None) -> str:
     """sezioni: (titolo, icona, [riga]) con riga = {key, label, hint, kind, is_set, shown, placeholder}."""
     parts = ["<h1>Impostazioni</h1><p class=\"sub\">Le chiavi e gli interruttori del Segretario. I valori non escono mai da qui.</p>"]
     if msg_ok:
@@ -221,7 +223,49 @@ def impostazioni(sezioni: list[tuple[str, str, list[dict]]], stato_righe: list[t
     if stato_righe:
         parts.append("<h2>Adesso</h2><div class=\"card\"><div class=\"rows\">" + "".join(
             f'<div class="row"><div class="t"><b>{esc(a)}</b></div><span class="pill">{esc(b)}</span></div>' for a, b in stato_righe) + "</div></div>")
+    if sicurezza is not None:
+        app = sicurezza.get("app") or []
+        elenco = "".join(f"<li>{esc(a['app'])} <span class=\"muted\">dal {esc(a['dal'])}</span></li>" for a in app) or "<li class=\"muted\">nessuna</li>"
+        parts.append(
+            "<h2>Sicurezza</h2><div class=\"card\">"
+            f"<p><b>Stato:</b> {esc(sicurezza.get('blocco', ''))}</p>"
+            f"<p><b>Browser fidati:</b> {int(sicurezza.get('browser', 0))}. <b>App di Claude collegate:</b></p><ul>{elenco}</ul>"
+            "<form method=\"post\"><div class=\"actions\">"
+            "<button class=\"btn quiet\" type=\"submit\" name=\"azione\" value=\"scollega_app\">Scollega tutte le app di Claude</button>"
+            "<button class=\"btn quiet\" type=\"submit\" name=\"azione\" value=\"scollega_browser\">Scollega tutti i browser</button>"
+            "</div></form></div>" + EMERGENZA)
     return shell("Impostazioni · Segretario", "".join(parts), current="manager")
+
+
+EMERGENZA = ("<h2>Emergenza</h2><div class=\"card\"><details><summary class=\"btn danger\">Spegni tutto</summary>"
+             "<p style=\"margin-top:12px\">Chiude subito Segretario, WhatsApp, Keep, Postino e link manager per tutti, Claude "
+             "compreso. I dati restano. Si riapre solo scrivendo <b>/riaccendi</b> al bot Telegram. Anche da telefono, "
+             "senza questa pagina: <b>/spegni</b> al bot.</p>"
+             "<form method=\"post\"><button class=\"btn danger\" type=\"submit\" name=\"azione\" value=\"spegni\">Sì, spegni tutto adesso</button></form>"
+             "</details></div>")
+
+
+def chiuso(msg: str) -> str:
+    """Pagina senza menu: Segretario spento, Telegram mancante, richiesta rifiutata."""
+    body = f"<div class=\"otp\"><div class=\"card\"><h1>Chiuso</h1><p class=\"sub\">{esc(msg)}</p></div></div>"
+    return ("<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            f"<meta name=\"robots\" content=\"noindex\"><title>Segretario</title><style>{TOKENS_CSS}</style></head><body><main>{body}</main></body></html>")
+
+
+def accesso(app: str, msg: str, rid: str) -> str:
+    """La pagina che claude.ai apre per collegarsi: senza il codice dal Telegram di Ema non entra nessuno."""
+    err = f'<div class="msg err">{esc(msg)}</div>' if msg else ""
+    if not rid:
+        return chiuso(msg or "Richiesta non valida.")
+    body = (f"<div class=\"otp\"><div class=\"card\"><h1>Collegare {esc(app)}?</h1>"
+            "<p class=\"sub\">Chiede di entrare nel tuo Segretario: memoria, WhatsApp, Keep, Instagram. Se l'hai chiesto tu, "
+            "scrivi <b>/codice</b> al bot Telegram e copia qui le 6 cifre. Se non sei stato tu, premi Rifiuta.</p>" + err
+            + f'<form method="post"><input type="hidden" name="r" value="{esc(rid)}">'
+            '<input type="text" name="codice" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" placeholder="······" aria-label="codice" autofocus>'
+            '<div class="actions"><button class="btn" type="submit" name="azione" value="consenti">Collega</button>'
+            '<button class="btn quiet" type="submit" name="azione" value="rifiuta" formnovalidate>Rifiuta</button></div></form></div></div>')
+    return ("<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            f"<meta name=\"robots\" content=\"noindex\"><title>Collegare il Segretario</title><style>{TOKENS_CSS}</style></head><body><main>{body}</main></body></html>")
 
 
 def codice(msg: str = "") -> str:

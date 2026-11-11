@@ -9,7 +9,7 @@ HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 DATA = Path(tempfile.mkdtemp(prefix="segretario-otp-"))
 os.environ.update({"SEGRETARIO_DATA": str(DATA), "SEGRETARIO_PUBLIC_HOST": "127.0.0.1", "SEGRETARIO_EXTRA_HOSTS": "testserver",
-                   "TELEGRAM_BOT_TOKEN": "", "ROUTINE_FIRE_URL": "", "GROQ_API_KEY": "", "SEGRETARIO_PUBLIC_PREFIX": ""})
+                   "TELEGRAM_BOT_TOKEN": "", "ROUTINE_FIRE_URL": "", "GROQ_API_KEY": "", "SEGRETARIO_PUBLIC_PREFIX": "", "SEGRETARIO_OAUTH": "0"})
 
 from starlette.testclient import TestClient  # noqa: E402
 
@@ -29,9 +29,10 @@ class FakeTelegram(telegram_bot.Telegram):
 
 def main():
     s = server.secret
-    # 1. senza Telegram: nessun secondo fattore possibile, la pagina si apre con il solo segreto
+    # 1. senza Telegram le pagine restano CHIUSE (prima si aprivano con il solo segreto)
     c = TestClient(server.app, base_url="http://testserver")
-    assert c.get(f"/{s}/manager").status_code == 200 and c.get(f"/{s}/cruscotto").status_code == 200
+    assert c.get(f"/{s}/manager").status_code == 503 and c.get(f"/{s}/cruscotto").status_code == 503
+    assert c.get(f"/{s}/cruscotto.json").status_code == 401
     # 2. con Telegram collegato: la pagina non manda MAI niente (è pubblica); il codice lo chiede Ema con /codice
     bot = FakeTelegram("TOKEN", DATA, server.make_bot("x").hooks, chat_id="42", daily_cap=50, pair_code="abc123")
     server.bot = bot
@@ -59,7 +60,7 @@ def main():
     assert r.status_code == 401 and "sbagliato" in r.text
     r = c.post(f"/{s}/manager", data={"azione": "verifica", "codice": code}, follow_redirects=False)
     assert r.status_code == 303 and server.DEVICE_COOKIE in r.headers.get("set-cookie", "")
-    assert "HttpOnly" in r.headers["set-cookie"] and f"Path={server.PUBLIC_PREFIX}/{s}" in r.headers["set-cookie"]
+    assert "HttpOnly" in r.headers["set-cookie"] and "Path=/" in r.headers["set-cookie"]
     assert c.get(f"/{s}/manager").status_code == 200 and "Vocali in testo" in c.get(f"/{s}/manager").text
     assert c.get(f"/{s}/cruscotto").status_code == 200
     # 4. il modulo del manager funziona ancora con il cookie

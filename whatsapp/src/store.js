@@ -206,8 +206,11 @@ export class Store {
 
   // ---- letture ----------------------------------------------------------------
 
-  rawMessage(id) {
-    return this.stmt('SELECT raw FROM messages WHERE id = ? AND raw IS NOT NULL LIMIT 1').get(id)?.raw;
+  /** Solo messaggi mandati da Ema, solo nella chat indicata (Baileys li chiede per rimandarli a chi non li ha ricevuti). */
+  rawMessage(id, chat) {
+    if (!chat) return undefined;
+    return this.stmt('SELECT raw FROM messages WHERE id = ? AND chat = ? AND from_me = 1 AND raw IS NOT NULL LIMIT 1')
+      .get(id, this.canonical(chat))?.raw;
   }
 
   displayName(jid) {

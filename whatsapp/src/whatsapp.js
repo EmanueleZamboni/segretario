@@ -87,7 +87,7 @@ export class WhatsApp extends EventEmitter {
       syncFullHistory: true,
       markOnlineOnConnect: false, // restiamo "offline" così il telefono continua a ricevere le notifiche
       getMessage: async key => {
-        const raw = this.store.rawMessage(key.id);
+        const raw = this.store.rawMessage(key.id, key.remoteJid);
         return raw ? JSON.parse(raw, BufferJSON.reviver).message : undefined;
       },
     });
@@ -320,6 +320,7 @@ export class WhatsApp extends EventEmitter {
       fileName: desc.fileName,
       quotedId: desc.quotedId,
       seconds: desc.seconds,
+      bytes: desc.bytes,
       raw: desc.media
         ? JSON.stringify({ key, message: msg.message, messageTimestamp: msg.messageTimestamp }, BufferJSON.replacer)
         : undefined,

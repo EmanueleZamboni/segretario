@@ -16,6 +16,12 @@ services:
       - SEGRETARIO_PUBLIC_HOST=${SEGRETARIO_PUBLIC_HOST:-postino.emazamboni.com}
       - SEGRETARIO_PUBLIC_PREFIX=/segretario
       - SEGRETARIO_SECRET=${SEGRETARIO_SECRET:-}
+      # Login (OAuth) sul connettore: 1 = acceso. 0 solo per emergenza (torna il solo segreto nell'indirizzo).
+      - SEGRETARIO_OAUTH=${SEGRETARIO_OAUTH:-1}
+      # Token SOLO per la trascrizione chiesta dal container WhatsApp (lo genera install.sh)
+      - TRASCRIVI_TOKEN=${TRASCRIVI_TOKEN:-}
+      # Reti in più da trattare come Anthropic, se un giorno Anthropic ne aggiunge (separate da virgola)
+      - SEGRETARIO_IP_FIDATI=${SEGRETARIO_IP_FIDATI:-}
       # Solo per mostrare nel manager il link della pagina WhatsApp (il servizio è whatsapp/)
       - WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
       # Keep letto dal server per il brief del mattino (li scrive ops/run.sh di Various nel .env)
@@ -46,6 +52,7 @@ services:
       - ALL
     expose:
       - "8766"
+    mem_limit: 768m
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8766/health',timeout=3).status==200 else 1)"]
       interval: 30s
@@ -66,8 +73,8 @@ services:
         max-file: "3"
     environment:
       - MCP_TOKEN=${WHATSAPP_TOKEN:-}
-      # Vocali WhatsApp -> testo tramite il Segretario (POST <SEGRETARIO_URL>/trascrivi); vuoto = spento
-      - SEGRETARIO_URL=${SEGRETARIO_URL:-}
+      # Vocali WhatsApp -> testo tramite il Segretario, con un token che serve SOLO a quello (non il segreto)
+      - SEGRETARIO_URL=http://segretario:8766/t/${TRASCRIVI_TOKEN:-spento}
       - TZ=Europe/Rome
     volumes:
       - whatsapp_data:/data
@@ -80,6 +87,7 @@ services:
       - ALL
     expose:
       - "8787"
+    mem_limit: 768m
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s

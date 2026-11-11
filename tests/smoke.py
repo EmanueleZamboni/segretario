@@ -73,13 +73,11 @@ async def run(url: str, data: Path, secret: str) -> None:
             r = await s.call_tool("proposta_decidi", {"id": pid, "approva": True, "codice": "sbagliato"})
             assert r.isError, "senza il codice giusto non si approva"
             r = await s.call_tool("proposta_decidi", {"id": pid, "approva": True, "codice": codice})
-            assert not r.isError, text(r)
+            assert r.isError and "/approva" in text(r), "le 6 lettere fisse del segreto non approvano più (serve /approva su Telegram)"
             r = await s.call_tool("memoria_leggi", {"nome": "regole"})
-            assert "Non proporre mai Obsidian" in text(r)
+            assert "Obsidian" not in text(r)
             r = await s.call_tool("nota_proponi", {"file": "persone", "testo": "Pablo · gli spedisce un lettore"})
             assert not r.isError, text(r)
-            r = await s.call_tool("proposta_decidi", {"id": (r.structuredContent or json.loads(text(r)))["id"], "approva": False, "codice": codice})
-            assert "scartata" in text(r)
             r = await s.call_tool("materiale_aggiungi", {"progetto": "Segretario", "titolo": "x", "link": "https://evil' onmouseover='1"})
             assert r.isError, "un link con apici non deve entrare"
 
@@ -150,7 +148,7 @@ async def run(url: str, data: Path, secret: str) -> None:
 
             r = await s.call_tool("stato", {})
             st = r.structuredContent or json.loads(text(r))
-            assert st["sessioni_che_aspettano_ema"] == 1 and st["proposte_in_attesa"] == 0, st
+            assert st["sessioni_che_aspettano_ema"] == 1 and st["proposte_in_attesa"] == 2 and st["blocco"] == "acceso", st
             print("stato:", st)
 
     log = subprocess.run(["git", "log", "--oneline"], cwd=data / "memoria", capture_output=True, text=True).stdout
@@ -164,7 +162,7 @@ async def run(url: str, data: Path, secret: str) -> None:
 def main() -> None:
     data = Path(tempfile.mkdtemp(prefix="segretario-test-"))
     env = {**os.environ, "SEGRETARIO_DATA": str(data), "SEGRETARIO_PUBLIC_HOST": "127.0.0.1",
-           "SEGRETARIO_EXTRA_HOSTS": f"127.0.0.1:{PORT},localhost:{PORT}", "PORT": str(PORT), "BIND": "127.0.0.1"}
+           "SEGRETARIO_EXTRA_HOSTS": f"127.0.0.1:{PORT},localhost:{PORT}", "PORT": str(PORT), "BIND": "127.0.0.1", "SEGRETARIO_OAUTH": "0"}
     proc = subprocess.Popen([sys.executable, str(HERE / "server.py")], env=env)
     try:
         wait_health(f"http://127.0.0.1:{PORT}/health")
@@ -177,6 +175,15 @@ def main() -> None:
             assert e.code in (404, 405), e.code
         print("percorso sbagliato: 404 ok")
         asyncio.run(run(f"http://127.0.0.1:{PORT}/{secret}/mcp", data, secret))
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{PORT}/{secret}/cruscotto", timeout=5)
+            raise SystemExit("senza Telegram e senza browser fidato le pagine devono restare chiuse")
+        except urllib.error.HTTPError as e:
+            assert e.code == 503, e.code
+        (data / "dispositivi.json").write_text(json.dumps({"fidato": {"dal": time.time()}}))
+        opener = urllib.request.build_opener()
+        opener.addheaders = [("Cookie", "seg_dispositivo=fidato")]
+        urllib.request.install_opener(opener)
         with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/{secret}/cruscotto", timeout=5) as r:
             html = r.read().decode("utf-8")
             csp = r.headers.get("Content-Security-Policy", "")

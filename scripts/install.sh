@@ -41,10 +41,15 @@ if ! grep -q '^WHATSAPP_TOKEN=' "$ENVF"; then
   (umask 077; printf '# WhatsApp: segreto nell'"'"'URL del connettore e della pagina /stato (generato una volta)\nWHATSAPP_TOKEN=%s\n' "$WTOKEN" >> "$ENVF")
   say "WHATSAPP_TOKEN added to .env"
 fi
-if ! grep -q '^SEGRETARIO_URL=' "$ENVF"; then
-  CUR_SECRET="$(grep -E '^SEGRETARIO_SECRET=' "$ENVF" | cut -d= -f2-)"
-  (umask 077; printf '# Vocali WhatsApp -> testo: il Segretario visto dal container whatsapp (vuoto = spento)\nSEGRETARIO_URL=http://segretario:8766/%s\n' "$CUR_SECRET" >> "$ENVF")
-  say "SEGRETARIO_URL added to .env"
+# Il container WhatsApp non deve conoscere il segreto del Segretario: per la trascrizione ha un token suo.
+if ! grep -q '^TRASCRIVI_TOKEN=' "$ENVF"; then
+  TTOKEN="$(head -c 48 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' | cut -c1-43)"
+  (umask 077; printf '# Vocali WhatsApp -> testo: token che serve SOLO alla trascrizione (generato una volta)\nTRASCRIVI_TOKEN=%s\n' "$TTOKEN" >> "$ENVF")
+  say "TRASCRIVI_TOKEN added to .env"
+fi
+if grep -q '^SEGRETARIO_URL=' "$ENVF"; then
+  sed -i '/^SEGRETARIO_URL=/d; /^# Vocali WhatsApp -> testo: il Segretario visto dal container whatsapp/d' "$ENVF"
+  say "SEGRETARIO_URL (con il segreto) tolto da .env"
 fi
 
 # 2c. Il database di Postino per le email nel brief (sola lettura): la cartella data di Postino sulla stessa VM.

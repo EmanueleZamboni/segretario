@@ -11,7 +11,8 @@ HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 DATA = Path(tempfile.mkdtemp(prefix="segretario-mgr-"))
 os.environ.update({"SEGRETARIO_DATA": str(DATA), "SEGRETARIO_PUBLIC_HOST": "127.0.0.1", "SEGRETARIO_EXTRA_HOSTS": "testserver",
-                   "TELEGRAM_BOT_TOKEN": "", "ROUTINE_FIRE_URL": "", "GROQ_API_KEY": "", "OPENAI_API_KEY": "", "LINKS_STATS_KEY": ""})
+                   "TELEGRAM_BOT_TOKEN": "", "ROUTINE_FIRE_URL": "", "GROQ_API_KEY": "", "OPENAI_API_KEY": "", "LINKS_STATS_KEY": "",
+                   "SEGRETARIO_OAUTH": "0", "TRASCRIVI_TOKEN": "tt"})
 
 from starlette.testclient import TestClient  # noqa: E402
 
@@ -22,6 +23,11 @@ import telegram_bot  # noqa: E402
 def main():
     c = TestClient(server.app, base_url="http://testserver")
     s = server.secret
+    # le pagine si aprono solo a un browser fidato (senza Telegram restano chiuse a tutti gli altri)
+    assert c.get(f"/{s}/manager").status_code == 503
+    import time
+    server._write_json(server.DATA / "dispositivi.json", {"fidato": {"dal": time.time()}})
+    c.cookies.set(server.DEVICE_COOKIE, "fidato")
     # 1. la pagina esiste solo con il segreto, non ha script, elenca le chiavi
     assert c.get("/nope/manager").status_code in (404, 405)
     r = c.get(f"/{s}/manager")
@@ -41,54 +47,82 @@ def main():
     assert "chiave sconosciuta" in r.text
     # 3. /trascrivi: 503 senza chiave, poi il testo con un trascrittore finto
     os.environ.pop("GROQ_API_KEY")
-    assert c.post(f"/{s}/trascrivi", content=b"OggS", headers={"content-type": "audio/ogg"}).status_code == 503
+    assert c.post(f"/{s}/trascrivi", content=b"OggS").status_code in (404, 405), "la vecchia rotta col segreto non esiste più"
+    assert c.post("/t/sbagliato/trascrivi", content=b"OggS").status_code == 404
+    assert c.post("/t/tt/trascrivi", content=b"OggS", headers={"x-forwarded-for": "1.2.3.4"}).status_code == 404, "da internet: no"
+    assert c.post("/t/tt/trascrivi", content=b"OggS", headers={"content-type": "audio/ogg"}).status_code == 503
     os.environ["GROQ_API_KEY"] = "gsk_provaprovaprova"
     seen = []
     telegram_bot.transcribe_bytes = lambda data, filename="voice", mime="audio/ogg": seen.append((len(data), mime)) or "ci vediamo alle nove"
-    r = c.post(f"/{s}/trascrivi", content=b"OggS fake", headers={"content-type": "audio/ogg; codecs=opus"})
+    r = c.post("/t/tt/trascrivi", content=b"OggS fake", headers={"content-type": "audio/ogg; codecs=opus"})
     assert r.status_code == 200 and r.json() == {"testo": "ci vediamo alle nove"} and seen == [(9, "audio/ogg; codecs=opus")]
-    assert c.post(f"/{s}/trascrivi", content=b"", headers={"content-type": "audio/ogg"}).status_code == 400
+    assert c.post("/t/tt/trascrivi", content=b"", headers={"content-type": "audio/ogg"}).status_code == 400
     # 4. vocali Instagram: l'allegato audio viene scaricato e trascritto una volta sola (cache per id)
     import httpx
     calls = []
 
     class FakeResp:
-        content = b"AUDIO"
+        status_code = 200
         headers = {"content-type": "audio/mp4"}
 
         def raise_for_status(self):
             pass
 
-    httpx.get = lambda url, **kw: calls.append(url) or FakeResp()
-    msgs = [{"id": "m1", "text": "", "attachments": [{"type": "audio", "mime": "audio/mp4", "url": "https://cdn/x.m4a"}]},
+        def iter_bytes(self):
+            yield b"AUDIO"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    httpx.stream = lambda method, url, **kw: calls.append(url) or FakeResp()
+    bad = [{"id": "mx", "text": "", "attachments": [{"type": "audio", "url": "https://evil.example/x.m4a"}]}]
+    os.environ["GROQ_API_KEY"] = "gsk_provaprovaprova"
+    server._ig_trascrivi(bad)
+    assert "non di Instagram" in bad[0]["vocale"] and calls == [], "solo dai server di Meta"
+    msgs = [{"id": "m1", "text": "", "attachments": [{"type": "audio", "mime": "audio/mp4", "url": "https://cdn.fbcdn.net/x.m4a"}]},
             {"id": "m2", "text": "ciao", "attachments": []}]
     server._ig_trascrivi(msgs)
-    assert msgs[0]["vocale"] == "ci vediamo alle nove" and "vocale" not in msgs[1] and calls == ["https://cdn/x.m4a"]
-    server._ig_trascrivi([{"id": "m1", "text": "", "attachments": [{"type": "audio", "url": "https://cdn/x.m4a"}]}])
-    assert calls == ["https://cdn/x.m4a"], "la seconda volta viene dalla cache"
+    assert msgs[0]["vocale"] == "ci vediamo alle nove" and "vocale" not in msgs[1] and calls == ["https://cdn.fbcdn.net/x.m4a"]
+    server._ig_trascrivi([{"id": "m1", "text": "", "attachments": [{"type": "audio", "url": "https://cdn.fbcdn.net/x.m4a"}]}])
+    assert calls == ["https://cdn.fbcdn.net/x.m4a"], "la seconda volta viene dalla cache"
     assert json.loads((DATA / "ig_vocali.json").read_text())["m1"] == "ci vediamo alle nove"
     os.environ.pop("GROQ_API_KEY")
     m = [{"id": "m3", "text": "", "attachments": [{"type": "audio", "url": "https://cdn/y.m4a"}]}]
     server._ig_trascrivi(m)
-    assert "manca la chiave Groq" in m[0]["vocale"] and calls == ["https://cdn/x.m4a"]
+    assert "manca la chiave Groq" in m[0]["vocale"] and calls == ["https://cdn.fbcdn.net/x.m4a"]
     # 5. hub: pagina con i pulsanti, link relativi per manager/cruscotto/whatsapp, pulsanti aggiunti dalla chat
     r = c.get(f"/{s}/hub")
     assert r.status_code == 200 and 'href="manager"' in r.text and 'href="cruscotto"' in r.text and 'href="whatsapp"' in r.text
-    assert "links.emazamboni.com/admin" in r.text and "postino.emazamboni.com" in r.text and server.secret[:6] in r.text
-    server.hub_link_aggiungi("Punti Vacanza", "https://punti.example.com", nota="i punti delle vacanze")
+    assert "links.emazamboni.com/admin" in r.text and "postino.emazamboni.com" in r.text and server.secret[:6] not in r.text
+    assert "Spegni tutto" in r.text and "/approva" in r.text
+    try:
+        server.hub_link_aggiungi("Punti Vacanza", "https://punti.example.com")
+        raise SystemExit("senza codice di approvazione non si aggiunge")
+    except PermissionError:
+        pass
+    server._approvazione_nuova()
+    codice = server._appr["codice"]
+    server.hub_link_aggiungi("Punti Vacanza", "https://punti.example.com", nota="i punti delle vacanze", codice=codice)
     r = c.get(f"/{s}/hub")
     assert "Punti Vacanza" in r.text and "punti.example.com" in r.text
     server.hub_link_togli("punti vacanza")
     assert "Punti Vacanza" not in c.get(f"/{s}/hub").text
     try:
-        server.hub_link_aggiungi("x", "http://no")
+        server.hub_link_aggiungi("x", "http://no", codice=codice)
         raise SystemExit("solo https")
     except ValueError:
         pass
-    assert c.get(f"/{s}/whatsapp").status_code == 404, "senza WHATSAPP_TOKEN"
-    os.environ["WHATSAPP_TOKEN"] = "tok"
     r = c.get(f"/{s}/whatsapp", follow_redirects=False)
-    assert r.status_code == 302 and r.headers["location"].endswith("/whatsapp/mcp/tok/stato")
+    assert r.status_code == 303 and r.headers["location"] == "whatsapp/stato", "nessun token WhatsApp al browser"
+    assert c.get(f"/{s}/whatsapp/stato").status_code == 404, "senza WHATSAPP_TOKEN"
+    # moduli da un altro sito: rifiutati
+    r = c.post(f"/{s}/manager", data={"chiave": "BRIEF_ORA", "valore": "06:00", "azione": "salva"}, headers={"origin": "https://links.emazamboni.com"})
+    assert r.status_code == 403 and server.stato()["brief_ora"] == "spento"
+    # /config non esiste più (scavalcava il codice Telegram)
+    assert c.post(f"/{s}/config", json={"TELEGRAM_BOT_TOKEN": ""}).status_code in (404, 405)
     # calendari: campo visibile, una riga per indirizzo
     os.environ["CALENDAR_ICS_URL"] = "https://a/basic.ics https://b/basic.ics"
     r = c.get(f"/{s}/manager")
