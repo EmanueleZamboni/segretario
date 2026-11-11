@@ -171,6 +171,11 @@ body{margin:0;background:#000;overflow:hidden}
 #voce-root #hal{position:relative;overflow:hidden}
 #voce-root #hal::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:calc(var(--p,0)*100%);background:#ff3b3b;box-shadow:0 0 8px #ff3b3b;transition:width .9s linear}
 #voce-root #hal.carica{animation:none;color:#ff8f8f;border-color:#ff3b3b}
+#voce-root #hal.pausa{color:var(--amber);border-color:var(--amber);box-shadow:0 0 10px -3px var(--amber)}
+#voce-root #halspegni{min-width:0;padding:9px 10px;font-size:13px;line-height:10px;color:#ff6b6b;border-color:rgba(255,80,80,.55)}
+#voce-root #halspegni:hover{color:#fff;border-color:#ff3b3b;box-shadow:0 0 12px -2px #ff3b3b}
+#voce-root #halspegni[hidden],#voce-root #halvel[hidden]{display:none}
+#voce-root #halvel{min-width:0;padding:9px 9px;letter-spacing:.06em;text-transform:none}
 /* quanto è occupata la scheda video */
 #voce-root .gpu{display:flex;align-items:center;gap:8px;font:400 10px/1 "Space Mono",monospace;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
 #voce-root .gpu[hidden]{display:none}
@@ -212,7 +217,9 @@ body{margin:0;background:#000;overflow:hidden}
       <button type="button" data-m="live" aria-pressed="false" title="Conversazione con la voce di Claude">Live</button>
       <button type="button" class="chatnorm" id="chatnorm" title="Nascondi la Voce e usa la chat normale">Chat normale</button>
       <button type="button" id="lingua" title="Lingua in cui parli al microfono">MIC IT</button>
-      <button type="button" id="hal" title="Voce HAL (sul PC): accesa usa la scheda video, spenta parla la voce di Claude" aria-pressed="false">HAL</button>
+      <button type="button" id="hal" title="Voce HAL: un clic la accende, poi la mette in pausa (parla Claude) e la riprende subito" aria-pressed="false">HAL OFF</button>
+      <button type="button" id="halvel" title="Velocità della voce HAL: un clic per cambiarla" hidden>1.5×</button>
+      <button type="button" id="halspegni" title="Spegni HAL del tutto: libera memoria e scheda video (riaccenderlo richiede circa 20 secondi)" aria-label="Spegni HAL del tutto" hidden>⏻</button>
     </div>
     <div class="cmd">
       <div class="tasto">

@@ -33,7 +33,10 @@ const SENZA_SEGNI = " (rispondi subito e in breve; strumenti solo se indispensab
 const S = { modo: "voce", fase: "riposo", muto: false, hal: false, lingua: "it-IT", turno: 0, richiesta: null, liveOn: false, voce: "", storia: [], avviato: false };
 try { const m = localStorage.getItem("voce.modo"); if (["testo", "voce", "live"].includes(m)) S.modo = m; } catch (_) {}
 try { S.lingua = localStorage.getItem("voce.lingua") || CFG.lingua || "it-IT"; } catch (_) {}
-try { S.hal = localStorage.getItem("voce.hal") === "1"; } catch (_) {}
+let halSalvato = "0";
+const HAL_VELOCITA = [1, 1.25, 1.5, 1.75];
+let halVel = 1.5; try { const v = parseFloat(localStorage.getItem("voce.halvel")); if (HAL_VELOCITA.includes(v)) halVel = v; } catch (_) {}
+try { halSalvato = localStorage.getItem("voce.hal") || "0"; S.hal = halSalvato === "1"; } catch (_) {}
 try { S.storia = JSON.parse(sessionStorage.getItem("voce.storia") || "[]").slice(-30); } catch (_) { S.storia = []; }
 const salva = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
 function ricorda(chi, testo) { S.storia.push({ chi, testo }); S.storia = S.storia.slice(-30); try { sessionStorage.setItem("voce.storia", JSON.stringify(S.storia)); } catch (_) {} }
@@ -178,11 +181,16 @@ const Hal = {
   async get(via, ms) { const r = await fetch(this.url + via, { signal: AbortSignal.timeout(ms || 2000) }); return r.json(); },
   disegna(stato, p) {
     const b = $("#hal"); if (!b) return;
+    const carica = stato === "carica", pausa = !carica && !S.hal && this.pronto;
     b.setAttribute("aria-pressed", S.hal ? "true" : "false");
-    b.classList.toggle("carica", stato === "carica");
-    b.style.setProperty("--p", stato === "carica" ? String(Math.max(0.04, p || 0)) : "0");
-    b.textContent = stato === "carica" ? "HAL " + Math.round(Math.max(0.04, p || 0) * 100) + "%" : S.hal && this.pronto ? "HAL ON" : "HAL OFF";
-    ROOT.dataset.hal = !S.hal ? "spento" : stato === "carica" ? "carica" : this.pronto ? "pronto" : "spento";
+    b.classList.toggle("carica", carica); b.classList.toggle("pausa", pausa);
+    b.style.setProperty("--p", carica ? String(Math.max(0.04, p || 0)) : "0");
+    b.textContent = carica ? "HAL " + Math.round(Math.max(0.04, p || 0) * 100) + "%" : S.hal && this.pronto ? "HAL ON" : pausa ? "HAL PAUSA" : "HAL OFF";
+    b.title = carica ? "HAL si sta caricando: un clic annulla" : S.hal && this.pronto ? "Un clic mette HAL in pausa: parla Claude, HAL resta pronto per riprendere subito"
+      : pausa ? "HAL in pausa: un clic lo riprende subito" : "Un clic accende la voce HAL (circa 20 secondi)";
+    const off = $("#halspegni"); if (off) off.hidden = !(carica || this.pronto);
+    const vel = $("#halvel"); if (vel) { vel.hidden = !(carica || this.pronto); vel.textContent = String(halVel).replace(".", ",") + "×"; }
+    ROOT.dataset.hal = carica ? "carica" : S.hal && this.pronto ? "pronto" : pausa ? "pausa" : "spento";
   },
   /* A che punto è il caricamento (0..1): il programma della voce dice in che fase è e da quanti secondi. */
   progresso(p) {
@@ -246,7 +254,9 @@ const Hal = {
     }
     rinuncia("HAL non si è caricato. Intanto parla Claude.");
   },
-  /* HAL OFF: il programma della voce si chiude del tutto (non resta niente in memoria né sulla scheda video). */
+  /* Il programma è acceso e il modello caricato? (per la pausa: riprendere senza ricaricare) */
+  async vivo() { try { const p = await this.get("/pronto", 1200); return !!p.pronto; } catch (_) { return false; } },
+  /* ⏻: il programma della voce si chiude del tutto (non resta niente in memoria né sulla scheda video). */
   spegni() {
     this.giro++; this.pronto = false; this.ferma(); this.disegna(); log("hal spegni");
     if (typeof CFG.halFerma === "function") CFG.halFerma().then((r) => { log("hal fermato: " + JSON.stringify(r)); if (!r || !r.ok) fetch(this.url + "/esci").catch(() => {}); });
@@ -261,8 +271,8 @@ const Hal = {
     if (this.actx.state === "suspended") this.actx.resume().catch(() => {});
     return this.actx;
   },
-  async sintetizza(testo, signal) {
-    const r = await fetch(this.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo, lingua: linguaDi(testo) }), signal });
+  async sintetizza(testo, signal, primo) {
+    const r = await fetch(this.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo, lingua: linguaDi(testo), velocita: halVel, primo: !!primo }), signal });
     if (!r.ok) throw new Error("HAL " + r.status);
     return this.audio().decodeAudioData(await r.arrayBuffer());
   },
@@ -281,14 +291,17 @@ const Hal = {
     const coda = [], pronte = new Map(); let presi = 0, fine = false, n = 0, chiudi; const self = this;
     const finito = new Promise((r) => (chiudi = r));
     const ctl = new AbortController(); this.ctl = ctl;
-    const prepara = (k) => { if (k < coda.length && !pronte.has(k)) { const p = self.sintetizza(coda[k].testo, ctl.signal); p.catch(() => {}); pronte.set(k, p); } };
+    const prepara = (k) => { if (k < coda.length && !pronte.has(k)) { const p = self.sintetizza(coda[k].testo, ctl.signal, k === 0); p.catch(() => {}); pronte.set(k, p); } };
     function spezza(sg, idx) {
-      // le frasi lunghe si dicono a pezzi, alle virgole: la voce parte prima e non lascia vuoti lunghi tra un pezzo e l'altro
-      const pezzi = []; let resto = sg.testo, primo = idx === 0;
-      while (resto.length > (primo ? 70 : 100)) {
-        const m = primo ? resto.match(/^(.{20,70}?[,;:])\s+(\S.{11,})$/s) : resto.match(/^(.{30,100}[,;:])\s+(\S.{11,})$/s);
+      // I pezzi crescono: il primo corto (la voce parte subito), il secondo medio (pronto prima che il primo finisca),
+      // poi lunghi (meno giunture). Si taglia alle virgole. Misurato l'11/11/2026: a 1,5x restano pochi vuoti brevi.
+      const pezzi = []; let resto = sg.testo;
+      const limite = () => { const n = coda.length + pezzi.length; return n === 0 ? 70 : n === 1 ? 110 : 180; };
+      while (resto.length > limite()) {
+        const lim = limite(), min = Math.min(40, lim >> 2);
+        const m = resto.match(new RegExp("^(.{" + min + "," + lim + "}" + (lim === 70 ? "?" : "") + "[,;:])\\s+(\\S.{11,})$", "s"));
         if (!m) break;
-        pezzi.push(m[1]); resto = m[2]; primo = false;
+        pezzi.push(m[1]); resto = m[2];
       }
       pezzi.push(resto);
       return pezzi.map((testo, k) => ({ testo, tono: sg.tono, idx, enfasi: k === 0 ? (sg.enfasi || []).length : 0 }));
@@ -714,7 +727,9 @@ const Gpu = {
 function nascondi() { interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo"); ROOT.hidden = true; }
 function mostra() {
   ROOT.hidden = false; etichetta(); Gpu.salta = 0; Gpu.giro();
-  if (S.hal) Hal.accendi(); else Hal.disegna();
+  if (S.hal) Hal.accendi();
+  else if (halSalvato === "pausa" || Hal.pronto) Hal.vivo().then((v) => { Hal.pronto = v; if (!v && halSalvato === "pausa") { halSalvato = "0"; salva("voce.hal", "0"); } Hal.disegna(); });
+  else Hal.disegna();
 }
 
 function avvia() {
@@ -728,11 +743,33 @@ function avvia() {
   if (lb) lb.addEventListener("click", () => { S.lingua = S.lingua.startsWith("en") ? "it-IT" : "en-GB"; salva("voce.lingua", S.lingua); mostraLingua(); const era = Mic.attivo ? Mic.modo : ""; Mic.annulla(); if (era === "live") riprendi(); riga("sys", S.lingua.startsWith("en") ? "Ora ti ascolto in inglese." : "Ora ti ascolto in italiano.", "piano"); });
   mostraLingua();
   const hb = $("#hal");
-  if (hb) hb.addEventListener("click", () => {
-    interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo");
-    S.hal = !S.hal; salva("voce.hal", S.hal ? "1" : "0");
-    if (S.hal) { riga("sys", "Accendo la voce HAL: la barra sul tasto mostra a che punto è (circa mezzo minuto). Intanto parla Claude.", "piano"); Hal.accendi(); }
-    else { Hal.spegni(); riga("sys", "HAL spento del tutto. Parla Claude.", "piano"); }
+  const ferma = () => { interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo"); };
+  if (hb) hb.addEventListener("click", async () => {
+    ferma();
+    if (ROOT.dataset.hal === "carica") {                          // annulla il caricamento: spento del tutto
+      S.hal = false; salva("voce.hal", "0"); Hal.spegni(); riga("sys", "Caricamento di HAL annullato. Parla Claude.", "piano"); return;
+    }
+    if (S.hal && Hal.pronto) {                                    // ON -> PAUSA: il modello resta caricato
+      S.hal = false; salva("voce.hal", "pausa"); Hal.ferma(); Hal.disegna(); log("hal pausa");
+      riga("sys", "HAL in pausa: parla Claude. Un clic su HAL lo riprende subito, ⏻ lo spegne del tutto.", "piano"); return;
+    }
+    if (!S.hal && Hal.pronto) {                                   // PAUSA -> ON: subito, se il programma c'è ancora
+      S.hal = true; salva("voce.hal", "1"); Hal.disegna();
+      if (await Hal.vivo()) { log("hal ripreso"); riga("sys", "HAL ripreso.", "piano"); return; }
+      Hal.pronto = false;                                         // il programma non c'è più: si ricarica
+    }
+    S.hal = true; salva("voce.hal", "1");                         // OFF -> carica
+    riga("sys", "Accendo la voce HAL: la barra sul tasto mostra a che punto è (circa 20 secondi). Intanto parla Claude.", "piano"); Hal.accendi();
+  });
+  const hvel = $("#halvel");
+  if (hvel) hvel.addEventListener("click", () => {
+    halVel = HAL_VELOCITA[(HAL_VELOCITA.indexOf(halVel) + 1) % HAL_VELOCITA.length]; salva("voce.halvel", String(halVel)); Hal.disegna();
+    log("hal velocità " + halVel); riga("sys", "Velocità di HAL: " + String(halVel).replace(".", ",") + "× (dalla prossima frase).", "piano");
+  });
+  const hoff = $("#halspegni");
+  if (hoff) hoff.addEventListener("click", () => {
+    ferma(); S.hal = false; salva("voce.hal", "0"); Hal.spegni(); log("hal spento del tutto");
+    riga("sys", "HAL spento del tutto: memoria e scheda video libere. Parla Claude.", "piano");
   });
   $("#zitto").addEventListener("click", () => {
     if (Nativo.attivo) { Nativo.mic(); return; }

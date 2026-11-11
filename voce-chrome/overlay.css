@@ -160,6 +160,11 @@
 #voce-root #hal{position:relative;overflow:hidden}
 #voce-root #hal::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:calc(var(--p,0)*100%);background:#ff3b3b;box-shadow:0 0 8px #ff3b3b;transition:width .9s linear}
 #voce-root #hal.carica{animation:none;color:#ff8f8f;border-color:#ff3b3b}
+#voce-root #hal.pausa{color:var(--amber);border-color:var(--amber);box-shadow:0 0 10px -3px var(--amber)}
+#voce-root #halspegni{min-width:0;padding:9px 10px;font-size:13px;line-height:10px;color:#ff6b6b;border-color:rgba(255,80,80,.55)}
+#voce-root #halspegni:hover{color:#fff;border-color:#ff3b3b;box-shadow:0 0 12px -2px #ff3b3b}
+#voce-root #halspegni[hidden],#voce-root #halvel[hidden]{display:none}
+#voce-root #halvel{min-width:0;padding:9px 9px;letter-spacing:.06em;text-transform:none}
 /* quanto è occupata la scheda video */
 #voce-root .gpu{display:flex;align-items:center;gap:8px;font:400 10px/1 "Space Mono",monospace;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
 #voce-root .gpu[hidden]{display:none}

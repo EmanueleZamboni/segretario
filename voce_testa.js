@@ -127,7 +127,10 @@ const MESH = (() => {
   const ord = Array.from(media).filter((v) => v > 0).sort((a, b) => a - b), mediana = ord[ord.length >> 1] || 1;
   for (let i = 0; i < n; i++) { const d = Math.min(1, Math.max(0.3, Math.pow(media[i] / mediana, 0.8))); const k = i * 3; vn[k] *= d; vn[k + 1] *= d; vn[k + 2] *= d; }
   // i bulbi oculari sono pezzi a sé (cornea, sclera, iride): li troviamo per connessione, vicino a dove ci aspettiamo gli occhi
-  const naso = m.naso, bocca = [naso[0], naso[1] - 0.205, naso[2] - 0.12];  // linea delle labbra misurata sul profilo mediano
+  // il taglio della bocca, dove le labbra si toccano: misurato sulla scansione l'11/11/2026 (profilo e fronte),
+  // 0,166 sotto la punta del naso, appena più basso agli angoli. Prima era a 0,205: metà del labbro di sotto, e la
+  // bocca si "apriva" tra labbro e mento.
+  const naso = m.naso, bocca = [naso[0] - 0.005, naso[1] - 0.166, naso[2] - 0.10];
   const par = new Int32Array(n); for (let i = 0; i < n; i++) par[i] = i;
   const trova = (a) => { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; };
   for (let t = 0; t < idx.length; t += 3) { const a = trova(idx[t]); par[trova(idx[t + 1])] = a; par[trova(idx[t + 2])] = a; }
@@ -150,14 +153,18 @@ const MESH = (() => {
   for (let i = 0; i < n; i++) {
     const x = base[i * 3], y = base[i * 3 + 1], z = base[i * 3 + 2];
     const front = sm(-0.35, 0.25, z);
-    // mandibola: dal labbro inferiore al mento (y da +0.02 a -0.21), davanti, sfuma verso le orecchie e verso la gola
-    const my = bocca[1];
-    wJaw[i] = sm(my - 0.01, my - 0.09, y) * sm(my - 0.33, my - 0.24, y) * (0.2 + 0.8 * front) * sm(0.62, 0.28, Math.abs(x));
-    // labbra: due fasce strette intorno alla linea della bocca, larghe quanto la bocca
-    const dx = x - bocca[0], dyU = y - bocca[1];
-    const larg = Math.exp(-((dx / 0.20) ** 2)) * front;
-    wLipU[i] = larg * Math.exp(-(((dyU - 0.032) / 0.028) ** 2));
-    wLipD[i] = larg * Math.exp(-(((dyU + 0.032) / 0.032) ** 2));
+    const dx = x - bocca[0], adx = Math.abs(dx);
+    const d = y - (bocca[1] - 0.008 * Math.min(1, (dx / 0.09) ** 2));   // distanza dal taglio della bocca (+ sopra, - sotto)
+    const davanti = sm(-0.40, -0.30, z - naso[2]);                      // la faccia, non la nuca
+    const ang = sm(0.115, 0.07, adx);                                   // larga quanto la bocca, sfuma agli angoli
+    // labbro di sopra (con il suo lato interno): sale un poco
+    wLipU[i] = sm(-0.002, 0.004, d) * (1 - sm(0.012, 0.06, d)) * ang * davanti;
+    // labbro di sotto: scende con la mascella e un filo in più
+    wLipD[i] = sm(0.002, -0.004, d) * (1 - sm(-0.03, -0.075, d)) * ang * davanti;
+    // mascella: dal labbro di sotto al mento, tutta insieme. Vicino al taglio è larga quanto la bocca (gli angoli si
+    // stirano come guance vere), più in basso prende tutto il mento; sfuma verso le orecchie e sotto il mento
+    const largJ = ang + (1 - ang) * sm(-0.02, -0.10, d) * sm(0.16, 0.09, adx) + (1 - ang) * sm(-0.06, -0.14, d);
+    wJaw[i] = sm(0.002, -0.012, d) * (1 - sm(-0.22, -0.32, d)) * (0.2 + 0.8 * front) * sm(0.62, 0.28, Math.abs(x)) * Math.min(1, largJ);
     // palpebre: la pelle attorno all'apertura dell'occhio (non il bulbo). Peso pieno sul bordo, sfuma verso sopracciglio e zigomo
     if (!bulbo[i] && z > 0.15) for (const o of occhi) {
       const [ex, ey] = o.lid, de = Math.hypot(x - ex, (y - ey) * 0.85);
@@ -180,8 +187,8 @@ function costruisciMesh(A) {
   const j = A.bocca, bl = A.blink;
   for (let i = 0; i < n; i++) {
     const k = i * 3; let x = base[k], y = base[k + 1], z = base[k + 2];
-    y -= wJaw[i] * j * 0.11; z -= wJaw[i] * j * 0.03;              // la mascella scende e rientra un filo
-    y += wLipU[i] * j * 0.022; y -= wLipD[i] * j * 0.06;            // le labbra si separano
+    y -= wJaw[i] * j * 0.075; z -= wJaw[i] * j * 0.02;             // la mascella scende e rientra un filo
+    y += wLipU[i] * j * 0.018; y -= wLipD[i] * j * 0.02;            // le labbra si separano proprio sul taglio
     if (wLid[i] > 0) {                                               // il battito: la palpebra di sopra scende a coprire l'occhio, quella di sotto sale un po'
       const w = wLid[i] * bl * (lidUp[i] ? 1 : 0.3);
       y += (lidY[i] - y) * w; z += 0.02 * w;                         // e si porta davanti al bulbo

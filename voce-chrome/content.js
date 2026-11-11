@@ -1,9 +1,9 @@
 /* Generato da voce-chrome/build.py: non modificare a mano. Fonte: voce.html, voce_scena.js, voce_logica.js, driver.js */
-window.VOCE_VERSIONE = "v1.0.14";
+window.VOCE_VERSIONE = "v1.0.15";
 (() => {
   if (document.getElementById("voce-root")) return;
   const wrap = document.createElement("div");
-  wrap.innerHTML = "<div id=\"voce-root\" data-fase=\"riposo\" data-modo=\"voce\" data-look=\"verde\" data-host=\"claude\">\n<canvas id=\"scena\" aria-hidden=\"true\"></canvas>\n<i class=\"ang a\"></i><i class=\"ang b\"></i><i class=\"ang c\"></i><i class=\"ang d\"></i>\n<div class=\"hud\">\n  <header class=\"top\">\n    <div class=\"brand\"><b>SEGRETARI<i>O</i></b><span class=\"cap\" id=\"sotto\">voce \u00b7 canale privato</span></div>\n    <div class=\"clock\"><b id=\"ora\">--:--</b><span class=\"cap\" id=\"data\"></span></div>\n  </header>\n  <section class=\"mid\">\n    <div class=\"pan l\">\n      <div class=\"blk\" id=\"b-cal\"><h3>Calendario</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-oggi\"><h3>Oggi</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-tempo\"><h3>Se hai tempo</h3><ul></ul></div>\n    </div>\n    <div class=\"centro\"><div id=\"righe\" aria-live=\"polite\"></div></div>\n    <div class=\"pan r\">\n      <div class=\"blk\" id=\"b-att\"><h3>Claude aspetta te</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-lav\"><h3>Al lavoro</h3><ul></ul></div>\n      <div class=\"blk\" id=\"b-mail\"><h3>Email da leggere</h3><ul></ul></div>\n    </div>\n  </section>\n  <footer class=\"bot\">\n    <div class=\"modi\" role=\"group\" aria-label=\"Modo\">\n      <button type=\"button\" data-m=\"testo\" aria-pressed=\"false\">Voce \u2192 testo</button>\n      <button type=\"button\" data-m=\"voce\" aria-pressed=\"true\">Voce \u2192 voce</button>\n      <button type=\"button\" data-m=\"live\" aria-pressed=\"false\" title=\"Conversazione con la voce di Claude\">Live</button>\n      <button type=\"button\" class=\"chatnorm\" id=\"chatnorm\" title=\"Nascondi la Voce e usa la chat normale\">Chat normale</button>\n      <button type=\"button\" id=\"lingua\" title=\"Lingua in cui parli al microfono\">MIC IT</button>\n      <button type=\"button\" id=\"hal\" title=\"Voce HAL (sul PC): accesa usa la scheda video, spenta parla la voce di Claude\" aria-pressed=\"false\">HAL</button>\n    </div>\n    <div class=\"cmd\">\n      <div class=\"tasto\">\n        <div class=\"barre sx\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>\n        <button id=\"parla\" type=\"button\" aria-label=\"Parla\" aria-pressed=\"false\">\n          <svg class=\"i-mic\" viewBox=\"0 0 24 24\"><path d=\"M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z\"/><path d=\"M19 10v2a7 7 0 0 1-14 0v-2\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/></svg>\n          <svg class=\"i-stop\" viewBox=\"0 0 24 24\"><rect x=\"6.5\" y=\"6.5\" width=\"11\" height=\"11\" rx=\"1.5\"/></svg>\n          <svg class=\"i-off\" viewBox=\"0 0 24 24\"><line x1=\"3\" x2=\"21\" y1=\"3\" y2=\"21\"/><path d=\"M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3\"/><path d=\"M19 10v2a7 7 0 0 1-.6 2.8M5 10v2a7 7 0 0 0 11 5.7\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/></svg>\n        </button>\n        <div class=\"barre dd\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>\n      </div>\n      <div class=\"l\" aria-live=\"polite\"><div class=\"nastro\"><span data-k=\"riposo\"></span><span data-k=\"ascolto\" class=\"rec\"></span><span data-k=\"penso\"></span><span data-k=\"parlo\"></span><span data-k=\"spento\"></span></div></div>\n    </div>\n    <div class=\"dx\">\n      <input id=\"scrivi\" type=\"text\" placeholder=\"oppure scrivi e premi Invio\" autocomplete=\"off\" spellcheck=\"false\">\n      <div class=\"gpu\" id=\"gpu\" hidden title=\"Quanto \u00e8 occupata la scheda video del PC: se \u00e8 rossa, un altro programma la sta usando e HAL va a rilento\"><span>GPU</span><b id=\"gpu-n\">--%</b><i class=\"gb\"><u></u></i><span id=\"gpu-m\"></span></div>\n      <div class=\"sys\" id=\"sys\"></div>\n      <button id=\"zitto\" type=\"button\" title=\"Zitto finch\u00e9 non ti chiamo per nome\">Silenzio</button>\n    </div>\n  </footer>\n</div>\n</div>";
+  wrap.innerHTML = "<div id=\"voce-root\" data-fase=\"riposo\" data-modo=\"voce\" data-look=\"verde\" data-host=\"claude\">\n<canvas id=\"scena\" aria-hidden=\"true\"></canvas>\n<i class=\"ang a\"></i><i class=\"ang b\"></i><i class=\"ang c\"></i><i class=\"ang d\"></i>\n<div class=\"hud\">\n  <header class=\"top\">\n    <div class=\"brand\"><b>SEGRETARI<i>O</i></b><span class=\"cap\" id=\"sotto\">voce \u00b7 canale privato</span></div>\n    <div class=\"clock\"><b id=\"ora\">--:--</b><span class=\"cap\" id=\"data\"></span></div>\n  </header>\n  <section class=\"mid\">\n    <div class=\"pan l\">\n      <div class=\"blk\" id=\"b-cal\"><h3>Calendario</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-oggi\"><h3>Oggi</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-tempo\"><h3>Se hai tempo</h3><ul></ul></div>\n    </div>\n    <div class=\"centro\"><div id=\"righe\" aria-live=\"polite\"></div></div>\n    <div class=\"pan r\">\n      <div class=\"blk\" id=\"b-att\"><h3>Claude aspetta te</h3><ul><li class=\"nl\">\u2026</li></ul></div>\n      <div class=\"blk\" id=\"b-lav\"><h3>Al lavoro</h3><ul></ul></div>\n      <div class=\"blk\" id=\"b-mail\"><h3>Email da leggere</h3><ul></ul></div>\n    </div>\n  </section>\n  <footer class=\"bot\">\n    <div class=\"modi\" role=\"group\" aria-label=\"Modo\">\n      <button type=\"button\" data-m=\"testo\" aria-pressed=\"false\">Voce \u2192 testo</button>\n      <button type=\"button\" data-m=\"voce\" aria-pressed=\"true\">Voce \u2192 voce</button>\n      <button type=\"button\" data-m=\"live\" aria-pressed=\"false\" title=\"Conversazione con la voce di Claude\">Live</button>\n      <button type=\"button\" class=\"chatnorm\" id=\"chatnorm\" title=\"Nascondi la Voce e usa la chat normale\">Chat normale</button>\n      <button type=\"button\" id=\"lingua\" title=\"Lingua in cui parli al microfono\">MIC IT</button>\n      <button type=\"button\" id=\"hal\" title=\"Voce HAL: un clic la accende, poi la mette in pausa (parla Claude) e la riprende subito\" aria-pressed=\"false\">HAL OFF</button>\n      <button type=\"button\" id=\"halvel\" title=\"Velocit\u00e0 della voce HAL: un clic per cambiarla\" hidden>1.5\u00d7</button>\n      <button type=\"button\" id=\"halspegni\" title=\"Spegni HAL del tutto: libera memoria e scheda video (riaccenderlo richiede circa 20 secondi)\" aria-label=\"Spegni HAL del tutto\" hidden>\u23fb</button>\n    </div>\n    <div class=\"cmd\">\n      <div class=\"tasto\">\n        <div class=\"barre sx\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>\n        <button id=\"parla\" type=\"button\" aria-label=\"Parla\" aria-pressed=\"false\">\n          <svg class=\"i-mic\" viewBox=\"0 0 24 24\"><path d=\"M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z\"/><path d=\"M19 10v2a7 7 0 0 1-14 0v-2\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/></svg>\n          <svg class=\"i-stop\" viewBox=\"0 0 24 24\"><rect x=\"6.5\" y=\"6.5\" width=\"11\" height=\"11\" rx=\"1.5\"/></svg>\n          <svg class=\"i-off\" viewBox=\"0 0 24 24\"><line x1=\"3\" x2=\"21\" y1=\"3\" y2=\"21\"/><path d=\"M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3\"/><path d=\"M19 10v2a7 7 0 0 1-.6 2.8M5 10v2a7 7 0 0 0 11 5.7\"/><line x1=\"12\" x2=\"12\" y1=\"19\" y2=\"22\"/></svg>\n        </button>\n        <div class=\"barre dd\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>\n      </div>\n      <div class=\"l\" aria-live=\"polite\"><div class=\"nastro\"><span data-k=\"riposo\"></span><span data-k=\"ascolto\" class=\"rec\"></span><span data-k=\"penso\"></span><span data-k=\"parlo\"></span><span data-k=\"spento\"></span></div></div>\n    </div>\n    <div class=\"dx\">\n      <input id=\"scrivi\" type=\"text\" placeholder=\"oppure scrivi e premi Invio\" autocomplete=\"off\" spellcheck=\"false\">\n      <div class=\"gpu\" id=\"gpu\" hidden title=\"Quanto \u00e8 occupata la scheda video del PC: se \u00e8 rossa, un altro programma la sta usando e HAL va a rilento\"><span>GPU</span><b id=\"gpu-n\">--%</b><i class=\"gb\"><u></u></i><span id=\"gpu-m\"></span></div>\n      <div class=\"sys\" id=\"sys\"></div>\n      <button id=\"zitto\" type=\"button\" title=\"Zitto finch\u00e9 non ti chiamo per nome\">Silenzio</button>\n    </div>\n  </footer>\n</div>\n</div>";
   const root = wrap.firstElementChild;
   root.hidden = true;  // parte nascosta: la chat è quella di sempre finché Ema non preme VOCE
   document.body.appendChild(root);
@@ -341,7 +341,10 @@ const MESH = (() => {
   const ord = Array.from(media).filter((v) => v > 0).sort((a, b) => a - b), mediana = ord[ord.length >> 1] || 1;
   for (let i = 0; i < n; i++) { const d = Math.min(1, Math.max(0.3, Math.pow(media[i] / mediana, 0.8))); const k = i * 3; vn[k] *= d; vn[k + 1] *= d; vn[k + 2] *= d; }
   // i bulbi oculari sono pezzi a sé (cornea, sclera, iride): li troviamo per connessione, vicino a dove ci aspettiamo gli occhi
-  const naso = m.naso, bocca = [naso[0], naso[1] - 0.205, naso[2] - 0.12];  // linea delle labbra misurata sul profilo mediano
+  // il taglio della bocca, dove le labbra si toccano: misurato sulla scansione l'11/11/2026 (profilo e fronte),
+  // 0,166 sotto la punta del naso, appena più basso agli angoli. Prima era a 0,205: metà del labbro di sotto, e la
+  // bocca si "apriva" tra labbro e mento.
+  const naso = m.naso, bocca = [naso[0] - 0.005, naso[1] - 0.166, naso[2] - 0.10];
   const par = new Int32Array(n); for (let i = 0; i < n; i++) par[i] = i;
   const trova = (a) => { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; };
   for (let t = 0; t < idx.length; t += 3) { const a = trova(idx[t]); par[trova(idx[t + 1])] = a; par[trova(idx[t + 2])] = a; }
@@ -364,14 +367,18 @@ const MESH = (() => {
   for (let i = 0; i < n; i++) {
     const x = base[i * 3], y = base[i * 3 + 1], z = base[i * 3 + 2];
     const front = sm(-0.35, 0.25, z);
-    // mandibola: dal labbro inferiore al mento (y da +0.02 a -0.21), davanti, sfuma verso le orecchie e verso la gola
-    const my = bocca[1];
-    wJaw[i] = sm(my - 0.01, my - 0.09, y) * sm(my - 0.33, my - 0.24, y) * (0.2 + 0.8 * front) * sm(0.62, 0.28, Math.abs(x));
-    // labbra: due fasce strette intorno alla linea della bocca, larghe quanto la bocca
-    const dx = x - bocca[0], dyU = y - bocca[1];
-    const larg = Math.exp(-((dx / 0.20) ** 2)) * front;
-    wLipU[i] = larg * Math.exp(-(((dyU - 0.032) / 0.028) ** 2));
-    wLipD[i] = larg * Math.exp(-(((dyU + 0.032) / 0.032) ** 2));
+    const dx = x - bocca[0], adx = Math.abs(dx);
+    const d = y - (bocca[1] - 0.008 * Math.min(1, (dx / 0.09) ** 2));   // distanza dal taglio della bocca (+ sopra, - sotto)
+    const davanti = sm(-0.40, -0.30, z - naso[2]);                      // la faccia, non la nuca
+    const ang = sm(0.115, 0.07, adx);                                   // larga quanto la bocca, sfuma agli angoli
+    // labbro di sopra (con il suo lato interno): sale un poco
+    wLipU[i] = sm(-0.002, 0.004, d) * (1 - sm(0.012, 0.06, d)) * ang * davanti;
+    // labbro di sotto: scende con la mascella e un filo in più
+    wLipD[i] = sm(0.002, -0.004, d) * (1 - sm(-0.03, -0.075, d)) * ang * davanti;
+    // mascella: dal labbro di sotto al mento, tutta insieme. Vicino al taglio è larga quanto la bocca (gli angoli si
+    // stirano come guance vere), più in basso prende tutto il mento; sfuma verso le orecchie e sotto il mento
+    const largJ = ang + (1 - ang) * sm(-0.02, -0.10, d) * sm(0.16, 0.09, adx) + (1 - ang) * sm(-0.06, -0.14, d);
+    wJaw[i] = sm(0.002, -0.012, d) * (1 - sm(-0.22, -0.32, d)) * (0.2 + 0.8 * front) * sm(0.62, 0.28, Math.abs(x)) * Math.min(1, largJ);
     // palpebre: la pelle attorno all'apertura dell'occhio (non il bulbo). Peso pieno sul bordo, sfuma verso sopracciglio e zigomo
     if (!bulbo[i] && z > 0.15) for (const o of occhi) {
       const [ex, ey] = o.lid, de = Math.hypot(x - ex, (y - ey) * 0.85);
@@ -394,8 +401,8 @@ function costruisciMesh(A) {
   const j = A.bocca, bl = A.blink;
   for (let i = 0; i < n; i++) {
     const k = i * 3; let x = base[k], y = base[k + 1], z = base[k + 2];
-    y -= wJaw[i] * j * 0.11; z -= wJaw[i] * j * 0.03;              // la mascella scende e rientra un filo
-    y += wLipU[i] * j * 0.022; y -= wLipD[i] * j * 0.06;            // le labbra si separano
+    y -= wJaw[i] * j * 0.075; z -= wJaw[i] * j * 0.02;             // la mascella scende e rientra un filo
+    y += wLipU[i] * j * 0.018; y -= wLipD[i] * j * 0.02;            // le labbra si separano proprio sul taglio
     if (wLid[i] > 0) {                                               // il battito: la palpebra di sopra scende a coprire l'occhio, quella di sotto sale un po'
       const w = wLid[i] * bl * (lidUp[i] ? 1 : 0.3);
       y += (lidY[i] - y) * w; z += 0.02 * w;                         // e si porta davanti al bulbo
@@ -1282,7 +1289,10 @@ const SENZA_SEGNI = " (rispondi subito e in breve; strumenti solo se indispensab
 const S = { modo: "voce", fase: "riposo", muto: false, hal: false, lingua: "it-IT", turno: 0, richiesta: null, liveOn: false, voce: "", storia: [], avviato: false };
 try { const m = localStorage.getItem("voce.modo"); if (["testo", "voce", "live"].includes(m)) S.modo = m; } catch (_) {}
 try { S.lingua = localStorage.getItem("voce.lingua") || CFG.lingua || "it-IT"; } catch (_) {}
-try { S.hal = localStorage.getItem("voce.hal") === "1"; } catch (_) {}
+let halSalvato = "0";
+const HAL_VELOCITA = [1, 1.25, 1.5, 1.75];
+let halVel = 1.5; try { const v = parseFloat(localStorage.getItem("voce.halvel")); if (HAL_VELOCITA.includes(v)) halVel = v; } catch (_) {}
+try { halSalvato = localStorage.getItem("voce.hal") || "0"; S.hal = halSalvato === "1"; } catch (_) {}
 try { S.storia = JSON.parse(sessionStorage.getItem("voce.storia") || "[]").slice(-30); } catch (_) { S.storia = []; }
 const salva = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
 function ricorda(chi, testo) { S.storia.push({ chi, testo }); S.storia = S.storia.slice(-30); try { sessionStorage.setItem("voce.storia", JSON.stringify(S.storia)); } catch (_) {} }
@@ -1427,11 +1437,16 @@ const Hal = {
   async get(via, ms) { const r = await fetch(this.url + via, { signal: AbortSignal.timeout(ms || 2000) }); return r.json(); },
   disegna(stato, p) {
     const b = $("#hal"); if (!b) return;
+    const carica = stato === "carica", pausa = !carica && !S.hal && this.pronto;
     b.setAttribute("aria-pressed", S.hal ? "true" : "false");
-    b.classList.toggle("carica", stato === "carica");
-    b.style.setProperty("--p", stato === "carica" ? String(Math.max(0.04, p || 0)) : "0");
-    b.textContent = stato === "carica" ? "HAL " + Math.round(Math.max(0.04, p || 0) * 100) + "%" : S.hal && this.pronto ? "HAL ON" : "HAL OFF";
-    ROOT.dataset.hal = !S.hal ? "spento" : stato === "carica" ? "carica" : this.pronto ? "pronto" : "spento";
+    b.classList.toggle("carica", carica); b.classList.toggle("pausa", pausa);
+    b.style.setProperty("--p", carica ? String(Math.max(0.04, p || 0)) : "0");
+    b.textContent = carica ? "HAL " + Math.round(Math.max(0.04, p || 0) * 100) + "%" : S.hal && this.pronto ? "HAL ON" : pausa ? "HAL PAUSA" : "HAL OFF";
+    b.title = carica ? "HAL si sta caricando: un clic annulla" : S.hal && this.pronto ? "Un clic mette HAL in pausa: parla Claude, HAL resta pronto per riprendere subito"
+      : pausa ? "HAL in pausa: un clic lo riprende subito" : "Un clic accende la voce HAL (circa 20 secondi)";
+    const off = $("#halspegni"); if (off) off.hidden = !(carica || this.pronto);
+    const vel = $("#halvel"); if (vel) { vel.hidden = !(carica || this.pronto); vel.textContent = String(halVel).replace(".", ",") + "×"; }
+    ROOT.dataset.hal = carica ? "carica" : S.hal && this.pronto ? "pronto" : pausa ? "pausa" : "spento";
   },
   /* A che punto è il caricamento (0..1): il programma della voce dice in che fase è e da quanti secondi. */
   progresso(p) {
@@ -1495,7 +1510,9 @@ const Hal = {
     }
     rinuncia("HAL non si è caricato. Intanto parla Claude.");
   },
-  /* HAL OFF: il programma della voce si chiude del tutto (non resta niente in memoria né sulla scheda video). */
+  /* Il programma è acceso e il modello caricato? (per la pausa: riprendere senza ricaricare) */
+  async vivo() { try { const p = await this.get("/pronto", 1200); return !!p.pronto; } catch (_) { return false; } },
+  /* ⏻: il programma della voce si chiude del tutto (non resta niente in memoria né sulla scheda video). */
   spegni() {
     this.giro++; this.pronto = false; this.ferma(); this.disegna(); log("hal spegni");
     if (typeof CFG.halFerma === "function") CFG.halFerma().then((r) => { log("hal fermato: " + JSON.stringify(r)); if (!r || !r.ok) fetch(this.url + "/esci").catch(() => {}); });
@@ -1510,8 +1527,8 @@ const Hal = {
     if (this.actx.state === "suspended") this.actx.resume().catch(() => {});
     return this.actx;
   },
-  async sintetizza(testo, signal) {
-    const r = await fetch(this.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo, lingua: linguaDi(testo) }), signal });
+  async sintetizza(testo, signal, primo) {
+    const r = await fetch(this.url + "/parla", { method: "POST", headers: { "Content-Type": "application/json; charset=utf-8" }, body: JSON.stringify({ testo, lingua: linguaDi(testo), velocita: halVel, primo: !!primo }), signal });
     if (!r.ok) throw new Error("HAL " + r.status);
     return this.audio().decodeAudioData(await r.arrayBuffer());
   },
@@ -1530,14 +1547,17 @@ const Hal = {
     const coda = [], pronte = new Map(); let presi = 0, fine = false, n = 0, chiudi; const self = this;
     const finito = new Promise((r) => (chiudi = r));
     const ctl = new AbortController(); this.ctl = ctl;
-    const prepara = (k) => { if (k < coda.length && !pronte.has(k)) { const p = self.sintetizza(coda[k].testo, ctl.signal); p.catch(() => {}); pronte.set(k, p); } };
+    const prepara = (k) => { if (k < coda.length && !pronte.has(k)) { const p = self.sintetizza(coda[k].testo, ctl.signal, k === 0); p.catch(() => {}); pronte.set(k, p); } };
     function spezza(sg, idx) {
-      // le frasi lunghe si dicono a pezzi, alle virgole: la voce parte prima e non lascia vuoti lunghi tra un pezzo e l'altro
-      const pezzi = []; let resto = sg.testo, primo = idx === 0;
-      while (resto.length > (primo ? 70 : 100)) {
-        const m = primo ? resto.match(/^(.{20,70}?[,;:])\s+(\S.{11,})$/s) : resto.match(/^(.{30,100}[,;:])\s+(\S.{11,})$/s);
+      // I pezzi crescono: il primo corto (la voce parte subito), il secondo medio (pronto prima che il primo finisca),
+      // poi lunghi (meno giunture). Si taglia alle virgole. Misurato l'11/11/2026: a 1,5x restano pochi vuoti brevi.
+      const pezzi = []; let resto = sg.testo;
+      const limite = () => { const n = coda.length + pezzi.length; return n === 0 ? 70 : n === 1 ? 110 : 180; };
+      while (resto.length > limite()) {
+        const lim = limite(), min = Math.min(40, lim >> 2);
+        const m = resto.match(new RegExp("^(.{" + min + "," + lim + "}" + (lim === 70 ? "?" : "") + "[,;:])\\s+(\\S.{11,})$", "s"));
         if (!m) break;
-        pezzi.push(m[1]); resto = m[2]; primo = false;
+        pezzi.push(m[1]); resto = m[2];
       }
       pezzi.push(resto);
       return pezzi.map((testo, k) => ({ testo, tono: sg.tono, idx, enfasi: k === 0 ? (sg.enfasi || []).length : 0 }));
@@ -1963,7 +1983,9 @@ const Gpu = {
 function nascondi() { interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo"); ROOT.hidden = true; }
 function mostra() {
   ROOT.hidden = false; etichetta(); Gpu.salta = 0; Gpu.giro();
-  if (S.hal) Hal.accendi(); else Hal.disegna();
+  if (S.hal) Hal.accendi();
+  else if (halSalvato === "pausa" || Hal.pronto) Hal.vivo().then((v) => { Hal.pronto = v; if (!v && halSalvato === "pausa") { halSalvato = "0"; salva("voce.hal", "0"); } Hal.disegna(); });
+  else Hal.disegna();
 }
 
 function avvia() {
@@ -1977,11 +1999,33 @@ function avvia() {
   if (lb) lb.addEventListener("click", () => { S.lingua = S.lingua.startsWith("en") ? "it-IT" : "en-GB"; salva("voce.lingua", S.lingua); mostraLingua(); const era = Mic.attivo ? Mic.modo : ""; Mic.annulla(); if (era === "live") riprendi(); riga("sys", S.lingua.startsWith("en") ? "Ora ti ascolto in inglese." : "Ora ti ascolto in italiano.", "piano"); });
   mostraLingua();
   const hb = $("#hal");
-  if (hb) hb.addEventListener("click", () => {
-    interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo");
-    S.hal = !S.hal; salva("voce.hal", S.hal ? "1" : "0");
-    if (S.hal) { riga("sys", "Accendo la voce HAL: la barra sul tasto mostra a che punto è (circa mezzo minuto). Intanto parla Claude.", "piano"); Hal.accendi(); }
-    else { Hal.spegni(); riga("sys", "HAL spento del tutto. Parla Claude.", "piano"); }
+  const ferma = () => { interrompi(); Mic.annulla(); if (Nativo.attivo) Nativo.ferma(); S.liveOn = false; fase("riposo"); };
+  if (hb) hb.addEventListener("click", async () => {
+    ferma();
+    if (ROOT.dataset.hal === "carica") {                          // annulla il caricamento: spento del tutto
+      S.hal = false; salva("voce.hal", "0"); Hal.spegni(); riga("sys", "Caricamento di HAL annullato. Parla Claude.", "piano"); return;
+    }
+    if (S.hal && Hal.pronto) {                                    // ON -> PAUSA: il modello resta caricato
+      S.hal = false; salva("voce.hal", "pausa"); Hal.ferma(); Hal.disegna(); log("hal pausa");
+      riga("sys", "HAL in pausa: parla Claude. Un clic su HAL lo riprende subito, ⏻ lo spegne del tutto.", "piano"); return;
+    }
+    if (!S.hal && Hal.pronto) {                                   // PAUSA -> ON: subito, se il programma c'è ancora
+      S.hal = true; salva("voce.hal", "1"); Hal.disegna();
+      if (await Hal.vivo()) { log("hal ripreso"); riga("sys", "HAL ripreso.", "piano"); return; }
+      Hal.pronto = false;                                         // il programma non c'è più: si ricarica
+    }
+    S.hal = true; salva("voce.hal", "1");                         // OFF -> carica
+    riga("sys", "Accendo la voce HAL: la barra sul tasto mostra a che punto è (circa 20 secondi). Intanto parla Claude.", "piano"); Hal.accendi();
+  });
+  const hvel = $("#halvel");
+  if (hvel) hvel.addEventListener("click", () => {
+    halVel = HAL_VELOCITA[(HAL_VELOCITA.indexOf(halVel) + 1) % HAL_VELOCITA.length]; salva("voce.halvel", String(halVel)); Hal.disegna();
+    log("hal velocità " + halVel); riga("sys", "Velocità di HAL: " + String(halVel).replace(".", ",") + "× (dalla prossima frase).", "piano");
+  });
+  const hoff = $("#halspegni");
+  if (hoff) hoff.addEventListener("click", () => {
+    ferma(); S.hal = false; salva("voce.hal", "0"); Hal.spegni(); log("hal spento del tutto");
+    riga("sys", "HAL spento del tutto: memoria e scheda video libere. Parla Claude.", "piano");
   });
   $("#zitto").addEventListener("click", () => {
     if (Nativo.attivo) { Nativo.mic(); return; }
