@@ -46,6 +46,8 @@ services:
       - segretario_data:/data
       # la copia di WhatsApp, in sola lettura, solo per metterla nel backup cifrato
       - whatsapp_data:/wa:ro
+      # lo stato degli aggiornamenti firmati, scritto da scripts/auto-update.sh (solo lettura)
+      - ./deploy-stato:/deploy:ro
       - ${POSTINO_DATA_DIR:-/nonexistent}:/postino:ro
     read_only: true
     tmpfs:

@@ -9,3 +9,5 @@ whatsapp/node_modules/
 whatsapp/data/
 .claude/
 *.zip
+deploy-stato/*
+!deploy-stato/.gitkeep

@@ -48,6 +48,7 @@ import guardia
 import oauth as oauth_mod
 import remoti
 import backup as backup_mod
+import drive as drive_mod
 
 DATA = Path(os.environ.get("SEGRETARIO_DATA", "/data"))
 MEMORIA = DATA / "memoria"
@@ -1218,6 +1219,41 @@ def _brief_loop() -> None:
 
 
 WA_DATA = Path(os.environ.get("SEGRETARIO_WA_DATA", "/wa"))
+DRIVE = drive_mod.Stato(DATA / "drive.json")
+DEPLOY = Path(os.environ.get("SEGRETARIO_DEPLOY_STATO", "/deploy"))
+
+
+def _copia_su_drive() -> None:
+    """Il backup più recente su Google Drive, se non c'è già (un tentativo fallito si ripete dopo un'ora)."""
+    ultimi = backup_mod.elenco(DATA)
+    if not ultimi or not drive_mod.indirizzo() or not DRIVE.da_fare(ultimi[-1].name):
+        return
+    f = ultimi[-1]
+    d = DRIVE.leggi()
+    d.update({"tentato": f.name, "tentato_alle": time.time()})
+    try:
+        drive_mod.copia(f)
+        d.update({"ultimo": f.name, "quando": now().strftime("%Y-%m-%d %H:%M"), "errore": ""})
+        log.info("backup copiato su Drive: %s", f.name)
+    except Exception as err:  # noqa: BLE001
+        d["errore"] = str(err)[:200]
+        log.warning("copia su Drive: %s", err)
+    DRIVE.scrivi(d)
+
+
+def _deploy_stato() -> dict:
+    """Cosa dicono gli aggiornamenti automatici (scripts/auto-update.sh): modo delle firme e se l'installato è firmato."""
+    out = {}
+    for p in sorted(DEPLOY.glob("*.json")) if DEPLOY.exists() else []:
+        try:
+            j = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        out[j.get("repo", p.stem)] = (f"{j.get('modo')}, installato {j.get('installato')} "
+                                      f"({'firmato' if j.get('installato_firmato') else 'NON firmato'}), "
+                                      f"GitHub {j.get('github')} ({'firmato' if j.get('github_firmato') else 'non firmato'}), "
+                                      f"{j.get('nota')}, {j.get('quando')}")
+    return out
 
 
 def _backup_loop() -> None:
@@ -1235,6 +1271,10 @@ def _backup_loop() -> None:
                     log.info("backup cifrato: %s (%d KB)", out.name, out.stat().st_size // 1024)
         except Exception as err:  # noqa: BLE001
             log.warning("backup: %s", err)
+        try:
+            _copia_su_drive()
+        except Exception as err:  # noqa: BLE001
+            log.warning("drive: %s", err)
         time.sleep(300)
 
 
@@ -1388,7 +1428,10 @@ def stato() -> dict:
         "calendario": bool(os.environ.get("CALENDAR_ICS_URL", "").strip()),
         "email_nel_brief": bool(os.environ.get("POSTINO_DB", "").strip()),
         "blocco": BLOCCO.descrivi(),
-        "ultimo_backup": (backup_mod.elenco(DATA)[-1].name if backup_mod.elenco(DATA) else "nessuno"),
+        "ultimo_backup": (f"{backup_mod.elenco(DATA)[-1].name} ({backup_mod.elenco(DATA)[-1].stat().st_size // 1024} KB)"
+                          if backup_mod.elenco(DATA) else "nessuno"),
+        "backup_su_drive": DRIVE.descrivi(),
+        "aggiornamenti": _deploy_stato(),
         "login_connettore": OAUTH_ON,
         "app_collegate": len(PROVIDER.collegamenti()),
         "whatsapp_keep_dal_segretario": {r.nome: (r.errore or "ok") for r in REMOTI if r.configurato()},
@@ -1464,7 +1507,7 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
 
 CONFIG_KEYS = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GROQ_API_KEY", "OPENAI_API_KEY", "ROUTINE_FIRE_URL", "ROUTINE_FIRE_TOKEN",
                "LINKS_API_URL", "LINKS_STATS_KEY", "KEEP_MCP_URL", "KEEP_MCP_HOST", "BRIEF_ORA", "TELEGRAM_PROPOSTE",
-               "CALENDAR_ICS_URL", "POSTINO_DB", "ANTHROPIC_API_KEY")
+               "CALENDAR_ICS_URL", "POSTINO_DB", "ANTHROPIC_API_KEY", "DRIVE_BACKUP_URL")
 
 
 def load_config() -> dict:
@@ -1768,6 +1811,8 @@ def _config_valida(k: str, v: str) -> str | None:
         return "POSTINO_DB è un percorso dentro il container (di solito /postino/postino.db)"
     if k == "GROQ_API_KEY" and v and not v.startswith("gsk_"):
         return "una chiave Groq inizia con gsk_"
+    if k == "DRIVE_BACKUP_URL" and v and not drive_mod.valido(v):
+        return "l'indirizzo è quello dell'app web dello script: inizia con https://script.google.com/macros/s/ e finisce con /exec"
     if k == "ANTHROPIC_API_KEY" and v and not v.startswith("sk-ant-"):
         return "una chiave di Claude inizia con sk-ant-"
     return None
@@ -1848,6 +1893,7 @@ MANAGER_KEYS = [
     ("ROUTINE_FIRE_URL", "Messaggi Telegram a Claude: indirizzo", "L'indirizzo /fire del task \"on demand\" su claude.ai: i messaggi che scrivi al bot vanno a Claude", "text", "Avanzate", "chat"),
     ("ROUTINE_FIRE_TOKEN", "Messaggi Telegram a Claude: token", "Dallo stesso dialogo del task", "password", "Avanzate", "chat"),
     ("KEEP_MCP_URL", "Keep: indirizzo interno", "Lo scrive il server da solo; cambialo solo se sai cosa fai", "text", "Avanzate", "sticky"),
+    ("DRIVE_BACKUP_URL", "Copia del backup su Google Drive", "Ogni notte il backup cifrato va anche nella cartella \"Backup Segretario\" del tuo Google Drive (ultimi 30). Qui va l'indirizzo dell'app web dello script \"Backup Segretario\" (script.google.com > il progetto > Deploy > Manage deployments > Web app URL): inizia con https://script.google.com/macros/s/ e finisce con /exec", "password", "Backup", "database"),
     ("KEEP_MCP_HOST", "Keep: host", "postino.emazamboni.com", "text", "Avanzate", "sticky"),
 ]
 
