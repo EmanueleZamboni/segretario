@@ -1698,6 +1698,16 @@ def _fermato(signum, frame):  # noqa: ARG001
     raise SystemExit(0)
 
 
+def _crash_coda() -> str:
+    """L'ultimo crash in C registrato da faulthandler (solo nomi di file e righe del codice, niente dati)."""
+    try:
+        t = (DATA / "crash.log").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    pezzi = [x for x in t.split("--- avvio ") if "Fatal Python error" in x or "Current thread" in x]
+    return pezzi[-1][-1500:] if pezzi else ""
+
+
 def _avvii_recenti() -> dict:
     try:
         avvii = json.loads((DATA / "avvii.json").read_text(encoding="utf-8"))
@@ -1710,7 +1720,8 @@ def _avvii_recenti() -> dict:
 async def health(_request):
     r = _avvii_recenti()  # solo orari e memoria, niente dati: serve a capire i riavvii senza il connettore
     return JSONResponse({"ok": True, "name": "segretario", "avviato": AVVIATO, "avvii_ultima_ora": r.get("avvii_ultima_ora"),
-                         "memoria": _mem_mb(), "vita_prima": (r.get("ultimi") or [{}])[-1].get("vita_prima")})
+                         "memoria": _mem_mb(), "vita_prima": (r.get("ultimi") or [{}])[-1].get("vita_prima"),
+                         "crash": _crash_coda()})
 
 
 def _tutti(request) -> bool:
@@ -2525,6 +2536,11 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     print(f"Segretario pronto: memoria in {MEMORIA}, URL del connettore in {DATA / 'connector-url'}", flush=True)
     started = True
+    import faulthandler  # un crash in C (segfault, abort) scrive qui dove stava ogni thread: lo mostra /health
+    _CRASH = open(DATA / "crash.log", "a", encoding="utf-8")
+    _CRASH.write(f"--- avvio {AVVIATO}
+"); _CRASH.flush()
+    faulthandler.enable(file=_CRASH, all_threads=True)
     _salute_avvio()
     import signal
     signal.signal(signal.SIGTERM, _fermato)
