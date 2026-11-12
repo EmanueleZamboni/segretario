@@ -1166,6 +1166,32 @@ def brief_testo() -> str:
 
 
 @mcp.tool()
+def viaggio(partenza: str, arrivo: str, quando: str = "", stazione_partenza: str = "", stazione_arrivo: str = "") -> dict:
+    """Assistente di viaggio: come arrivare da `partenza` ad `arrivo` coi mezzi pubblici.
+    Ema NON usa app che lo tracciano: per sapere dov'è ti manda uno screenshot (Google Maps, la sua posizione) o lo scrive.
+    Leggi tu dallo screenshot la via o il luogo e passalo in `partenza` (indirizzo, luogo o città).
+    `quando`: vuoto = adesso; "09:30" (oggi, o domani se già passato) o "2026-11-20 08:00".
+    `stazione_partenza`/`stazione_arrivo`: la stazione dei treni da usare se diversa dalla città (es. "Bologna Centrale").
+    Ritorna: il link di Google Maps col percorso coi mezzi pubblici (bus, treni, a piedi: daglielo SEMPRE, lo apre sul
+    telefono) e i treni Trenitalia veri (orari, cambi, prezzo da). Poi proponi la soluzione migliore e scrivi cosa
+    scegliere nell'app Trenitalia (Da, A, giorno, ora, il treno). Il biglietto lo compra SEMPRE Ema nell'app con
+    l'impronta: tu non compri e non paghi mai niente."""
+    import viaggi
+    partenza, arrivo = _check(partenza, "partenza", 200), _check(arrivo, "arrivo", 200)
+    out: dict = {"google_maps": viaggi.link_maps(partenza, arrivo)}
+    da = (stazione_partenza or partenza).strip()
+    a = (stazione_arrivo or arrivo).strip()
+    try:
+        out["treni"] = viaggi.treni(da, a, quando)
+    except Exception as err:  # noqa: BLE001  (Trenitalia giù o la città senza stazione: resta Google Maps)
+        out["treni"] = None
+        out["avviso_treni"] = (f"Trenitalia non ha risposto o non trova la stazione ({str(err)[:120]}). "
+                               "Usa il link di Google Maps, o riprova indicando stazione_partenza/stazione_arrivo.")
+    out["comprare"] = "Il biglietto lo compra Ema nell'app Trenitalia (Da, A, giorno, ora, treno): mai tu."
+    return out
+
+
+@mcp.tool()
 def spesa_lista() -> dict:
     """Cosa deve comprare Ema: le voci NON spuntate della lista Keep SPESA (= finite), raggruppate per negozio
     (Lidl, Mercato agricolo, DM). La lista SPESA contiene solo le cose che compra sempre: una cosa da comprare
