@@ -1,0 +1,9 @@
+name = "segretario-backup"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+# Le copie cifrate del backup del Segretario (ultimi 30). Nessun segreto: si accetta solo dall'IP della VM.
+[[kv_namespaces]]
+binding = "BACKUP"
+id = "9eaf9bcb85b54adc8f96275580ce7d62"

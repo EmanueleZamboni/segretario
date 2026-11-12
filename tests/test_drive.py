@@ -52,6 +52,32 @@ def test_giro_completo(tmp_path, monkeypatch):
     assert visto["byte"] == f.read_bytes() and visto["headers"]["Content-Length"] == str(f.stat().st_size)
 
 
+def test_cloudflare(tmp_path, monkeypatch):
+    f = tmp_path / "segretario-2026-11-12.tar.gz.age"
+    f.write_bytes(os.urandom(2 * drive.PEZZO + 5))
+    monkeypatch.delenv("DRIVE_BACKUP_URL", raising=False)
+    monkeypatch.delenv("BACKUP_FUORI_URL", raising=False)
+    assert drive.destinazione() == "Cloudflare"
+    visto = {}
+
+    def put(url, content=None, headers=None, **kw):
+        visto["url"], visto["byte"] = url, b"".join(content)
+        return httpx.Response(200, json={"ok": True, "nome": f.name})
+
+    monkeypatch.setattr(drive.httpx, "put", put)
+    assert drive.copia_fuori(f) == f.name
+    assert visto["url"] == drive.CF_PREDEFINITO + "/" + f.name and visto["byte"] == f.read_bytes()
+    monkeypatch.setattr(drive.httpx, "put", lambda *a, **k: httpx.Response(403, json={"ok": False, "errore": "indirizzo non ammesso: 1.2.3.4"}))
+    try:
+        drive.copia_cloudflare(f)
+    except RuntimeError as err:
+        assert "403" in str(err) and "1.2.3.4" in str(err)
+    else:
+        raise AssertionError("doveva fallire")
+    monkeypatch.setenv("BACKUP_FUORI_URL", "")
+    assert drive.destinazione() == "" and drive.Stato(tmp_path / "d.json").descrivi() == "spenta"
+
+
 def test_sessione_non_google(tmp_path, monkeypatch):
     f = tmp_path / "segretario-2026-11-12.tar.gz.age"
     f.write_bytes(b"x")

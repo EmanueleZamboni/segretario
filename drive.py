@@ -73,6 +73,46 @@ def copia(file: Path) -> str:
         return ""
 
 
+CF_PREDEFINITO = "https://segretario-backup.ezamboni96.workers.dev"
+
+
+def cf_indirizzo() -> str:
+    """La copia su Cloudflare (backup-worker/ nel repo): accetta solo dall'IP della VM, nessun segreto. Vuoto = spenta."""
+    return os.environ.get("BACKUP_FUORI_URL", CF_PREDEFINITO).strip().rstrip("/")
+
+
+def destinazione() -> str:
+    if indirizzo():
+        return "Google Drive"
+    return "Cloudflare" if cf_indirizzo() else ""
+
+
+def copia_cloudflare(file: Path) -> str:
+    """12/11/2026: Google bloccava lo script di Drive ("This app is blocked") anche col solo drive.file, quindi la copia
+    fuori dal server va nel KV di Cloudflare di Ema (ultimi 30). Per riaverla: account Cloudflare > KV > segretario-backup."""
+    u = cf_indirizzo()
+    if not u.startswith("https://"):
+        raise RuntimeError("indirizzo della copia su Cloudflare non valido")
+    dim = file.stat().st_size
+    try:
+        r = httpx.put(f"{u}/{file.name}", content=_leggi(file), timeout=300,
+                      headers={"Content-Length": str(dim), "Content-Type": "application/octet-stream"})
+    except httpx.HTTPError as err:
+        raise RuntimeError(f"Cloudflare irraggiungibile: {type(err).__name__}") from None
+    try:
+        j = r.json()
+    except ValueError:
+        j = {}
+    if r.status_code != 200 or not j.get("ok"):
+        raise RuntimeError(f"Cloudflare: HTTP {r.status_code} {str(j.get('errore', ''))[:120]}")
+    return str(j.get("nome") or file.name)
+
+
+def copia_fuori(file: Path) -> str:
+    """Copia il backup dove è configurato: lo script di Drive se c'è, altrimenti Cloudflare."""
+    return copia(file) if indirizzo() else copia_cloudflare(file)
+
+
 class Stato:
     """/data/drive.json: l'ultimo file copiato e l'ultimo errore (per stato() e le Impostazioni)."""
 
@@ -100,10 +140,11 @@ class Stato:
         return not (d.get("tentato") == nome and t - float(d.get("tentato_alle", 0)) < 3600)
 
     def descrivi(self) -> str:
-        if not indirizzo():
-            return "non collegato"
+        dove = destinazione()
+        if not dove:
+            return "spenta"
         d = self.leggi()
-        s = f"{d['ultimo']} copiato il {d.get('quando', '?')}" if d.get("ultimo") else "ancora nessuna copia"
+        s = f"{dove}: " + (f"{d['ultimo']} copiato il {d.get('quando', '?')}" if d.get("ultimo") else "ancora nessuna copia")
         if d.get("errore") and d.get("tentato") != d.get("ultimo"):
             s += f"; ultimo tentativo fallito: {d['errore']}"
         return s

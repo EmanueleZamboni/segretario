@@ -1226,15 +1226,15 @@ DEPLOY = Path(os.environ.get("SEGRETARIO_DEPLOY_STATO", "/deploy"))
 def _copia_su_drive() -> None:
     """Il backup più recente su Google Drive, se non c'è già (un tentativo fallito si ripete dopo un'ora)."""
     ultimi = backup_mod.elenco(DATA)
-    if not ultimi or not drive_mod.indirizzo() or not DRIVE.da_fare(ultimi[-1].name):
+    if not ultimi or not drive_mod.destinazione() or not DRIVE.da_fare(ultimi[-1].name):
         return
     f = ultimi[-1]
     d = DRIVE.leggi()
     d.update({"tentato": f.name, "tentato_alle": time.time()})
     try:
-        drive_mod.copia(f)
+        drive_mod.copia_fuori(f)
         d.update({"ultimo": f.name, "quando": now().strftime("%Y-%m-%d %H:%M"), "errore": ""})
-        log.info("backup copiato su Drive: %s", f.name)
+        log.info("backup copiato fuori dal server (%s): %s", drive_mod.destinazione(), f.name)
     except Exception as err:  # noqa: BLE001
         d["errore"] = str(err)[:200]
         log.warning("copia su Drive: %s", err)
