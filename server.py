@@ -2538,8 +2538,8 @@ if __name__ == "__main__":
     started = True
     import faulthandler  # un crash in C (segfault, abort) scrive qui dove stava ogni thread: lo mostra /health
     _CRASH = open(DATA / "crash.log", "a", encoding="utf-8")
-    _CRASH.write(f"--- avvio {AVVIATO}
-"); _CRASH.flush()
+    _CRASH.write("--- avvio " + AVVIATO + chr(10))
+    _CRASH.flush()
     faulthandler.enable(file=_CRASH, all_threads=True)
     _salute_avvio()
     import signal
