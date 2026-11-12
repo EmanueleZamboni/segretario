@@ -31,12 +31,13 @@ if [ "$MODE" != off ] && [ "$LOCAL" != "$REMOTE" ]; then
   if [ "$MODE" = obbligo ]; then TARGET="${ULTIMO_FIRMATO:-$LOCAL}"; fi
 fi
 stato() {   # quello che il Segretario mostra in stato(): niente segreti, solo id dei commit e sì/no
-  local dir="$REPO/deploy-stato" inst="$1" nota="$2" hf=false rf=false
+  local dir="$REPO/deploy-stato" inst="$1" nota="$2" hf=false rf=false as=false
   mkdir -p "$dir"
   [ "$MODE" != off ] && firmato "$inst" && hf=true
   [ "$MODE" != off ] && firmato "$REMOTE" && rf=true
-  printf '{"repo":"segretario","modo":"%s","installato":"%s","installato_firmato":%s,"github":"%s","github_firmato":%s,"nota":"%s","quando":"%s"}\n' \
-    "$MODE" "${inst:0:7}" "$hf" "${REMOTE:0:7}" "$rf" "$nota" "$(date -u +%FT%TZ)" > "$dir/segretario.json.tmp" \
+  [ "$inst" != "$REMOTE" ] && as=true   # qui tutto il repo è codice del server: ogni attesa conta (il Segretario avvisa Ema)
+  printf '{"repo":"segretario","modo":"%s","installato":"%s","installato_firmato":%s,"github":"%s","github_firmato":%s,"attesa_server":%s,"nota":"%s","quando":"%s"}\n' \
+    "$MODE" "${inst:0:7}" "$hf" "${REMOTE:0:7}" "$rf" "$as" "$nota" "$(date -u +%FT%TZ)" > "$dir/segretario.json.tmp" \
     && mv -f "$dir/segretario.json.tmp" "$dir/segretario.json"
 }
 

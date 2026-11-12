@@ -58,6 +58,9 @@ services:
       - ALL
     expose:
       - "8766"
+    networks:
+      - default
+      - interno
     mem_limit: 768m
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8766/health',timeout=3).status==200 else 1)"]
@@ -93,6 +96,8 @@ services:
       - ALL
     expose:
       - "8787"
+    networks:
+      - interno
     mem_limit: 768m
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -101,10 +106,15 @@ services:
       retries: 3
 
 # La rete di Caddy (progetto compose "postino" => "postino_default"). install.sh la rileva e la scrive in .env.
+# "interno" (dal 12/11/2026): solo Segretario e WhatsApp. WhatsApp legge messaggi di sconosciuti, quindi non sta più
+# sulla rete di Caddy: da lì non raggiunge Postino, Caddy né Keep (il firewall di Keep ammette solo la rete di Caddy).
+# Internet resta raggiungibile (serve per WhatsApp).
 networks:
   default:
     name: ${CADDY_NETWORK:-postino_default}
     external: true
+  interno:
+    name: segretario_interno
 
 volumes:
   segretario_data:

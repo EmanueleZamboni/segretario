@@ -1275,6 +1275,10 @@ def _backup_loop() -> None:
             _copia_su_drive()
         except Exception as err:  # noqa: BLE001
             log.warning("drive: %s", err)
+        try:
+            _controlla_aggiornamenti()
+        except Exception as err:  # noqa: BLE001
+            log.warning("aggiornamenti: %s", err)
         time.sleep(300)
 
 
@@ -1653,6 +1657,60 @@ def _mem_mb() -> dict:
     return out
 
 
+AVVISI_MAX_GIORNO = 3
+
+
+def _avviso_raro(chiave: str, testo: str) -> bool:
+    """Un avviso di guasto/sicurezza su Telegram: una volta sola per `chiave`, al massimo 3 al giorno in tutto
+    (Ema vuole pochissimi messaggi). /data/avvisi.json ricorda cosa è già stato detto."""
+    f = DATA / "avvisi.json"
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    oggi = now().strftime("%Y-%m-%d")
+    fatti = d.get("chiavi", {})
+    if chiave in fatti:
+        return False
+    contati = d.get("giorni", {})
+    if contati.get(oggi, 0) >= AVVISI_MAX_GIORNO:
+        return False
+    fatti[chiave] = now().strftime("%Y-%m-%d %H:%M")
+    d = {"chiavi": dict(list(fatti.items())[-200:]), "giorni": {oggi: contati.get(oggi, 0) + 1}}
+    try:
+        _write_json(f, d)
+    except Exception:  # noqa: BLE001
+        pass
+    threading.Thread(target=_avvisa_ema, args=(testo,), name="avviso", daemon=True).start()
+    return True
+
+
+def _controlla_avvii() -> None:
+    """Se il processo si è riavviato 5 o più volte nell'ultima ora (es. il kernel lo uccide), lo dice a Ema: una volta
+    ogni ora al massimo (la chiave contiene l'ora)."""
+    n = _avvii_recenti().get("avvii_ultima_ora", 0)
+    if n >= 5:
+        _avviso_raro(f"riavvii {now():%Y-%m-%d %H}",
+                     f"Il Segretario si è riavviato {n} volte nell'ultima ora: qualcosa non va. "
+                     "Apri una chat di Claude Code sul PC e scrivi \"il Segretario si riavvia\".")
+
+
+def _controlla_aggiornamenti() -> None:
+    """Un cambiamento al codice dei server è su GitHub ma NON firmato dal PC di Ema: resta fermo (giusto), ma Ema deve
+    saperlo, perché o è lavoro di una chat nel cloud da rilasciare, o qualcuno sta provando a mettere codice sul server."""
+    for p in sorted(DEPLOY.glob("*.json")) if DEPLOY.exists() else []:
+        try:
+            j = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if j.get("nota") == "in attesa di un commit firmato" and j.get("attesa_server"):
+            app = {"segretario": "il Segretario", "various": "Postino"}.get(j.get("repo"), j.get("repo"))
+            _avviso_raro(f"attesa {j.get('repo')} {j.get('github')}",
+                         f"C'è una modifica a {app} su GitHub che NON è firmata dal tuo PC, quindi non va online. "
+                         "Se l'hai chiesta a Claude nel cloud o sul telefono, apri una chat di Claude Code sul PC e "
+                         "scrivi \"rilascia le modifiche\". Se non ne sai niente, dillo a Claude Code: potrebbe essere un attacco.")
+
+
 def _salute_avvio() -> None:
     """All'avvio: annota l'avvio e conserva l'ultima fotografia della vita precedente (se è finita male, si vede)."""
     f, a = DATA / "salute.json", DATA / "avvii.json"
@@ -1667,6 +1725,10 @@ def _salute_avvio() -> None:
     avvii = (avvii + [{"avvio": AVVIATO, "vita_prima": prima}])[-30:]
     try:
         _write_json(a, avvii)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        _controlla_avvii()
     except Exception:  # noqa: BLE001
         pass
 

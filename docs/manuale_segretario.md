@@ -40,6 +40,14 @@ per toglierlo `hub_link_togli(nome)`.
   `/riaccendi` dal Telegram di Ema. Da spento tu non vedi niente: se Ema ti chiede perché, è spento.
 - **Approvare.** Le regole proposte si approvano con un codice usa-e-getta: Ema scrive `/approva` al bot, riceve 6
   cifre valide 10 minuti e te le dà. Il vecchio codice fisso dell'hub non esiste più. Mai cercarlo o indovinarlo.
+- **Staccare la spina dal telefono** (se si sospetta che il Segretario stesso sia stato bucato, l'interruttore dentro
+  di lui non basta): browser del telefono > https://cloud.oracle.com > Cloud Account Name `ezamboni96` > Next > accesso
+  > menu ☰ > Compute > Instances > il nome dell'istanza > Stop > Force stop > Stop instance. Si spegne tutto il server
+  (Segretario, WhatsApp, Keep, Postino); i dati restano. Per riaccendere: stessa pagina > Start.
+- **La chiave di Google di Keep** apre molto più di Keep. Se il server è stato bucato: Ema cambia la password di Google
+  (https://myaccount.google.com/security > Password): la chiave muore. Poi Keep va ricollegato da Postino > Settings.
+- **Avvisi**: il Segretario scrive su Telegram SOLO se si riavvia 5+ volte in un'ora o se una modifica al codice dei
+  server aspetta su GitHub senza firma (max 3 al giorno). In quel caso Ema apre Claude Code sul PC.
 - **Il manuale** (questo testo) viene dal codice del Segretario: nessuna chat lo può riscrivere, neanche tu.
 - **Impostazioni > Sicurezza**: le app collegate e i browser fidati, con "Scollega tutte le app di Claude" e
   "Scollega tutti i browser".
