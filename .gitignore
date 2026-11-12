@@ -11,3 +11,4 @@ whatsapp/data/
 *.zip
 deploy-stato/*
 !deploy-stato/.gitkeep
+.wrangler/
