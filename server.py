@@ -1639,6 +1639,16 @@ def _mem_mb() -> dict:
                 out[k] = int(v)
     except (OSError, ValueError):
         pass
+    try:  # la memoria di TUTTA la VM (/proc/meminfo non è isolato dal container): un OOM della VM uccide senza avviso
+        mi = {r.split(":")[0]: int(r.split()[1]) // 1024 for r in open("/proc/meminfo", encoding="utf-8") if r.split(":")[0]
+              in ("MemTotal", "MemAvailable", "SwapTotal", "SwapFree")}
+        out["vm_mb"] = mi
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        out["vm_pressione"] = open("/proc/pressure/memory", encoding="utf-8").read().splitlines()[1][:80]
+    except (OSError, IndexError):
+        pass
     out["thread"] = threading.active_count()
     return out
 
