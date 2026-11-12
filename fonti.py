@@ -99,13 +99,24 @@ def email_non_lette(db_path: str, adesso: datetime, ore: int = 48, massimo: int 
     src = Path(db_path)
     if not src.exists():
         raise RuntimeError("database di Postino non trovato")
-    tmp = Path(tempfile.mkdtemp(prefix="postino-ro-"))
+    # 12/11/2026: la copia in /tmp (tmpfs = RAM del container, tetto 768 MB) faceva uccidere il Segretario dal kernel a
+    # ogni lettura (la Voce chiede le email ogni minuto). Ora si legge il database dov'è, in sola lettura (SQLite >= 3.22
+    # legge un WAL anche senza poter scrivere -shm); solo se non riesce, copia su disco (/data), mai in memoria.
+    tmp: Path | None = None
     try:
-        for suffix in ("", "-wal", "-shm"):
-            f = Path(str(src) + suffix)
-            if f.exists():
-                shutil.copy2(f, tmp / (src.name + suffix))
-        con = sqlite3.connect(f"file:{(tmp / src.name).as_posix()}?mode=ro", uri=True)
+        try:
+            con = sqlite3.connect(f"file:{src.as_posix()}?mode=ro", uri=True, timeout=5)
+            con.execute("SELECT 1 FROM accounts LIMIT 1").fetchall()
+        except sqlite3.Error:
+            peso = sum(Path(str(src) + s).stat().st_size for s in ("", "-wal") if Path(str(src) + s).exists())
+            if peso > 2 << 30:
+                raise RuntimeError("database di Postino troppo grande da copiare") from None
+            tmp = Path(tempfile.mkdtemp(prefix="postino-ro-", dir=os.environ.get("SEGRETARIO_DATA", None)))
+            for suffix in ("", "-wal", "-shm"):
+                f = Path(str(src) + suffix)
+                if f.exists():
+                    shutil.copy2(f, tmp / (src.name + suffix))
+            con = sqlite3.connect(f"file:{(tmp / src.name).as_posix()}?mode=ro", uri=True)
         try:
             da = (adesso - timedelta(hours=ore)).astimezone(ZoneInfo("UTC")).strftime("%Y-%m-%dT%H:%M:%S")
             miei = {r[0].lower() for r in con.execute("SELECT email FROM accounts").fetchall()}
@@ -119,7 +130,8 @@ def email_non_lette(db_path: str, adesso: datetime, ore: int = 48, massimo: int 
         finally:
             con.close()
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        if tmp is not None:
+            shutil.rmtree(tmp, ignore_errors=True)
     out = []
     visti = set()
     for subject, from_json, from_email, d, snippet, account in rows:
