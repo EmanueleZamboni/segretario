@@ -1179,6 +1179,11 @@ def viaggio(partenza: str, arrivo: str, quando: str = "", stazione_partenza: str
     import viaggi
     partenza, arrivo = _check(partenza, "partenza", 200), _check(arrivo, "arrivo", 200)
     out: dict = {"google_maps": viaggi.link_maps(partenza, arrivo)}
+    try:
+        out["porta_a_porta"] = viaggi.porta_a_porta(partenza, arrivo, quando)
+    except Exception as err:  # noqa: BLE001
+        out["porta_a_porta"] = None
+        out["avviso_porta_a_porta"] = f"percorso con bus e treni non disponibile ({str(err)[:120]}): usa il link di Google Maps"
     da = (stazione_partenza or partenza).strip()
     a = (stazione_arrivo or arrivo).strip()
     try:
