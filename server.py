@@ -1663,11 +1663,29 @@ def _salute_avvio() -> None:
     def giro():
         while True:
             try:
-                _write_json(f, {"ultimo": now().strftime("%Y-%m-%d %H:%M:%S"), "avvio": AVVIATO, **_mem_mb()})
+                _write_json(f, {"ultimo": now().strftime("%Y-%m-%d %H:%M:%S"), "avvio": AVVIATO, **_mem_mb(),
+                                **({"fine": _FINE[-5:]} if _FINE else {})})
             except Exception:  # noqa: BLE001
                 pass
             time.sleep(5)
     threading.Thread(target=giro, name="salute", daemon=True).start()
+
+
+_FINE: list[str] = []
+
+
+def _annota_fine(motivo: str) -> None:
+    """Scrive in salute.json perché il processo sta finendo (lo legge il prossimo avvio come vita_prima)."""
+    _FINE.append(f"{now():%H:%M:%S} {motivo}"[:600])
+    try:
+        d = json.loads((DATA / "salute.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    d["fine"] = _FINE[-5:]
+    try:
+        _write_json(DATA / "salute.json", d)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _fermato(signum, frame):  # noqa: ARG001
@@ -2459,6 +2477,19 @@ async def _rispondi(send, status: int, body: bytes, ctype: str) -> None:
 
 
 async def app(scope, receive, send):
+    if scope["type"] == "lifespan":
+        try:
+            await _app(scope, receive, send)
+        except BaseException as err:
+            import traceback
+            _annota_fine("lifespan finito con errore: " + "".join(traceback.format_exception(err))[-500:])
+            raise
+        _annota_fine("lifespan finito")
+        return
+    await _app(scope, receive, send)
+
+
+async def _app(scope, receive, send):
     """L'ingresso di tutto. 1) Spento: tutto chiuso tranne /health e /blocco. 2) Il connettore usato da un indirizzo che
     non è Anthropic né la rete interna = qualcuno ha l'indirizzo segreto: si spegne tutto e Ema riceve un avviso.
     3) Troppe chiamate in 5 minuti = uso strano: si spegne tutto. 4) Istruzioni fresche (data, regole) a ogni chiamata."""
@@ -2503,10 +2534,18 @@ if __name__ == "__main__":
         print("Telegram: non configurato (TELEGRAM_BOT_TOKEN vuoto): nessuna consegna al telefono", flush=True)
     threading.Thread(target=_brief_loop, name="brief", daemon=True).start()
     threading.Thread(target=_backup_loop, name="backup", daemon=True).start()
-    uvicorn.run(
+    import atexit
+    atexit.register(lambda: _annota_fine("uscita del processo (atexit)"))
+
+    class _Server(uvicorn.Server):
+        def handle_exit(self, sig, frame):  # chi ci ferma: SIGTERM = docker stop/restart, SIGINT = Ctrl+C
+            _annota_fine(f"segnale {sig} ricevuto da uvicorn")
+            return super().handle_exit(sig, frame)
+
+    _Server(uvicorn.Config(
         app,
         host=BIND,
         port=PORT,
         access_log=False,  # il segreto è nel percorso: niente log delle richieste
         proxy_headers=True,
-    )
+    )).run()
