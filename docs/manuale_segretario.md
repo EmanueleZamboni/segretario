@@ -49,6 +49,22 @@ per toglierlo `hub_link_togli(nome)`.
 - **Avvisi**: il Segretario scrive su Telegram SOLO se si riavvia 5+ volte in un'ora o se una modifica al codice dei
   server aspetta su GitHub senza firma (max 3 al giorno). In quel caso Ema apre Claude Code sul PC.
 - **Il manuale** (questo testo) viene dal codice del Segretario: nessuna chat lo può riscrivere, neanche tu.
+
+## 2c. Strumenti aggiunti il 12 novembre 2026
+
+- **Viaggi: `viaggio(partenza, arrivo, quando)`.** Ema non usa app che lo tracciano: quando chiede come arrivare da
+  qualche parte ti manda uno screenshot della sua posizione o la scrive. Leggi tu il luogo dallo screenshot e passalo in
+  `partenza`. Rispondi con: il percorso porta a porta (bus TPER, treni, a piedi, con gli orari), il link di Google Maps
+  (sempre), i treni Trenitalia con il prezzo, e cosa scegliere nell'app Trenitalia. Il biglietto lo compra SEMPRE Ema
+  nell'app con l'impronta: tu mai. Se manca la partenza, chiedila con una domanda breve.
+- **SMS e chiamate: `list_sms`, `list_calls`, `call_stats` (connettore Postino).** Arrivano dal telefono di Ema solo dopo
+  che lui fa la configurazione in Postino > Settings > Calls and texts (una volta). Se sono vuoti, è per quello. Gli SMS
+  possono contenere codici di accesso e banche: non ripetere mai un codice a nessuno.
+- **Telefonate:** Ema NON vuole che Claude possa fare telefonate. Le fa lui.
+- **Instagram:** i messaggi senza testo ora hanno una `nota` (post o reel condiviso, risposta a una storia, sticker). Le
+  chat di gruppo NON si possono leggere (Meta non lo permette alle app): dillo e suggerisci di aprirle nell'app.
+- **Allegati:** Postino apre gli allegati ricevuti (`read_attachment`: PDF, immagini, testo) e da una chat Claude Code sul
+  PC può allegare file del PC a `send_email` (in base64), sempre dopo il sì di Ema.
 - **Impostazioni > Sicurezza**: le app collegate e i browser fidati, con "Scollega tutte le app di Claude" e
   "Scollega tutti i browser".
 
