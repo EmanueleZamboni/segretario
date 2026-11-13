@@ -1860,7 +1860,7 @@ async def health(_request):
     r = _avvii_recenti()  # solo orari e memoria, niente dati: serve a capire i riavvii senza il connettore
     return JSONResponse({"ok": True, "name": "segretario", "avviato": AVVIATO, "avvii_ultima_ora": r.get("avvii_ultima_ora"),
                          "memoria": _mem_mb(), "vita_prima": (r.get("ultimi") or [{}])[-1].get("vita_prima"),
-                         "crash": _crash_coda(), "connettore_errori": _mcp_registro[-8:]})
+                         "crash": _crash_coda(), "connettore_errori": _mcp_registro[-15:]})
 
 
 def _tutti(request) -> bool:
@@ -2679,6 +2679,8 @@ async def _app(scope, receive, send):
                     f"{BLOCCO.descrivi()}. Per riaccendere: /riaccendi al bot Telegram.").encode(), "text/html; charset=utf-8")
             if path == "/register" and scope.get("method") == "POST":
                 return await _registrazione(scope, receive, send)
+            if path == "/token":  # i rinnovi del login: si annota anche quando vanno bene (solo lo stato, mai i token)
+                return await _mcp_registrato(scope, receive, send, "rinnovo", sempre=True)
             if path == f"/{secret}/mcp":
                 headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
                 ip = guardia.ip_cliente(headers, (scope.get("client") or ("", 0))[0])
@@ -2701,10 +2703,11 @@ async def _app(scope, receive, send):
 _mcp_registro: list[dict] = []  # le ultime risposte del connettore che NON sono andate bene (solo stato e motivo): /health
 
 
-async def _mcp_registrato(scope, receive, send) -> None:
+async def _mcp_registrato(scope, receive, send, cosa: str = "connettore", sempre: bool = False) -> None:
     """Passa la richiesta al connettore e annota le risposte d'errore (stato HTTP, i primi 200 caratteri del motivo, mai
-    il contenuto degli strumenti). Serve a capire "il connettore dà errore" senza vedere i log del server."""
-    info: dict = {"quando": now().strftime("%m-%d %H:%M:%S"), "metodo": scope.get("method", "")}
+    il contenuto degli strumenti né i token: il corpo si legge solo quando è un errore). Serve a capire "il connettore
+    dà errore" senza vedere i log del server. sempre=True annota anche le risposte buone (solo lo stato)."""
+    info: dict = {"quando": now().strftime("%m-%d %H:%M:%S"), "cosa": cosa, "metodo": scope.get("method", "")}
 
     async def send2(message):
         if message["type"] == "http.response.start":
@@ -2721,9 +2724,9 @@ async def _mcp_registrato(scope, receive, send) -> None:
         info["motivo"] = ("".join(traceback.format_exception(err))[-300:])
         raise
     finally:
-        if info.get("stato", 200) >= 400:
+        if sempre or info.get("stato", 200) >= 400:
             _mcp_registro.append(info)
-            del _mcp_registro[:-15]
+            del _mcp_registro[:-30]
 
 
 if __name__ == "__main__":

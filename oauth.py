@@ -33,6 +33,7 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 ACCESS_S = 3600
 REFRESH_S = 400 * 86400
 CODE_S = 300
+GRAZIA_S = 120  # quanto vale ancora un rinnovo già usato (rinnovi quasi simultanei dello stesso client)
 PENDING_S = 900
 MAX_CLIENTS = 40
 MAX_PENDING = 50
@@ -82,12 +83,14 @@ class Provider:
         """Le app collegate (un rinnovo valido = un collegamento)."""
         with self._lock:
             now = time.time()
-            out = []
+            per_app: dict[str, dict] = {}  # un'app con più rinnovi validi (tolleranza della rotazione) conta una volta
             for v in self.d["refresh"].values():
                 if float(v.get("scade", 0)) > now:
                     c = self.d["clients"].get(v["client_id"], {})
-                    out.append({"app": c.get("client_name") or v["client_id"][:8], "dal": v.get("dal", "")})
-            return out
+                    voce = {"app": c.get("client_name") or v["client_id"][:8], "dal": v.get("dal", "")}
+                    if v["client_id"] not in per_app or voce["dal"] > per_app[v["client_id"]]["dal"]:
+                        per_app[v["client_id"]] = voce
+            return list(per_app.values())
 
     def revoca_tutto(self) -> int:
         with self._lock:
@@ -219,7 +222,10 @@ class Provider:
             if not r:
                 from mcp.server.auth.provider import TokenError
                 raise TokenError(error="invalid_grant", error_description="rinnovo non valido")
-            self._togli_coppia(r["coppia"])  # rotazione: il vecchio rinnovo non vale più
+            # Rotazione con 2 minuti di tolleranza (13/11/2026): se claude.ai manda due rinnovi quasi insieme con lo
+            # stesso token, il secondo NON deve fallire (prima falliva e il connettore smetteva di funzionare). Il vecchio
+            # rinnovo vale ancora 120 s, poi scade; l'accesso già dato resta valido fino alla sua scadenza (max 1 h).
+            r["scade"] = min(float(r.get("scade", 0)), time.time() + GRAZIA_S)
             return self._emetti(client.client_id, scopes or r["scopes"], r.get("resource"))
 
     async def load_access_token(self, token: str) -> AccessToken | None:

@@ -130,10 +130,18 @@ def prove(bot, c, s):
     r = mcp_post(c, INIT, token=access)
     assert r.status_code == 200, (r.status_code, r.text[:200])
     assert mcp_post(c, INIT, token="falso").status_code == 401
-    # rinnovo: ruota, il vecchio non vale più
+    # rinnovo: ruota; due rinnovi quasi insieme con lo stesso token vanno bene tutti e due (13/11: il secondo falliva e il
+    # connettore si rompeva), finita la tolleranza il vecchio non vale più
     new = c.post("/token", data={"grant_type": "refresh_token", "refresh_token": refresh, "client_id": cid})
     assert new.status_code == 200, new.text
+    gemello = c.post("/token", data={"grant_type": "refresh_token", "refresh_token": refresh, "client_id": cid})
+    assert gemello.status_code == 200, gemello.text
+    import oauth as oauth_mod
+    for v in server.PROVIDER.d["refresh"].values():  # la tolleranza è finita
+        if float(v["scade"]) <= time.time() + oauth_mod.GRAZIA_S + 1:
+            v["scade"] = time.time() - 1
     assert c.post("/token", data={"grant_type": "refresh_token", "refresh_token": refresh, "client_id": cid}).status_code == 400
+    assert mcp_post(c, INIT, token=gemello.json()["access_token"]).status_code == 200
     access = new.json()["access_token"]
     assert mcp_post(c, INIT, token=access).status_code == 200
     assert len(server.PROVIDER.collegamenti()) == 1
