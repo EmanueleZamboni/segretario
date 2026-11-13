@@ -1860,7 +1860,7 @@ async def health(_request):
     r = _avvii_recenti()  # solo orari e memoria, niente dati: serve a capire i riavvii senza il connettore
     return JSONResponse({"ok": True, "name": "segretario", "avviato": AVVIATO, "avvii_ultima_ora": r.get("avvii_ultima_ora"),
                          "memoria": _mem_mb(), "vita_prima": (r.get("ultimi") or [{}])[-1].get("vita_prima"),
-                         "crash": _crash_coda()})
+                         "crash": _crash_coda(), "connettore_errori": _mcp_registro[-8:]})
 
 
 def _tutti(request) -> bool:
@@ -2694,7 +2694,36 @@ async def _app(scope, receive, send):
                         mcp._mcp_server.instructions = build_instructions()
                     except Exception as err:  # mai bloccare una richiesta per le istruzioni
                         print("istruzioni:", err, flush=True)
+                return await _mcp_registrato(scope, receive, send)
     await inner(scope, receive, send)
+
+
+_mcp_registro: list[dict] = []  # le ultime risposte del connettore che NON sono andate bene (solo stato e motivo): /health
+
+
+async def _mcp_registrato(scope, receive, send) -> None:
+    """Passa la richiesta al connettore e annota le risposte d'errore (stato HTTP, i primi 200 caratteri del motivo, mai
+    il contenuto degli strumenti). Serve a capire "il connettore dà errore" senza vedere i log del server."""
+    info: dict = {"quando": now().strftime("%m-%d %H:%M:%S"), "metodo": scope.get("method", "")}
+
+    async def send2(message):
+        if message["type"] == "http.response.start":
+            info["stato"] = message["status"]
+        elif message["type"] == "http.response.body" and info.get("stato", 200) >= 400 and "motivo" not in info:
+            info["motivo"] = message.get("body", b"")[:200].decode("utf-8", "replace")
+        await send(message)
+
+    try:
+        await inner(scope, receive, send2)
+    except Exception as err:
+        import traceback
+        info["stato"] = 500
+        info["motivo"] = ("".join(traceback.format_exception(err))[-300:])
+        raise
+    finally:
+        if info.get("stato", 200) >= 400:
+            _mcp_registro.append(info)
+            del _mcp_registro[:-15]
 
 
 if __name__ == "__main__":
