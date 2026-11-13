@@ -221,7 +221,10 @@ export class WhatsApp extends EventEmitter {
       this.emit('replaced');
       return;
     }
-    if (!this.creds?.registered) {
+    // 13/11/2026: prima c'era creds.registered, che con il collegamento via QR resta SEMPRE false (vale solo per il
+    // codice di abbinamento): a ogni caduta di rete (es. 428 "Connection Terminated") il servizio si fermava come "non
+    // collegato" invece di riconnettersi, e WhatsApp è rimasto giù dal 12/11. Collegato = creds.me esiste.
+    if (!this.creds?.me) {
       // Nessuno ha scansionato il QR in tempo (408), oppure la connessione è caduta prima: si torna in attesa,
       // il pulsante "Collega" lo rifà. Il motivo vero resta leggibile nella pagina /stato.
       this.state = 'not_linked';
