@@ -966,6 +966,42 @@ def sessioni_lista(solo_aperte: bool = True) -> list[dict]:
     return [{**s, "da": _age(s.get("aggiornato", ""))} for s in items]
 
 
+CHAT_APERTE = None  # recenti.Aperte, creato al primo uso (DATA è pronta)
+
+
+def _aperte():
+    global CHAT_APERTE
+    if CHAT_APERTE is None:
+        import recenti
+        CHAT_APERTE = recenti.Aperte(DATA / "chat_aperte.json")
+    return CHAT_APERTE
+
+
+@mcp.tool()
+def chat_aperte(voci: list[dict]) -> dict:
+    """Segna le chat che Ema ha aperto di recente: lo chiamano da sole la barra "segretario-tabs" dell'app Claude e
+    l'estensione Voce di claude.ai, non serve chiamarlo a mano. voci: [{titolo, tipo ("claude.ai" | "claude code"),
+    link (https://claude.ai/chat/... o claude://claude.ai/epitaxy/local_...), quando ("AAAA-MM-GG HH:MM", vuoto = adesso),
+    in_corso}]. Solo titolo e link, mai il contenuto delle chat."""
+    if not isinstance(voci, list):
+        raise ValueError("voci: una lista")
+    return {"segnate": _aperte().segna([v for v in voci if isinstance(v, dict)], now().strftime("%Y-%m-%d %H:%M"))}
+
+
+def _chat_recenti(quante: int = 40) -> list[dict]:
+    import recenti
+    with lock:
+        sess = list(_sessioni().values())
+    return recenti.recenti(_aperte().leggi(), sess, progetti_lista(True), quante)
+
+
+@mcp.tool()
+def chat_recenti(quante: int = 40) -> list[dict]:
+    """Dove ero rimasto: le chat recenti di Ema (claude.ai e Claude Code) e i progetti, dalla più recente, ognuna con
+    il link per riaprirla (se si sa), il progetto, cosa è stato fatto, il prossimo passo e cosa aspetta da Ema."""
+    return _chat_recenti(quante)
+
+
 @mcp.tool()
 def sessione_chiudi(nome: str) -> dict:
     """Segna una sessione come finita (resta in elenco con solo_aperte=false)."""
@@ -2452,6 +2488,31 @@ async def voce_page(request):
         "Permissions-Policy": "microphone=(self)"})
 
 
+async def chat_recenti_json(request):
+    """La barra delle chat su claude.ai (estensione Voce): le chat recenti, solo a un browser fidato."""
+    if not _voce_fidato(request):
+        return _voce_negato()
+    try:
+        quante = int(request.query_params.get("quante", "40"))
+    except ValueError:
+        quante = 40
+    return JSONResponse({"chat": await asyncio.to_thread(_chat_recenti, quante)}, headers={"Cache-Control": "no-store"})
+
+
+async def chat_aperta_post(request):
+    """L'estensione Voce segna la chat di claude.ai appena aperta: {titolo, link}. Solo titolo e link."""
+    if not _voce_fidato(request):
+        return _voce_negato()
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"errore": "JSON non valido"}, status_code=400)
+    voci = body.get("voci") if isinstance(body, dict) and isinstance(body.get("voci"), list) else [body]
+    voci = [{**v, "tipo": v.get("tipo") or "claude.ai"} for v in voci if isinstance(v, dict)]
+    n = _aperte().segna(voci, now().strftime("%Y-%m-%d %H:%M"))
+    return JSONResponse({"segnate": n}, headers={"Cache-Control": "no-store"})
+
+
 async def voce_json(request):
     if not _voce_fidato(request):
         return _voce_negato()
@@ -2527,7 +2588,8 @@ for _nome, _h, _m in (("hub", hub_page, ["GET", "POST"]), ("manager", manager_pa
                       ("whatsapp", whatsapp_pagina, ["GET"]), ("whatsapp/{sub}", whatsapp_pagina, ["GET", "POST"]),
                       ("backup", backup_scarica, ["GET"]), ("voce", voce_page, ["GET", "POST"]),
                       ("voce.json", voce_json, ["GET"]), ("voce/ascolta", voce_ascolta, ["POST"]),
-                      ("voce/parla", voce_parla, ["POST"])):
+                      ("voce/parla", voce_parla, ["POST"]), ("chat-recenti.json", chat_recenti_json, ["GET"]),
+                      ("chat-aperta", chat_aperta_post, ["POST"])):
     inner.add_route(f"/pagine/{_nome}", _h, methods=_m)
 
 
