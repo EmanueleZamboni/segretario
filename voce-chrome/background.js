@@ -41,6 +41,19 @@ chrome.runtime.onMessage.addListener((msg, sender, rispondi) => {
     (msg.cmd === "ferma" ? halFerma() : halChiedi(msg.cmd === "stato" ? "stato" : "avvia")).then(rispondi);
     return true;
   }
+  // la barra delle chat recenti (schede.js): "questa chat di claude.ai è aperta", solo titolo e link
+  if (msg && msg.tipo === "chat_aperta") {
+    const link = String(msg.link || "");
+    if (!/^https:\/\/claude\.ai\/(chat|project)\/[A-Za-z0-9-]{8,80}$/.test(link)) { rispondi({ errore: "link non permesso" }); return false; }
+    fetch("https://hub.emazamboni.com/chat-aperta", {
+      method: "POST", credentials: "include", cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titolo: String(msg.titolo || "").slice(0, 80), link, tipo: "claude.ai" }),
+    })
+      .then((r) => rispondi(r.ok ? { ok: true } : { errore: "http " + r.status }))
+      .catch((err) => rispondi({ errore: String(err && err.message || err) }));
+    return true;
+  }
   if (!msg || msg.tipo !== "pannelli") return false;
   const url = String(msg.url || "");
   if (!url.startsWith("https://hub.emazamboni.com/")) { rispondi({ errore: "indirizzo non permesso" }); return false; }

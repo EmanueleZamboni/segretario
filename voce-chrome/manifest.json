@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Segretario · Voce",
-  "version": "1.0.15",
+  "version": "1.0.19",
   "description": "La Voce del Segretario sopra la chat Secretary di claude.ai: parli, lui risponde a voce, con la scena. Un tasto e torni alla chat normale.",
   "permissions": [
     "nativeMessaging"
@@ -31,6 +31,18 @@
       ],
       "js": [
         "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "css": [
+        "schede.css"
+      ],
+      "js": [
+        "schede.js"
       ],
       "run_at": "document_idle"
     }
