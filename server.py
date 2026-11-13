@@ -2696,8 +2696,25 @@ async def _app(scope, receive, send):
                         mcp._mcp_server.instructions = build_instructions()
                     except Exception as err:  # mai bloccare una richiesta per le istruzioni
                         print("istruzioni:", err, flush=True)
-                return await _mcp_registrato(scope, receive, send)
+                return await _mcp_registrato(_versione_compatibile(scope), receive, send)
     await inner(scope, receive, send)
+
+
+def _versione_compatibile(scope: dict) -> dict:
+    """13/11/2026: claude.ai ha iniziato a mandare l'intestazione MCP-Protocol-Version "2026-07-28", che questa versione
+    dell'SDK (mcp 1.30) non conosce: rifiutava OGNI chiamata con 400 "Unsupported protocol version" e il connettore era
+    morto. Una versione più nuova e sconosciuta diventa la più recente che conosciamo (come fa l'initialize, che già
+    risponde con la nostra versione): il protocollo è pensato per scendere così. Le versioni vecchie non si toccano."""
+    from mcp.shared.version import SUPPORTED_PROTOCOL_VERSIONS
+    from mcp.types import LATEST_PROTOCOL_VERSION
+    nuove = []
+    for k, v in scope.get("headers") or []:
+        if k.lower() == b"mcp-protocol-version":
+            ver = v.decode("latin-1").strip()
+            if ver not in SUPPORTED_PROTOCOL_VERSIONS and ver > LATEST_PROTOCOL_VERSION:
+                v = LATEST_PROTOCOL_VERSION.encode()
+        nuove.append((k, v))
+    return {**scope, "headers": nuove}
 
 
 _mcp_registro: list[dict] = []  # le ultime risposte del connettore che NON sono andate bene (solo stato e motivo): /health

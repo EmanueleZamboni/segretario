@@ -46,9 +46,11 @@ def tg(bot, testo):
     return bot.handle({"message": {"message_id": 1, "chat": {"id": 42}, "from": {"id": 42}, "text": testo}})
 
 
-def mcp_post(c, body, token=None, ip=ANTHROPIC_IP):
+def mcp_post(c, body, token=None, ip=ANTHROPIC_IP, versione=None):
     h = {"content-type": "application/json", "accept": "application/json, text/event-stream", "x-forwarded-for": ip,
          "host": "localhost"}
+    if versione:
+        h["mcp-protocol-version"] = versione
     if token:
         h["authorization"] = f"Bearer {token}"
     return c.post(f"/{server.secret}/mcp", content=json.dumps(body), headers=h)
@@ -144,6 +146,11 @@ def prove(bot, c, s):
     assert mcp_post(c, INIT, token=gemello.json()["access_token"]).status_code == 200
     access = new.json()["access_token"]
     assert mcp_post(c, INIT, token=access).status_code == 200
+    # 13/11: claude.ai manda una versione del protocollo più nuova di quelle che l'SDK conosce: deve funzionare lo stesso
+    lista = {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
+    r = mcp_post(c, lista, token=access, versione="2026-07-28")
+    assert r.status_code == 200 and "stato" in r.text, (r.status_code, r.text[:200])
+    assert mcp_post(c, lista, token=access, versione="1999-01-01").status_code == 400  # una versione inventata e vecchia no
     assert len(server.PROVIDER.collegamenti()) == 1
     # nel file solo hash, mai i token
     raw = (DATA / "oauth.json").read_text()
