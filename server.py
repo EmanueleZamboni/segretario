@@ -1161,6 +1161,117 @@ def instagram_rispondi(destinatario_id: str, testo: str) -> dict:
     return {"inviato": True, "message_id": out.get("message_id"), "quando": f"{t:%Y-%m-%d %H:%M}"}
 
 
+# ---------- area riservata STOSTUDIO (stostudio.it/riservato) ----------
+# Video di lavori non pubblici, mostrati a una persona alla volta: link personale + password, visioni limitate,
+# il nome della persona sopra al video. Il Worker stostudio-riservato accetta la chiave RISERVATO_KEY (sua, solo del
+# Segretario) per 3 cose: le liste, creare un link, disattivarne uno. Niente viene salvato qui.
+RISERVATO_API = "https://stostudio.it/riservato/api/"
+
+
+def _riservato_api(sub: str, body: dict | None = None) -> dict:
+    import urllib.error
+    import urllib.request
+
+    key = os.environ.get("RISERVATO_KEY", "").strip()
+    if not key:
+        raise RuntimeError("Area riservata non collegata (manca RISERVATO_KEY in Impostazioni)")
+    base = os.environ.get("RISERVATO_API_URL", "").strip() or RISERVATO_API   # solo per i test
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(base + sub, data=data, method="POST" if data else "GET",
+                                 headers={"x-riservato-key": key, "Content-Type": "application/json",
+                                          "User-Agent": "segretario"})
+    try:
+        with urllib.request.urlopen(req, timeout=25) as r:
+            out = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise RuntimeError("Area riservata: chiave rifiutata o funzione non permessa") from None
+        try:
+            msg = json.loads(e.read().decode("utf-8")).get("error") or f"HTTP {e.code}"
+        except Exception:
+            msg = f"HTTP {e.code}"
+        raise RuntimeError(f"Area riservata: {msg}") from None
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        raise RuntimeError(f"Area riservata: non risponde ({type(e).__name__})") from None
+    if isinstance(out, dict) and out.get("ok") is False:
+        raise RuntimeError(f"Area riservata: {out.get('error') or 'richiesta rifiutata'}")
+    return out
+
+
+def _riservato_giorno(ms) -> str:
+    try:
+        return datetime.fromtimestamp(int(ms) / 1000, TZ).strftime("%Y-%m-%d")
+    except (TypeError, ValueError, OSError):
+        return ""
+
+
+@mcp.tool()
+def riservato_video() -> list[dict]:
+    """I video dell'area riservata STOSTUDIO (stostudio.it/riservato), nell'ordine in cui li vede chi apre il link:
+    id, titolo (lo vede solo Ema, mai chi guarda), durata. Servono a riservato_link."""
+    out = _riservato_api("state")
+    return [{"id": v.get("id"), "titolo": v.get("title"), "durata": v.get("duration")} for v in out.get("videos", [])]
+
+
+@mcp.tool()
+def riservato_link(nome: str, video: list[str] | None = None, visioni: int = 3, giorni: int = 7) -> dict:
+    """Crea un link privato all'area riservata STOSTUDIO per UNA persona: nome = chi lo riceve, compare sopra ai video
+    (es. "Mario Rossi · Nome azienda"). video = titoli o id da riservato_video (vuoto = tutti). visioni per video 1-3,
+    giorni di validità 1-30. Restituisce il messaggio pronto (link + password): mostralo a Ema così com'è, è lui che
+    lo manda. La password si vede SOLO adesso: non salvarla da nessuna parte (né diario né documenti)."""
+    nome = _check(nome, "nome", 60).strip()
+    if not nome:
+        raise ValueError("nome di chi riceve il link")
+    catalogo = _riservato_api("state").get("videos", [])
+    scelti = []
+    for x in (video or []):
+        k = str(x).strip().lower()
+        hit = [v for v in catalogo if v.get("id") == k] or [v for v in catalogo if k and k in str(v.get("title", "")).lower()]
+        if not hit:
+            raise ValueError(f"video non trovato: {x}. Quelli che ci sono: " + ", ".join(str(v.get("title")) for v in catalogo))
+        if len(hit) > 1:
+            raise ValueError(f"'{x}' è ambiguo: " + ", ".join(str(v.get("title")) for v in hit))
+        if hit[0]["id"] not in scelti:
+            scelti.append(hit[0]["id"])
+    if not scelti:
+        scelti = [v["id"] for v in catalogo]
+    if not scelti:
+        raise RuntimeError("Area riservata: non ci sono video")
+    out = _riservato_api("create", {"name": nome, "videos": scelti, "plays": max(1, min(int(visioni), 3)),
+                                    "days": max(1, min(int(giorni), 30))})
+    titoli = [str(v.get("title")) for v in catalogo if v.get("id") in scelti]
+    return {"per": nome, "video": titoli, "scade": _riservato_giorno(out.get("expires")),
+            "messaggio": out.get("message"), "link": out.get("link"),
+            "nota": "Mostra il messaggio a Ema: lo manda lui. La password non va salvata."}
+
+
+@mcp.tool()
+def riservato_link_lista() -> list[dict]:
+    """I link privati dell'area riservata STOSTUDIO, dal più recente: per chi, attivo o no, fino a quando,
+    quante visioni ha usato per video. token serve a riservato_disattiva."""
+    out = _riservato_api("state")
+    titoli = {v.get("id"): v.get("title") for v in out.get("videos", [])}
+    adesso = out.get("now") or 0
+    righe = []
+    for l in out.get("links", []):
+        stato_l = "disattivato" if l.get("revoked") else ("scaduto" if (l.get("expires") or 0) <= adesso else "attivo")
+        righe.append({"token": l.get("token"), "per": l.get("name"), "stato": stato_l,
+                      "creato": _riservato_giorno(l.get("created")), "fino_al": _riservato_giorno(l.get("expires")),
+                      "visioni": {str(titoli.get(v, "video tolto")): f"{(l.get('plays') or {}).get(v, 0)}/{l.get('maxPlays')}"
+                                  for v in (l.get("videos") or [])}})
+    return righe
+
+
+@mcp.tool()
+def riservato_disattiva(token: str) -> dict:
+    """Disattiva un link privato (token da riservato_link_lista): chi lo ha non vede più niente. Chiedi prima a Ema."""
+    tok = re.sub(r"[^A-Za-z0-9_-]", "", _check(token, "token", 64))
+    if len(tok) < 16:
+        raise ValueError("token non valido")
+    _riservato_api("revoke", {"token": tok})
+    return {"disattivato": True}
+
+
 # ---------- brief e spesa (fatti dal server, senza Claude) ----------
 def _brief_testo() -> str:
     t = now()
@@ -1494,6 +1605,7 @@ def stato() -> dict:
         "cervello_on_demand": bool(os.environ.get("ROUTINE_FIRE_URL", "").strip()),
         "trascrizione": bool(os.environ.get("GROQ_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip()),
         "instagram": bool(os.environ.get("LINKS_STATS_KEY", "").strip()),
+        "area_riservata_stostudio": bool(os.environ.get("RISERVATO_KEY", "").strip()),
         "keep": keep.configured(),
         "brief_ora": os.environ.get("BRIEF_ORA", "").strip() or "spento",
         "calendario": bool(os.environ.get("CALENDAR_ICS_URL", "").strip()),
@@ -1579,7 +1691,7 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
 
 CONFIG_KEYS = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GROQ_API_KEY", "OPENAI_API_KEY", "ROUTINE_FIRE_URL", "ROUTINE_FIRE_TOKEN",
                "LINKS_API_URL", "LINKS_STATS_KEY", "KEEP_MCP_URL", "KEEP_MCP_HOST", "BRIEF_ORA", "TELEGRAM_PROPOSTE",
-               "CALENDAR_ICS_URL", "POSTINO_DB", "ANTHROPIC_API_KEY", "DRIVE_BACKUP_URL")
+               "CALENDAR_ICS_URL", "POSTINO_DB", "ANTHROPIC_API_KEY", "DRIVE_BACKUP_URL", "RISERVATO_KEY")
 
 
 def load_config() -> dict:
@@ -2056,6 +2168,8 @@ def _config_valida(k: str, v: str) -> str | None:
         return "una chiave Groq inizia con gsk_"
     if k == "DRIVE_BACKUP_URL" and v and not drive_mod.valido(v):
         return "l'indirizzo è quello dell'app web dello script: inizia con https://script.google.com/macros/s/ e finisce con /exec"
+    if k == "RISERVATO_KEY" and v and not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", v):
+        return "la chiave dell'area riservata è di 32-128 lettere e numeri, senza spazi"
     if k == "ANTHROPIC_API_KEY" and v and not v.startswith("sk-ant-"):
         return "una chiave di Claude inizia con sk-ant-"
     return None
@@ -2132,6 +2246,7 @@ MANAGER_KEYS = [
     ("TELEGRAM_PROPOSTE", "Regole proposte sul telefono", "1 = ogni regola proposta arriva su Telegram con i bottoni. Vuoto = no: le approvi in chat con il codice", "text", "Telegram", "telegram"),
     ("LINKS_STATS_KEY", "Instagram", "Accende i messaggi Instagram: la chiave del tuo link manager (il contenuto del file STATS-KEY.txt nel repo links)", "password", "Instagram e link manager", "instagram"),
     ("LINKS_API_URL", "Indirizzo del link manager", "Di solito https://links-tracker.ezamboni96.workers.dev", "text", "Instagram e link manager", "link"),
+    ("RISERVATO_KEY", "Area riservata STOSTUDIO", "Permette alle chat di creare i link privati di stostudio.it/riservato (e di vederli o disattivarli). La chiave sta nel file chiave-segretario.txt che Claude ti apre: copiala qui e salva", "password", "STOSTUDIO", "link"),
     ("OPENAI_API_KEY", "Vocali: riserva OpenAI", "Usata solo se la chiave Groq manca", "password", "Avanzate", "mic"),
     ("ROUTINE_FIRE_URL", "Messaggi Telegram a Claude: indirizzo", "L'indirizzo /fire del task \"on demand\" su claude.ai: i messaggi che scrivi al bot vanno a Claude", "text", "Avanzate", "chat"),
     ("ROUTINE_FIRE_TOKEN", "Messaggi Telegram a Claude: token", "Dallo stesso dialogo del task", "password", "Avanzate", "chat"),
