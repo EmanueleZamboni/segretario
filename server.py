@@ -48,6 +48,7 @@ import guardia
 import oauth as oauth_mod
 import remoti
 import backup as backup_mod
+import caccia as caccia_mod
 import drive as drive_mod
 
 DATA = Path(os.environ.get("SEGRETARIO_DATA", "/data"))
@@ -1031,6 +1032,75 @@ def notify(testo: str) -> dict:
     return {"inviato": True, "message_id": mid, "quando": f"{t:%Y-%m-%d %H:%M}"}
 
 
+# ---------- Caccia agli affari su Vinted (sul server, 24/7; regole fisse in /data/caccia, niente IA) ----------
+CACCIA = caccia_mod.Caccia(DATA / "caccia", now)
+
+
+def _caccia_giro(manuale: bool = False) -> dict:
+    """Un giro di caccia; se trova affari manda UN messaggio Telegram (Ema vuole un avviso solo quando c'è un affare)."""
+    out = CACCIA.giro(manuale)
+    trovati = out.pop("lista", [])
+    if trovati and bot is not None and bot.chat_id is not None:
+        try:
+            bot.send(caccia_mod.messaggio(trovati))
+            out["messaggio"] = True
+        except Exception as err:  # noqa: BLE001
+            out["messaggio"] = f"non inviato: {err}"
+            log.warning("caccia: messaggio non inviato: %s", err)
+    if trovati:
+        try:
+            elenco = "; ".join(f"{a['titolo'][:40]} EUR {a['prezzo']:.0f} {a['url']}" for a in trovati[:4])
+            diario_scrivi(f"Caccia Vinted sul server: {len(trovati)} affari ({elenco})"[:495], origine="server")
+        except Exception as err:  # noqa: BLE001
+            log.warning("caccia: diario: %s", err)
+    return out
+
+
+def _caccia_loop() -> None:
+    while True:
+        try:
+            if not BLOCCO.attivo and CACCIA.dovuto():
+                _caccia_giro()
+        except Exception as err:  # noqa: BLE001
+            log.warning("caccia: %s", err)
+        time.sleep(60)
+
+
+@mcp.tool()
+def caccia_regole(regole: str = "") -> dict:
+    """La caccia agli affari su Vinted che gira sul server (due volte al giorno, anche a PC spento). Senza argomenti
+    restituisce le regole attuali. Con `regole` (JSON) le SOSTITUISCE tutte: {"ricerche": [{"cerca": "ccd-tr918",
+    "max": 80, "deve": "regex sul titolo (facoltativo)", "gruppo": "camere|synth|telefoni|lista"}, {"cerca": "nokia n91",
+    "mediana": 0.5, "gruppo": "lista"}], "escludi": "regex", "per_giro": 14, "orari": ["09:00", "21:00"],
+    "gia_visti": [id...]}. max = prezzo massimo in euro; mediana = frazione del prezzo tipico di quella ricerca.
+    Leggi prima quelle attuali e cambia solo quello che Ema chiede."""
+    if regole.strip():
+        try:
+            nuove = json.loads(regole)
+        except ValueError as err:
+            raise ValueError(f"JSON non valido: {err}") from None
+        r = CACCIA.salva_regole(nuove)
+        return {"salvate": True, "ricerche": len(r["ricerche"]), "orari": r["orari"], "per_giro": r["per_giro"]}
+    return CACCIA.regole() or {"regole": "nessuna: la caccia è spenta finché non le scrivi"}
+
+
+@mcp.tool()
+def caccia_stato(avvia_ora: bool = False, riattiva: bool = False) -> dict:
+    """Come va la caccia Vinted sul server: ultimo giro, esito (ok / bloccato da Vinted), affari trovati di recente.
+    avvia_ora=True fa partire subito un giro in sottofondo (1-2 minuti; poi richiama caccia_stato per l'esito).
+    riattiva=True la rimette in moto se si era fermata da sola dopo troppi blocchi di Vinted."""
+    if riattiva:
+        CACCIA.riattiva()
+    if avvia_ora:
+        if CACCIA.in_corso:
+            return {"avviato": False, "motivo": "un giro è già in corso", **CACCIA.stato()}
+        if not CACCIA.regole():
+            raise ValueError("nessuna regola: prima caccia_regole")
+        threading.Thread(target=_caccia_giro, args=(True,), name="caccia", daemon=True).start()
+        return {"avviato": True, "nota": "richiama caccia_stato tra 2 minuti"}
+    return CACCIA.stato()
+
+
 # ---------- Instagram (DM del profilo @emazamboni, via il Worker del link manager) ----------
 # Il Worker di links.emazamboni.com ha il token Instagram e gli endpoint /ig/conversations,
 # /ig/messages, /ig/reply (repo EmanueleZamboni/links, branch ig-dm). Qui si fa solo da ponte:
@@ -1644,6 +1714,7 @@ def stato() -> dict:
         "instagram": bool(os.environ.get("LINKS_STATS_KEY", "").strip()),
         "area_riservata_stostudio": bool(os.environ.get("RISERVATO_KEY", "").strip()),
         "keep": keep.configured(),
+        "caccia_vinted": {k: v for k, v in CACCIA.stato().items() if k in ("attiva", "regole", "fermo", "ultimo_giro", "in_corso")},
         "brief_ora": os.environ.get("BRIEF_ORA", "").strip() or "spento",
         "calendario": bool(os.environ.get("CALENDAR_ICS_URL", "").strip()),
         "email_nel_brief": bool(os.environ.get("POSTINO_DB", "").strip()),
@@ -2009,7 +2080,8 @@ async def health(_request):
     r = _avvii_recenti()  # solo orari e memoria, niente dati: serve a capire i riavvii senza il connettore
     return JSONResponse({"ok": True, "name": "segretario", "avviato": AVVIATO, "avvii_ultima_ora": r.get("avvii_ultima_ora"),
                          "memoria": _mem_mb(), "vita_prima": (r.get("ultimi") or [{}])[-1].get("vita_prima"),
-                         "crash": _crash_coda(), "connettore_errori": _mcp_registro[-15:]})
+                         "crash": _crash_coda(), "connettore_errori": _mcp_registro[-15:],
+                         "caccia": {k: v for k, v in CACCIA.stato().items() if k in ("attiva", "fermo", "ultimo_giro", "in_corso")}})
 
 
 def _tutti(request) -> bool:
@@ -2916,6 +2988,7 @@ if __name__ == "__main__":
         print("Telegram: non configurato (TELEGRAM_BOT_TOKEN vuoto): nessuna consegna al telefono", flush=True)
     threading.Thread(target=_brief_loop, name="brief", daemon=True).start()
     threading.Thread(target=_backup_loop, name="backup", daemon=True).start()
+    threading.Thread(target=_caccia_loop, name="caccia", daemon=True).start()
     import atexit
     atexit.register(lambda: _annota_fine("uscita del processo (atexit)"))
 
