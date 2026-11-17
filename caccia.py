@@ -30,6 +30,7 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
 PAUSA = 6.0          # secondi tra due pagine di ricerca (ognuna ~7 MB): sul PC 4-5 s non ha mai bloccato
 MAX_PER_GIRO = 20    # tetto duro, qualunque cosa dicano le regole
+MAX_SEMPRE = 8       # ricerche "sempre" (ogni giro) al massimo
 MAX_TROVATI_MSG = 4  # affari per messaggio
 FERMO_DOPO = 3       # giri bloccati di fila prima di fermarsi da soli
 
@@ -210,6 +211,8 @@ def controlla_regole(r: dict) -> dict:
             raise ValueError(f"ricerca {i} ({y['cerca']}): serve 'max' (euro) o 'mediana'")
         if x.get("accessori"):
             y["accessori"] = True
+        if x.get("sempre"):
+            y["sempre"] = True
         if x.get("deve"):
             re.compile(x["deve"])
             y["deve"] = str(x["deve"])
@@ -328,9 +331,12 @@ class Caccia:
             s["orari_fatti"] = fatti
             visti_d = self._leggi("visti.json", {})
             visti = {int(k) for k in visti_d} | set(r["gia_visti"])
-            ric = r["ricerche"]
+            # "sempre": ricerche larghe che girano ogni volta (lì escono gli annunci nuovi); le altre a turno
+            sempre = [x for x in r["ricerche"] if x.get("sempre")][:MAX_SEMPRE]
+            ric = [x for x in r["ricerche"] if not x.get("sempre")] or [None]
             da = s.get("prossimo", 0) % len(ric)
-            turno = [ric[(da + i) % len(ric)] for i in range(min(r["per_giro"], len(ric)))]
+            n_rot = min(max(r["per_giro"] - len(sempre), 0), len(ric))
+            turno = sempre + [x for x in (ric[(da + i) % len(ric)] for i in range(n_rot)) if x]
             v = self.vinted_factory()
             trovati, cercati, letti, esito = [], 0, 0, "ok"
             for x in turno:
@@ -348,7 +354,7 @@ class Caccia:
                 for a in affari(x, pagina, r["escludi"], visti):
                     trovati.append(a)
                     visti.add(a["id"])
-            s["prossimo"] = (da + cercati) % len(ric)
+            s["prossimo"] = (da + max(cercati - len(sempre), 0)) % len(ric)
             for a in trovati:
                 visti_d[str(a["id"])] = t.strftime("%Y-%m-%d")
             if len(visti_d) > 20_000:

@@ -157,6 +157,20 @@ def main():
         pass
     st = server.stato()["caccia_vinted"]
     ok(st["attiva"] is True and "ricerche" not in json.dumps(st), st)
+    # 10. "sempre": la ricerca larga gira ogni volta, le altre a turno
+    c2 = caccia.Caccia(DATA / "caccia2", lambda: ora["t"], FintoVinted)
+    c2.salva_regole({"ricerche": [{"cerca": "videocamera sony", "max": 30, "deve": "sc55", "sempre": True},
+                                  {"cerca": "ccd-tr918", "max": 80}, {"cerca": "nokia n91", "max": 50},
+                                  {"cerca": "x3", "max": 5}], "per_giro": 2})
+    giri = []
+    for _ in range(4):
+        n0 = len(CHIAMATE)
+        c2.giro(manuale=True)
+        giri.append([caccia.urllib.parse.parse_qs(caccia.urllib.parse.urlsplit(u).query).get("search_text", ["home"])[0]
+                     for u in CHIAMATE[n0:]])
+    termini = [[g for g in giro if g != "home"] for giro in giri]
+    ok(termini == [["videocamera sony", "ccd-tr918"], ["videocamera sony", "nokia n91"], ["videocamera sony", "x3"],
+                   ["videocamera sony", "ccd-tr918"]], termini)
     print("CACCIA OK" if not fails else f"CACCIA: {fails} errori")
     sys.exit(1 if fails else 0)
 

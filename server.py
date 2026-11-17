@@ -1072,7 +1072,9 @@ def caccia_regole(regole: str = "") -> dict:
     restituisce le regole attuali. Con `regole` (JSON) le SOSTITUISCE tutte: {"ricerche": [{"cerca": "ccd-tr918",
     "max": 80, "deve": "regex sul titolo (facoltativo)", "gruppo": "camere|synth|telefoni|lista"}, {"cerca": "nokia n91",
     "mediana": 0.5, "gruppo": "lista"}], "escludi": "regex", "per_giro": 14, "orari": ["09:00", "21:00"],
-    "gia_visti": [id...]}. max = prezzo massimo in euro; mediana = frazione del prezzo tipico di quella ricerca.
+    "gia_visti": [id...]}. max = prezzo massimo in euro; mediana = frazione del prezzo tipico di quella ricerca;
+    "sempre": true = cercata a ogni giro (ricerche larghe, max 8), le altre a turno; "accessori": true = non scartare
+    batterie/cavi/custodie (quando l'accessorio è la cosa cercata).
     Leggi prima quelle attuali e cambia solo quello che Ema chiede."""
     if regole.strip():
         try:
