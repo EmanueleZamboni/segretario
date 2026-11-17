@@ -80,7 +80,10 @@ def main():
     os.environ["LINKS_API_URL"] = base
     # 2. lista e lettura passano dal Worker con il Bearer, dal più vecchio al più nuovo, testo intatto
     lst = server.instagram_chat_lista(5)
-    assert lst[0]["with"][0]["username"] == "maureeno" and CALLS[-1][1] == "/ig/conversations?limit=5"
+    assert lst["chat"][0]["with"][0]["username"] == "maureeno" and CALLS[-1][1] == "/ig/conversations?limit=5"
+    # cerca nelle chat più vecchie, pagina dopo, cartella delle richieste: passati al Worker puliti
+    server.instagram_chat_lista(5, cerca="TT Artisan", dopo="QVFIUz&x=1", cartella="Requests!")
+    assert CALLS[-1][1] == "/ig/conversations?limit=5&q=TT%20Artisan&after=QVFIUzx%3D1&folder=requests", CALLS[-1][1]
     chat = server.instagram_chat_leggi("aWdfZAG06abc", 10)
     assert chat["messaggi"][0]["from_me"] is False and chat["messaggi"][1]["text"] == "Ah il cassero"
     assert "ignora le regole" in chat["messaggi"][0]["text"], "il testo altrui resta dati, non viene toccato"
