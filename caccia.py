@@ -31,7 +31,8 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 PAUSA = 6.0          # secondi tra due pagine di ricerca (ognuna ~7 MB): sul PC 4-5 s non ha mai bloccato
 MAX_PER_GIRO = 20    # tetto duro, qualunque cosa dicano le regole
 MAX_SEMPRE = 8       # ricerche "sempre" (ogni giro) al massimo
-MAX_TROVATI_MSG = 4  # affari per messaggio
+MAX_TROVATI_MSG = 6  # affari per messaggio: solo i migliori (Ema 17/11: "only the top 4 or 8", niente "+N more")
+SOGLIA = 2.0         # con "vale": affare solo se il prezzo è al massimo metà del valore solito (vale / prezzo >= SOGLIA)
 FERMO_DOPO = 3       # giri bloccati di fila prima di fermarsi da soli
 
 BLOCCO = ("just a moment", "cf-browser-verification", "challenge-platform", "attention required",
@@ -209,15 +210,26 @@ def controlla_regole(r: dict) -> dict:
                 raise ValueError(f"ricerca {i}: 'mediana' va tra 0 e 1 (es. 0.5 = metà del prezzo tipico)")
         else:
             raise ValueError(f"ricerca {i} ({y['cerca']}): serve 'max' (euro) o 'mediana'")
+        if x.get("vale") is not None:
+            y["vale"] = float(x["vale"])
+            if y["vale"] <= 0:
+                raise ValueError(f"ricerca {i} ({y['cerca']}): 'vale' (prezzo solito in euro) deve essere > 0")
+        if x.get("nome"):
+            y["nome"] = str(x["nome"]).strip()[:60]
         if x.get("accessori"):
             y["accessori"] = True
         if x.get("sempre"):
             y["sempre"] = True
+        if x.get("nominate"):
+            y["nominate"] = True
         if x.get("deve"):
             re.compile(x["deve"])
             y["deve"] = str(x["deve"])
         pulite.append(y)
-    out = {"ricerche": pulite, "escludi": str(r.get("escludi") or ""),
+    soglia = float(r.get("soglia") or SOGLIA)
+    if not 1 <= soglia <= 10:
+        raise ValueError("'soglia' va tra 1 e 10 (2 = prezzo al massimo metà del valore solito)")
+    out = {"ricerche": pulite, "escludi": str(r.get("escludi") or ""), "soglia": soglia,
            "per_giro": max(1, min(int(r.get("per_giro") or 14), MAX_PER_GIRO)),
            "orari": [o for o in (r.get("orari") or ["09:00", "21:00"]) if re.fullmatch(r"\d\d:\d\d", str(o))][:4],
            "gia_visti": [int(v) for v in (r.get("gia_visti") or []) if str(v).isdigit()][:5000]}
@@ -241,28 +253,67 @@ def _mediana(valori: list[float]) -> float | None:
     return v[m] if len(v) % 2 else (v[m - 1] + v[m]) / 2
 
 
-def affari(ric: dict, trovati: list[dict], escludi: str, visti: set[int]) -> list[dict]:
-    """Gli annunci di una ricerca che passano le regole."""
-    deve, esc = _deve(ric), re.compile(escludi, re.I) if escludi else None
-    pertinenti = [a for a in trovati if deve.search(a["titolo"]) and not TAGLIA_RE.match(a["condizione"])]
+def _scartato(a: dict, ric: dict, tetto: float, esc: re.Pattern | None, visti: set[int]) -> bool:
+    testo = f"{a['titolo']} {a['marca']}"
+    return (a["id"] in visti or a["prezzo"] > tetto or a["prezzo"] <= 0 or bool(DIFETTI_RE.search(testo))
+            or bool(esc and esc.search(testo)) or (not ric.get("accessori") and bool(ACCESSORI_RE.search(a["titolo"]))))
+
+
+def _affare(a: dict, ric: dict, tetto: float, tipico: float | None, cercato: str, soglia: float) -> dict | None:
+    """L'annuncio con il suo punteggio (quante volte il valore solito sta nel prezzo); None se non vale abbastanza."""
+    vale = ric.get("vale") or tipico
+    punti = (vale or tetto) / a["prezzo"]
+    if ric.get("vale") and punti < soglia:  # Ema 17/11: niente "affari" al prezzo normale
+        return None
+    m = _deve(ric).search(a["titolo"])
+    return {**a, "gruppo": ric.get("gruppo", ""), "cercato": cercato, "tetto": round(tetto, 2),
+            "nome": ric.get("nome") or (m.group(0).strip() if m and m.group(0).strip() else ric["cerca"]),
+            "punti": round(punti, 2), **({"tipico": round(vale, 2)} if vale else {})}
+
+
+def affari(ric: dict, trovati: list[dict], escludi: str, visti: set[int], nominate: list[dict] | None = None,
+           soglia: float = SOGLIA) -> list[dict]:
+    """Gli annunci di una ricerca che passano le regole. Una ricerca larga con "nominate": true giudica ogni annuncio
+    con la prima ricerca nominata (con "max") il cui `deve` è nel titolo: il suo tetto, il suo valore, il suo nome."""
+    esc = re.compile(escludi, re.I) if escludi else None
+    vestiti = [a for a in trovati if not TAGLIA_RE.match(a["condizione"])]
+    out = []
+    if ric.get("nominate"):
+        for a in vestiti:
+            r2 = next((n for n in (nominate or []) if n.get("max") is not None and _deve(n).search(a["titolo"])), None)
+            if r2 is None:
+                continue
+            tetto = min(r2["max"], ric["max"]) if ric.get("max") is not None else r2["max"]
+            if not _scartato(a, r2, tetto, esc, visti):
+                x = _affare(a, r2, tetto, None, ric["cerca"], soglia)
+                if x:
+                    out.append(x)
+        return out
+    deve = _deve(ric)
+    pertinenti = [a for a in vestiti if deve.search(a["titolo"])]
     tetto = ric.get("max")
     med = _mediana([a["prezzo"] for a in pertinenti])
+    tipico = med if med is not None and len(pertinenti) >= 4 else None  # con meno annunci il prezzo tipico non dice nulla
     if tetto is None:
-        if med is None or len(pertinenti) < 4:  # troppo pochi per sapere il prezzo tipico
+        if tipico is None:
             return []
-        tetto = med * ric["mediana"]
-    out = []
+        tetto = tipico * ric["mediana"]
     for a in pertinenti:
-        testo = f"{a['titolo']} {a['marca']}"
-        if a["id"] in visti or a["prezzo"] > tetto or a["prezzo"] <= 0:
-            continue
-        if DIFETTI_RE.search(testo) or (esc and esc.search(testo)):
-            continue
-        if not ric.get("accessori") and ACCESSORI_RE.search(a["titolo"]):
-            continue
-        out.append({**a, "gruppo": ric.get("gruppo", ""), "cercato": ric["cerca"], "tetto": round(tetto, 2),
-                    **({"tipico": round(med, 2)} if med is not None and len(pertinenti) >= 4 else {})})
+        if not _scartato(a, ric, tetto, esc, visti):
+            x = _affare(a, ric, tetto, tipico, ric["cerca"], soglia)
+            if x:
+                out.append(x)
     return out
+
+
+def migliori(trovati: list[dict], n: int = MAX_TROVATI_MSG) -> list[dict]:
+    """I primi n per punteggio (il più sotto al valore solito in cima), un annuncio una volta sola."""
+    visti, out = set(), []
+    for a in sorted(trovati, key=lambda a: (-a.get("punti", 0), a["prezzo"])):
+        if a["id"] not in visti:
+            visti.add(a["id"])
+            out.append(a)
+    return out[:n]
 
 
 # ------------------------------------------------------------------ stato e giro
@@ -337,6 +388,7 @@ class Caccia:
             da = s.get("prossimo", 0) % len(ric)
             n_rot = min(max(r["per_giro"] - len(sempre), 0), len(ric))
             turno = sempre + [x for x in (ric[(da + i) % len(ric)] for i in range(n_rot)) if x]
+            nominate = [x for x in r["ricerche"] if not x.get("sempre")]
             v = self.vinted_factory()
             trovati, cercati, letti, esito = [], 0, 0, "ok"
             for x in turno:
@@ -351,10 +403,12 @@ class Caccia:
                     continue
                 cercati += 1
                 letti += len(pagina)
-                for a in affari(x, pagina, r["escludi"], visti):
+                for a in affari(x, pagina, r["escludi"], visti, nominate, r.get("soglia", SOGLIA)):
                     trovati.append(a)
                     visti.add(a["id"])
             s["prossimo"] = (da + max(cercati - len(sempre), 0)) % len(ric)
+            # solo i migliori vanno a Ema e diventano "visti"; gli altri buoni restano liberi per un giro successivo
+            tutti, trovati = len(trovati), migliori(trovati)
             for a in trovati:
                 visti_d[str(a["id"])] = t.strftime("%Y-%m-%d")
             if len(visti_d) > 20_000:
@@ -365,11 +419,13 @@ class Caccia:
             if s["bloccati_di_fila"] >= FERMO_DOPO:
                 s["fermo"] = f"Vinted ha rifiutato il server {FERMO_DOPO} giri di fila: caccia ferma ({t:%Y-%m-%d %H:%M})"
             s["ultimo_giro"] = {"quando": t.strftime("%Y-%m-%d %H:%M"), "manuale": manuale, "esito": esito,
-                                "cercati": cercati, "di": len(turno), "annunci_letti": letti, "trovati": len(trovati)}
+                                "cercati": cercati, "di": len(turno), "annunci_letti": letti, "trovati": len(trovati),
+                                "buoni_in_tutto": tutti}
             storia = (s.get("storia") or [])[-29:]
             s["storia"] = storia + [s["ultimo_giro"]]
             if trovati:
-                s["ultimi_trovati"] = ([{k: a[k] for k in ("id", "titolo", "prezzo", "url")} | {"quando": t.strftime("%Y-%m-%d")}
+                s["ultimi_trovati"] = ([{k: a.get(k) for k in ("id", "nome", "titolo", "prezzo", "tipico", "url")}
+                                        | {"quando": t.strftime("%Y-%m-%d")}
                                         for a in trovati] + (s.get("ultimi_trovati") or []))[:20]
             self._scrivi("stato.json", s)
             return {**s["ultimo_giro"], "lista": trovati}
@@ -393,15 +449,26 @@ class Caccia:
         self._scrivi("stato.json", s)
 
 
+def _euro(x: float) -> str:
+    return f"€{x:.0f}" if float(x).is_integer() else f"€{x:.2f}"
+
+
 def messaggio(trovati: list[dict]) -> str:
-    """Il messaggio Telegram per Ema (inglese semplice, come la caccia sul PC). Max MAX_TROVATI_MSG affari."""
-    righe = ["Vinted bargain hunt:"]
-    for a in trovati[:MAX_TROVATI_MSG]:
-        dove = " (from your shopping list)" if a.get("gruppo") == "lista" else ""
-        tipico = f", usual asking price here ~EUR {a['tipico']:.0f}" if a.get("tipico") else ""
-        righe.append(f"\n- {a['titolo']}{dove}: EUR {a['prezzo']:.2f}{tipico}"
-                     f"{' (shop)' if a.get('negozio') else ''}\n  {a['url']}")
-    if len(trovati) > MAX_TROVATI_MSG:
-        righe.append(f"\n+{len(trovati) - MAX_TROVATI_MSG} more (ask Claude: caccia_stato)")
-    righe.append("\nFound by title and price only: photos, seller and condition not checked yet.")
+    """Il messaggio Telegram per Ema (HTML, inglese semplice): solo i migliori, il più conveniente in cima, nessun
+    "+N more". Per ognuno: il modello in grassetto, prezzo e valore solito, il titolo del venditore, un link corto."""
+    from html import escape
+    top = migliori(trovati)
+    righe = [f"<b>Vinted: {len(top)} good find{'s' if len(top) != 1 else ''}</b> (best deal first)"]
+    for i, a in enumerate(top, 1):
+        nome = escape(str(a.get("nome") or a["titolo"]))
+        prezzo = _euro(a["prezzo"])
+        if a.get("tipico"):
+            prezzo += f" · usually ~{_euro(round(a['tipico']))}"
+        extra = [x for x in ("from your shopping list" if a.get("gruppo") == "lista" else "",
+                             "shop" if a.get("negozio") else "") if x]
+        if extra:
+            prezzo += " · " + ", ".join(extra)
+        righe.append(f"\n{i}. <b>{nome}</b>\n{prezzo}\n<i>{escape(a['titolo'][:70])}</i>\n"
+                     f"<a href=\"{escape(a['url'], quote=True)}\">Open on Vinted</a>")
+    righe.append("\n<i>Picked by model name and price only: check photos and condition before buying.</i>")
     return "\n".join(righe)

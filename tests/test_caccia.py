@@ -111,11 +111,30 @@ def main():
     ora["t"] = datetime(2026, 11, 18, 9, 1)
     out3 = c.giro()
     ok(not out3["lista"], f"visti ripetuti: {out3['lista']}")
-    # 6. messaggio: inglese, link completi, max 4, 'shopping list'
+    # 6. messaggio: HTML, link corti, solo i migliori (max 6, niente "+N more"), il più conveniente in cima
     msg = caccia.messaggio(list(trovati.values()) + out2["lista"])
-    ok("https://www.vinted.it/items/1001" in msg and "shopping list" in msg and "EUR 45.00" in msg, msg)
-    molti = [dict(out2["lista"][0], id=i) for i in range(7)]
-    ok("+3 more" in caccia.messaggio(molti), "oltre 4 affari: '+N more'")
+    ok('href="https://www.vinted.it/items/1001"' in msg and "shopping list" in msg and "€45" in msg
+       and "Open on Vinted" in msg, msg)
+    molti = [dict(out2["lista"][0], id=i, prezzo=10 + i, punti=round(50 / (10 + i), 2),
+                  url=f"https://www.vinted.it/items/{i}") for i in range(9)]
+    mm = caccia.messaggio(molti)
+    ok("more" not in mm and mm.count("Open on Vinted") == 6 and "items/0\"" in mm and "items/8\"" not in mm
+       and mm.index("€10") < mm.index("€11"), mm)
+    ok("<b>" in caccia.messaggio([dict(out2["lista"][0], titolo="a <b> & c")]) and
+       "a &lt;b&gt; &amp; c" in caccia.messaggio([dict(out2["lista"][0], titolo="a <b> & c")]), "titolo non escapato")
+    # 6b. "vale" + soglia: al prezzo normale non è un affare; la ricerca larga "nominate" usa la regola del modello
+    nom = [{"cerca": "ccd-tr918", "max": 60, "vale": 120, "nome": "Sony CCD-TR918 (Hi8)", "deve": "tr-?918"},
+           {"cerca": "olympus camedia", "max": 30, "vale": 30, "nome": "Olympus C-2040", "deve": "c-?2040"}]
+    larga = {"cerca": "fotocamera digitale vintage", "max": 80, "nominate": True, "sempre": True}
+    pag = [{"id": 1, "titolo": "Olympus Camedia C-2040 zoom", "prezzo": 25.0, "marca": "", "condizione": "Buone"},
+           {"id": 2, "titolo": "Videocamera Sony TR918 hi8", "prezzo": 30.0, "marca": "", "condizione": "Buone"},
+           {"id": 3, "titolo": "Videocamera Sony TR918 hi8", "prezzo": 70.0, "marca": "", "condizione": "Buone"},
+           {"id": 4, "titolo": "Fotocamera qualunque", "prezzo": 5.0, "marca": "", "condizione": "Buone"},
+           {"id": 5, "titolo": "Olympus C-2040", "prezzo": 12.0, "marca": "", "condizione": "Buone"}]
+    got = {a["id"]: a for a in caccia.affari(larga, pag, "", set(), nom, 2.0)}
+    ok(set(got) == {2, 5} and got[2]["nome"] == "Sony CCD-TR918 (Hi8)" and got[2]["tipico"] == 120
+       and got[2]["punti"] == 4.0, got)
+    ok([a["id"] for a in caccia.migliori(list(got.values()))] == [2, 5], "ordine per punteggio")
     # 7. blocco Cloudflare: il giro si ferma subito, dopo 3 giri bloccati la caccia si ferma da sola
     MODO["blocca"] = True
     n_prima = len(CHIAMATE)

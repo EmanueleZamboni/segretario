@@ -1042,15 +1042,16 @@ def _caccia_giro(manuale: bool = False) -> dict:
     trovati = out.pop("lista", [])
     if trovati and bot is not None and bot.chat_id is not None:
         try:
-            bot.send(caccia_mod.messaggio(trovati))
+            bot.send(caccia_mod.messaggio(trovati), html=True)
             out["messaggio"] = True
         except Exception as err:  # noqa: BLE001
             out["messaggio"] = f"non inviato: {err}"
             log.warning("caccia: messaggio non inviato: %s", err)
     if trovati:
         try:
-            elenco = "; ".join(f"{a['titolo'][:40]} EUR {a['prezzo']:.0f} {a['url']}" for a in trovati[:4])
-            diario_scrivi(f"Caccia Vinted sul server: {len(trovati)} affari ({elenco})"[:495], origine="server")
+            elenco = "; ".join(f"{a.get('nome') or a['titolo'][:40]} EUR {a['prezzo']:.0f} {a['url']}"
+                               for a in caccia_mod.migliori(trovati))
+            diario_scrivi(f"Caccia Vinted sul server: {len(trovati)} affari mandati a Ema ({elenco})"[:495], origine="server")
         except Exception as err:  # noqa: BLE001
             log.warning("caccia: diario: %s", err)
     return out
