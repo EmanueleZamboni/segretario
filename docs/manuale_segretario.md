@@ -138,8 +138,8 @@ video; `riservato_link(nome, video, visioni, giorni)` crea il link personale per
 compare sopra ai video; video = titoli, vuoto = tutti; visioni 1-3, default 3; giorni default 7) e restituisce il
 messaggio pronto con link e password. Se Ema chiede di mandarlo per email ("manda il riservato a Mario"):
 l'indirizzo lo dice lui, oppure cercalo con Postino (`search_emails`) e chiedigli conferma; crea il link con
-`riservato_link`; scrivi l'email dalla casella emanuele.zamboni@stostudio.it (Postino `list_accounts`, "Emanuele di
-Stostudio"), oggetto "Altri lavori STOSTUDIO", testo = il messaggio così com'è; mostragli destinatario, oggetto e
+`riservato_link`; scrivi l'email dalla casella personale STOSTUDIO di Ema (Postino `list_accounts`, account
+"Emanuele di Stostudio"), oggetto "Altri lavori STOSTUDIO", testo = il messaggio così com'è; mostragli destinatario, oggetto e
 testo esatti e chiama `send_email` solo dopo il suo "mandalo". Se non chiede l'email, mostragli il messaggio e lo
 manda lui. La password non si salva mai (né diario né documenti). `riservato_link_lista()` mostra i link e le visioni usate; `riservato_disattiva(token)` spegne un link,
 solo dopo il sì di Ema. Cancellare link, rinominare video e scegliere le copertine si fa nello Studio Manager.
