@@ -155,6 +155,18 @@ def main():
         ok(False, "json rotto doveva essere rifiutato")
     except ValueError:
         pass
+    # le regole dal documento "regole" del progetto Caccia Vinted: buone = usate, rotte = ignorate con l'errore
+    doc = server.MEMORIA / "progetti" / "caccia-vinted" / "regole.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text(json.dumps({"ricerche": [{"cerca": "da documento", "max": 9}]}), encoding="utf-8")
+    server._caccia_regole_da_documento()
+    ok(server.caccia_regole()["ricerche"][0]["cerca"] == "da documento", "regole dal documento non prese")
+    doc.write_text("{rotto", encoding="utf-8")
+    server._caccia_regole_da_documento()
+    ok(server.caccia_regole()["ricerche"][0]["cerca"] == "da documento" and "regole_errore" in server.CACCIA.stato(),
+       "un documento rotto non deve toccare le regole")
+    server.caccia_regole(json.dumps(REGOLE))
+    ok("regole_errore" not in server.CACCIA.stato(), "salvare dal tool toglie l'errore")
     st = server.stato()["caccia_vinted"]
     ok(st["attiva"] is True and "ricerche" not in json.dumps(st), st)
     # 10. "sempre": la ricerca larga gira ogni volta, le altre a turno

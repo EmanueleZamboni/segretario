@@ -376,6 +376,16 @@ class Caccia:
         finally:
             self.in_corso = False
 
+    def segna(self, **campi) -> None:
+        """Aggiorna qualche campo dello stato (None = toglilo)."""
+        s = self._leggi("stato.json", {})
+        for k, v in campi.items():
+            if v is None:
+                s.pop(k, None)
+            else:
+                s[k] = v
+        self._scrivi("stato.json", s)
+
     def riattiva(self) -> None:
         s = self._leggi("stato.json", {})
         s.pop("fermo", None)

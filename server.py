@@ -1056,8 +1056,33 @@ def _caccia_giro(manuale: bool = False) -> dict:
     return out
 
 
+CACCIA_PROGETTO, CACCIA_DOC = "caccia-vinted", "regole.md"  # documento del progetto "Caccia Vinted": le regole in JSON
+
+
+def _caccia_regole_da_documento() -> None:
+    """Le regole si possono scrivere anche come documento "regole" del progetto "Caccia Vinted" (documento_salva, da
+    qualunque chat): quando il documento cambia, diventa le regole. Un JSON sbagliato non tocca le regole in uso."""
+    import hashlib
+    path = MEMORIA / "progetti" / CACCIA_PROGETTO / CACCIA_DOC
+    if not path.exists():
+        return
+    testo = path.read_text(encoding="utf-8")
+    h = hashlib.sha256(testo.encode("utf-8")).hexdigest()[:16]
+    if CACCIA.stato().get("regole_doc") == h:
+        return
+    try:
+        CACCIA.salva_regole(json.loads(testo))
+        CACCIA.segna(regole_doc=h, regole_errore=None, regole_da=f"documento, {now():%Y-%m-%d %H:%M}")
+    except Exception as err:  # noqa: BLE001
+        CACCIA.segna(regole_doc=h, regole_errore=f"documento regole non valido: {str(err)[:200]}")
+
+
 def _caccia_loop() -> None:
     while True:
+        try:
+            _caccia_regole_da_documento()
+        except Exception as err:  # noqa: BLE001
+            log.warning("caccia: documento regole: %s", err)
         try:
             if not BLOCCO.attivo and CACCIA.dovuto():
                 _caccia_giro()
@@ -1075,13 +1100,15 @@ def caccia_regole(regole: str = "") -> dict:
     "gia_visti": [id...]}. max = prezzo massimo in euro; mediana = frazione del prezzo tipico di quella ricerca;
     "sempre": true = cercata a ogni giro (ricerche larghe, max 8), le altre a turno; "accessori": true = non scartare
     batterie/cavi/custodie (quando l'accessorio è la cosa cercata).
-    Leggi prima quelle attuali e cambia solo quello che Ema chiede."""
+    Leggi prima quelle attuali e cambia solo quello che Ema chiede. Le stesse regole si possono anche salvare come
+    documento "regole" del progetto "Caccia Vinted" (documento_salva): il server le prende entro un minuto."""
     if regole.strip():
         try:
             nuove = json.loads(regole)
         except ValueError as err:
             raise ValueError(f"JSON non valido: {err}") from None
         r = CACCIA.salva_regole(nuove)
+        CACCIA.segna(regole_da=f"caccia_regole, {now():%Y-%m-%d %H:%M}", regole_errore=None)
         return {"salvate": True, "ricerche": len(r["ricerche"]), "orari": r["orari"], "per_giro": r["per_giro"]}
     return CACCIA.regole() or {"regole": "nessuna: la caccia è spenta finché non le scrivi"}
 
@@ -1716,7 +1743,8 @@ def stato() -> dict:
         "instagram": bool(os.environ.get("LINKS_STATS_KEY", "").strip()),
         "area_riservata_stostudio": bool(os.environ.get("RISERVATO_KEY", "").strip()),
         "keep": keep.configured(),
-        "caccia_vinted": {k: v for k, v in CACCIA.stato().items() if k in ("attiva", "regole", "fermo", "ultimo_giro", "in_corso")},
+        "caccia_vinted": {k: v for k, v in CACCIA.stato().items()
+                          if k in ("attiva", "regole", "fermo", "ultimo_giro", "in_corso", "regole_da", "regole_errore")},
         "brief_ora": os.environ.get("BRIEF_ORA", "").strip() or "spento",
         "calendario": bool(os.environ.get("CALENDAR_ICS_URL", "").strip()),
         "email_nel_brief": bool(os.environ.get("POSTINO_DB", "").strip()),
@@ -2083,7 +2111,8 @@ async def health(_request):
     return JSONResponse({"ok": True, "name": "segretario", "avviato": AVVIATO, "avvii_ultima_ora": r.get("avvii_ultima_ora"),
                          "memoria": _mem_mb(), "vita_prima": (r.get("ultimi") or [{}])[-1].get("vita_prima"),
                          "crash": _crash_coda(), "connettore_errori": _mcp_registro[-15:],
-                         "caccia": {k: v for k, v in CACCIA.stato().items() if k in ("attiva", "fermo", "ultimo_giro", "in_corso")}})
+                         "caccia": {k: v for k, v in CACCIA.stato().items()
+                                    if k in ("attiva", "fermo", "ultimo_giro", "in_corso", "regole_errore")}})
 
 
 def _tutti(request) -> bool:
