@@ -68,6 +68,12 @@ per toglierlo `hub_link_togli(nome)`.
   I tag li mette Ema a mano: se un video manca, non è taggato (Links Manager > Analytics > Device tags).
 - **Instagram più vecchio:** `instagram_chat_lista(cerca="nome")` cerca fra fino a 2.000 conversazioni; `dopo` per la
   pagina seguente; `cartella="requests"` per le richieste di messaggi se Instagram lo permette.
+- **Caccia Vinted sul server** (17/11, progetto "Caccia Vinted"): 3 giri al giorno (08, 14, 20) anche a PC spento,
+  regole fisse senza IA (modello nel titolo + prezzo massimo, o metà del prezzo tipico per la lista della spesa).
+  Telegram solo quando trova qualcosa. `caccia_stato()` = ultimo giro ed esito (`avvia_ora=True` per un giro subito);
+  `caccia_regole()` = le regole (JSON), anche come documento "regole" del progetto. Per cambiarle: leggi, cambia solo
+  quello che Ema chiede, risalva. Non guarda le foto: se Ema chiede "è un affare vero?", controlla tu con il Vinted MCP.
+  Se Vinted blocca il server 3 giri di fila si ferma da sola (`caccia_stato(riattiva=True)` per ripartire).
 - **Allegati:** Postino apre gli allegati ricevuti (`read_attachment`: PDF, immagini, testo) e da una chat Claude Code sul
   PC può allegare file del PC a `send_email` (in base64), sempre dopo il sì di Ema.
 - **Impostazioni > Sicurezza**: le app collegate e i browser fidati, con "Scollega tutte le app di Claude" e
@@ -130,8 +136,12 @@ dall'ultimo messaggio dell'altro.
 Area riservata STOSTUDIO (stostudio.it/riservato, lavori che non si possono pubblicare): `riservato_video()` elenca i
 video; `riservato_link(nome, video, visioni, giorni)` crea il link personale per UNA persona (nome = chi lo riceve,
 compare sopra ai video; video = titoli, vuoto = tutti; visioni 1-3, default 3; giorni default 7) e restituisce il
-messaggio pronto con link e password: mostralo a Ema così com'è, lo manda lui. La password non si salva mai (né diario
-né documenti). `riservato_link_lista()` mostra i link e le visioni usate; `riservato_disattiva(token)` spegne un link,
+messaggio pronto con link e password. Se Ema chiede di mandarlo per email ("manda il riservato a Mario"):
+l'indirizzo lo dice lui, oppure cercalo con Postino (`search_emails`) e chiedigli conferma; crea il link con
+`riservato_link`; scrivi l'email dalla casella emanuele.zamboni@stostudio.it (Postino `list_accounts`, "Emanuele di
+Stostudio"), oggetto "Altri lavori STOSTUDIO", testo = il messaggio così com'è; mostragli destinatario, oggetto e
+testo esatti e chiama `send_email` solo dopo il suo "mandalo". Se non chiede l'email, mostragli il messaggio e lo
+manda lui. La password non si salva mai (né diario né documenti). `riservato_link_lista()` mostra i link e le visioni usate; `riservato_disattiva(token)` spegne un link,
 solo dopo il sì di Ema. Cancellare link, rinominare video e scegliere le copertine si fa nello Studio Manager.
 Spesa: `spesa_lista()` = le voci NON spuntate di Keep SPESA raggruppate per negozio (Lidl, Mercato agricolo, DM);
 `spesa_negozio(prodotto, negozio)` insegna dove compra una cosa. SPESA contiene solo ciò che compra sempre: una cosa
