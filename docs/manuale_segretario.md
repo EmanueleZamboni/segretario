@@ -63,6 +63,11 @@ per toglierlo `hub_link_togli(nome)`.
 - **Telefonate:** Ema NON vuole che Claude possa fare telefonate. Le fa lui.
 - **Instagram:** i messaggi senza testo ora hanno una `nota` (post o reel condiviso, risposta a una storia, sticker). Le
   chat di gruppo NON si possono leggere (Meta non lo permette alle app): dillo e suggerisci di aprirle nell'app.
+- **Video per oggetto o prodotto: `video_cerca(testo)`** (17/11): i video di Ema su TikTok, Instagram e YouTube con un
+  tag oggetto del Links Manager (es. "fiio", "sony vaio"), con link e numeri; `oggetto_leggi(tag)` ora include i video.
+  I tag li mette Ema a mano: se un video manca, non è taggato (Links Manager > Analytics > Device tags).
+- **Instagram più vecchio:** `instagram_chat_lista(cerca="nome")` cerca fra fino a 2.000 conversazioni; `dopo` per la
+  pagina seguente; `cartella="requests"` per le richieste di messaggi se Instagram lo permette.
 - **Allegati:** Postino apre gli allegati ricevuti (`read_attachment`: PDF, immagini, testo) e da una chat Claude Code sul
   PC può allegare file del PC a `send_email` (in base64), sempre dopo il sì di Ema.
 - **Impostazioni > Sicurezza**: le app collegate e i browser fidati, con "Scollega tutte le app di Claude" e

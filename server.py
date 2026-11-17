@@ -1536,7 +1536,29 @@ def oggetto_leggi(tag: str) -> dict:
     with lock:
         scheda = _oggetti().get(tg)
     hits = memoria_cerca(f"#{tg}")
-    return {"tag": f"#{tg}", "scheda": scheda, "righe": hits[:60]}
+    out = {"tag": f"#{tg}", "scheda": scheda, "righe": hits[:60]}
+    try:  # i video (TikTok, Instagram, YouTube) dove compare, dai tag del Links Manager (richiesta r5bdbd6)
+        tags = _links_api(f"/analytics/tags?q={tg}").get("tags") or {}
+        out["video"] = tags.get(f"#{tg}", [])[:40]
+    except Exception as err:  # noqa: BLE001  (il Links Manager giù non deve rompere la scheda)
+        out["video_avviso"] = f"video non letti: {str(err)[:100]}"
+    return out
+
+
+@mcp.tool()
+def video_cerca(testo: str = "") -> dict:
+    """I video di Ema (TikTok, Instagram, YouTube) dove compare un oggetto o un prodotto, dai tag oggetto del Links
+    Manager (es. "fiio" trova #fiio-eh11, #fiio-dm13...): per ogni tag i video con app, link, data, visualizzazioni,
+    like, commenti, condivisioni. "also" = video che lo nominano nella didascalia anche senza tag. testo vuoto = tutti i
+    tag (solo i nomi e quanti video). I tag li mette Ema a mano nel Links Manager (Analytics > Device tags): un video senza
+    tag non compare. notMine = oggetti filmati ma non suoi."""
+    from urllib.parse import quote as _q
+    t = (testo or "").strip()
+    if not t:
+        tags = _links_api("/analytics/tags").get("tags") or {}
+        return {"tag": {k: len(v) for k, v in sorted(tags.items())}, "quanti_tag": len(tags)}
+    out = _links_api("/analytics/tags?q=" + _q(_check(t, "testo", 60)))
+    return {"cercato": t, "tag": out.get("tags") or {}, "also": (out.get("also") or [])[:30], "notMine": out.get("notMine") or []}
 
 
 @mcp.tool()

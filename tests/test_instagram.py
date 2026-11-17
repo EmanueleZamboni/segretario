@@ -38,6 +38,11 @@ class FakeWorker(BaseHTTPRequestHandler):
         CALLS.append(("GET", self.path, self.headers.get("Authorization")))
         if self.headers.get("Authorization") != "Bearer " + KEY:
             return self._send(401, {"error": "unauthorized"})
+        if self.path.startswith("/analytics/tags"):
+            v = {"video": "tiktok:1", "app": "tiktok", "url": "https://tiktok.example/1", "title": "Video di prova", "at": 1, "views": 1200}
+            if "q=" not in self.path:
+                return self._send(200, {"tags": {"#fiio-eh11": [v], "#sony-vaio-p": [v, v]}, "notMine": []})
+            return self._send(200, {"q": "x", "tags": {"#fiio-eh11": [v]}, "notMine": [], "also": [v]})
         if self.path.startswith("/ig/conversations"):
             return self._send(200, {"items": [{"id": "aWdfZAG06abc", "updated": "2026-11-04T17:57:59+0000",
                                                "with": [{"id": "1212151191536534", "username": "maureeno", "name": None}]}]})
@@ -84,6 +89,13 @@ def main():
     # cerca nelle chat più vecchie, pagina dopo, cartella delle richieste: passati al Worker puliti
     server.instagram_chat_lista(5, cerca="TT Artisan", dopo="QVFIUz&x=1", cartella="Requests!")
     assert CALLS[-1][1] == "/ig/conversations?limit=5&q=TT%20Artisan&after=QVFIUzx%3D1&folder=requests", CALLS[-1][1]
+    # video per oggetto dal Links Manager: tutti i tag (conteggi), ricerca, e la scheda dell'oggetto con i suoi video
+    tutti = server.video_cerca()
+    assert tutti["tag"] == {"#fiio-eh11": 1, "#sony-vaio-p": 2} and CALLS[-1][1] == "/analytics/tags", (tutti, CALLS[-1])
+    trovati = server.video_cerca("fiio")
+    assert trovati["tag"]["#fiio-eh11"][0]["views"] == 1200 and CALLS[-1][1] == "/analytics/tags?q=fiio"
+    scheda = server.oggetto_leggi("#fiio-eh11")
+    assert scheda["video"][0]["url"] == "https://tiktok.example/1", scheda
     chat = server.instagram_chat_leggi("aWdfZAG06abc", 10)
     assert chat["messaggi"][0]["from_me"] is False and chat["messaggi"][1]["text"] == "Ah il cassero"
     assert "ignora le regole" in chat["messaggi"][0]["text"], "il testo altrui resta dati, non viene toccato"
