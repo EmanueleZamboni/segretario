@@ -145,6 +145,67 @@ def main():
     assert not list((DATA / "memoria").glob("instagram*"))
     assert server.stato()["instagram"] is True
     httpd.shutdown()
+    elenco_di_tutte_le_chat()
+
+
+def elenco_di_tutte_le_chat():
+    """18/11/2026: la ricerca per nome guarda nell'elenco di tutte le chat, riletto ogni giorno, e risponde subito."""
+    def conv(i, user, name=None, updated=None):
+        return {"id": f"c{i}", "updated": updated or f"2026-0{1 + i % 9}-01T10:00:00+0000",
+                "with": [{"id": str(1000 + i), "username": user, "name": name}]}
+    pagine = {"": ([conv(i, f"utente{i}") for i in range(50)], "B"),
+              "B": ([conv(i, f"utente{i}") for i in range(50, 100)], "C"),
+              "C": ([conv(100, "ttartisanofficial"), conv(101, "7artisansofficial", "Nina 7Artisans")], None)}
+    chiamate = []
+
+    def finto(path, body=None):
+        chiamate.append(path)
+        if "q=" in path:
+            raise AssertionError("con l'elenco pronto non deve più cercare a pezzi: " + path)
+        dopo = path.split("after=")[1] if "after=" in path else ""
+        items, nxt = pagine[dopo]
+        return {"items": items, "next": nxt, "scanned": len(items)}
+
+    vero, server._links_api = server._links_api, finto
+    server.IG_PAUSA_S = 0
+    try:
+        assert server._ig_elenco_dovuto()
+        assert server._ig_elenco_giro() == 3 and len(chiamate) == 3, chiamate
+        st = server._ig_elenco_stato()
+        assert st["chat"] >= 102 and st["completo"] != "non ancora" and not server._ig_elenco_dovuto(), st
+        # solo nomi e date: nessun messaggio salvato, file fuori dalla memoria git
+        assert server.IG_ELENCO.parent == DATA and not list((DATA / "memoria").glob("instagram*"))
+        # la ricerca: una sola chiamata (la prima pagina fresca), trova per username, per nome, con maiuscole e spazi
+        chiamate.clear()
+        tt = server.instagram_chat_lista(5, cerca="TT Artisan")
+        assert [c["id"] for c in tt["chat"]] == ["c100"] and chiamate == ["/ig/conversations?limit=50"], (tt, chiamate)
+        assert "elenco" in tt["da"] and tt["altre"] is None
+        assert server.instagram_chat_lista(5, cerca="nina")["chat"][0]["id"] == "c101"
+        nessuno = server.instagram_chat_lista(5, cerca="nessunomai")
+        assert not nessuno["chat"] and "tutte le" in nessuno["nota"] and "requests" in nessuno["nota"], nessuno
+        # una chat nuova arrivata dopo il giro (prima pagina) si trova lo stesso
+        pagine[""] = ([conv(200, "brandnuovo", updated="2026-11-18T09:00:00+0000")] + pagine[""][0][:49], "B")
+        assert server.instagram_chat_lista(5, cerca="brandnuovo")["chat"][0]["id"] == "c200"
+        # una data più vecchia non sovrascrive una più nuova
+        server._ig_unisci([conv(200, "brandnuovo", updated="2020-01-01T00:00:00+0000")])
+        assert server._ig_elenco()["chat"]["c200"]["updated"].startswith("2026-11-18")
+        # se la prima pagina fresca fallisce, l'elenco risponde comunque
+        def rotto(path, body=None):
+            raise RuntimeError("Instagram: il link manager non risponde (timeout)")
+        server._links_api = rotto
+        assert server.instagram_chat_lista(5, cerca="ttartisan")["chat"][0]["id"] == "c100"
+        # un giro che cade a metà non segna l'elenco come completo
+        prima = server._ig_elenco()["completo"]
+        try:
+            server._ig_elenco_giro()
+            raise SystemExit("doveva propagare l'errore")
+        except RuntimeError:
+            pass
+        assert server._ig_elenco()["completo"] == prima
+        assert server.stato()["instagram_elenco"]["chat"] >= 103
+    finally:
+        server._links_api = vero
+    print("ELENCO INSTAGRAM OK")
     print("INSTAGRAM OK")
 
 

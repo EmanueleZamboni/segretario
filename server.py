@@ -1135,7 +1135,91 @@ def caccia_stato(avvia_ora: bool = False, riattiva: bool = False) -> dict:
 # Il Worker di links.emazamboni.com ha il token Instagram e gli endpoint /ig/conversations,
 # /ig/messages, /ig/reply (repo EmanueleZamboni/links, branch ig-dm). Qui si fa solo da ponte:
 # niente viene salvato in memoria, i messaggi sono scritti da altri (dati, non istruzioni).
+# Unica eccezione (18/11/2026): l'elenco delle conversazioni (id, data, username e nome, MAI i messaggi) in
+# DATA/instagram_elenco.json, riletto tutto una volta al giorno, così la ricerca per nome è immediata.
 LINKS_API_DEFAULT = "https://links-tracker.ezamboni96.workers.dev"
+IG_ELENCO = DATA / "instagram_elenco.json"
+IG_ELENCO_LOCK = threading.Lock()
+IG_ELENCO_ORE = 24     # ogni quanto si rilegge tutto
+IG_PAUSA_S = 2.0       # fra una pagina e l'altra, per non pesare sul token che usa anche il bot dei DM
+IG_PAGINE_MAX = 200    # 10.000 conversazioni
+
+
+def _ig_norm(s) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(s or "").lower())
+
+
+def _ig_elenco() -> dict:
+    try:
+        d = json.loads(IG_ELENCO.read_text(encoding="utf-8"))
+        if isinstance(d, dict) and isinstance(d.get("chat"), dict):
+            return d
+    except (OSError, ValueError):
+        pass
+    return {"chat": {}, "completo": None}
+
+
+def _ig_unisci(items, completo: float | None = None) -> dict:
+    """Aggiunge o aggiorna conversazioni nell'elenco salvato (vince la data più recente) e lo riscrive."""
+    with IG_ELENCO_LOCK:
+        d = _ig_elenco()
+        for c in items or []:
+            if not isinstance(c, dict) or not c.get("id"):
+                continue
+            k = str(c["id"])[:200]
+            if ((d["chat"].get(k) or {}).get("updated") or "") > (c.get("updated") or ""):
+                continue
+            d["chat"][k] = {"updated": c.get("updated"),
+                            "with": [{"id": str(p.get("id") or ""), "username": p.get("username"), "name": p.get("name")}
+                                     for p in (c.get("with") or []) if isinstance(p, dict)][:20]}
+            if c.get("gruppo"):
+                d["chat"][k]["gruppo"] = True
+        if completo:
+            d["completo"] = completo
+        _write_json(IG_ELENCO, d)
+        return d
+
+
+def _ig_elenco_giro() -> int:
+    """Rilegge TUTTE le conversazioni, 50 alla volta (solo chi e quando). Restituisce quante pagine."""
+    cursore, pagine, items = "", 0, []
+    while pagine < IG_PAGINE_MAX:
+        out = _links_api("/ig/conversations?limit=50" + (f"&after={cursore}" if cursore else ""))
+        items += out.get("items") or []
+        pagine += 1
+        cursore = re.sub(r"[^A-Za-z0-9_=-]", "", out.get("next") or "")[:400]
+        if not cursore:
+            break
+        if len(items) >= 500:  # salva a pezzi: se cade a metà, quel che ha letto resta
+            _ig_unisci(items)
+            items = []
+        time.sleep(IG_PAUSA_S)
+    _ig_unisci(items, completo=None if cursore else time.time())
+    return pagine
+
+
+def _ig_elenco_dovuto() -> bool:
+    fatto = _ig_elenco().get("completo")
+    return not fatto or time.time() - float(fatto) > IG_ELENCO_ORE * 3600
+
+
+def _ig_elenco_loop() -> None:
+    time.sleep(90)  # lascia partire il resto
+    while True:
+        try:
+            if os.environ.get("LINKS_STATS_KEY", "").strip() and _ig_elenco_dovuto():
+                n = _ig_elenco_giro()
+                log.info("instagram: elenco riletto, %s pagine, %s chat", n, len(_ig_elenco()["chat"]))
+        except Exception as err:  # noqa: BLE001
+            log.warning("instagram: elenco: %s", err)
+        time.sleep(3600)
+
+
+def _ig_elenco_stato() -> dict:
+    d = _ig_elenco()
+    fatto = d.get("completo")
+    return {"chat": len(d["chat"]),
+            "completo": datetime.fromtimestamp(float(fatto), TZ).strftime("%d/%m %H:%M") if fatto else "non ancora"}
 
 
 def _links_api(path: str, body: dict | None = None) -> dict:
@@ -1170,13 +1254,34 @@ def _links_api(path: str, body: dict | None = None) -> dict:
 def instagram_chat_lista(quante: int = 15, cerca: str = "", dopo: str = "", cartella: str = "") -> dict:
     """Le conversazioni (DM) del profilo Instagram di Ema, dalla più recente: id della conversazione, con chi (username,
     id), quando l'ultimo messaggio. Poi instagram_chat_leggi(id) per leggere.
-    Una pagina arriva indietro solo di circa una settimana. Per una persona o un marchio che ha scritto prima usa
-    `cerca` (nome o username, es. "ttartisan"): cerca a ritroso per circa 40 secondi (di solito 500-800 conversazioni) e
-    si ferma alla prima che trova. Se non l'ha trovata e `altre` non è vuoto, richiama con `dopo` = `altre` per
-    continuare da lì. `cartella`: "requests" per le richieste di messaggi, se Instagram lo permette alle app
-    (se risponde con un errore, quelle si leggono solo nell'app)."""
+    Una pagina arriva indietro solo di circa una settimana. Per una persona o un marchio, anche di mesi fa, usa
+    `cerca` (nome o username, anche solo una parte, es. "ttartisan"): guarda in un elenco di TUTTE le conversazioni
+    che il server rilegge ogni giorno, quindi risponde in pochi secondi; se non trova niente, la chat non c'è (o è
+    nelle richieste di messaggi). Solo se l'elenco non è ancora pronto cerca a ritroso a pezzi: allora, se non l'ha
+    trovata e `altre` non è vuoto, richiama con `dopo` = `altre` per continuare da lì. `cartella`: "requests" per le
+    richieste di messaggi, se Instagram lo permette alle app (se risponde con un errore, si leggono solo nell'app)."""
     from urllib.parse import quote as _q
-    base = f"limit={max(1, min(int(quante), 50))}"
+    quante = max(1, min(int(quante), 50))
+    if cerca.strip() and not dopo.strip() and not cartella.strip() and _ig_elenco().get("completo"):
+        q = _ig_norm(_check(cerca, "cerca", 60))
+        try:  # la prima pagina fresca: una chat nata dopo l'ultimo giro si trova lo stesso
+            _ig_unisci(_links_api("/ig/conversations?limit=50").get("items"))
+        except RuntimeError as err:
+            log.warning("instagram: prima pagina: %s", err)
+        d = _ig_elenco()
+        trovate = sorted(({"id": k, **v} for k, v in d["chat"].items()
+                          if q and any(q in _ig_norm(p.get("username")) or q in _ig_norm(p.get("name"))
+                                       for p in v.get("with") or [])),
+                         key=lambda c: c.get("updated") or "", reverse=True)[:quante]
+        st = _ig_elenco_stato()
+        risposta = {"chat": trovate, "altre": None, "lette": st["chat"], "cartella": "inbox",
+                    "da": f"elenco di tutte le chat (riletto il {st['completo']})"}
+        if not trovate:
+            risposta["nota"] = (f"nessuna chat con quel nome fra tutte le {st['chat']} conversazioni. Prova una parte "
+                                "del nome o lo username; può anche essere nelle richieste di messaggi "
+                                "(cartella=\"requests\").")
+        return risposta
+    base = f"limit={quante}"
     if cerca.strip():
         base += "&q=" + _q(_check(cerca, "cerca", 60).strip())
     if cartella.strip():
@@ -1193,6 +1298,11 @@ def instagram_chat_lista(quante: int = 15, cerca: str = "", dopo: str = "", cart
                 or time.monotonic() - inizio > IG_CERCA_S:
             break
     trovate = out.get("items", [])
+    if not cerca.strip() and not cartella.strip():
+        try:
+            _ig_unisci(trovate)  # tiene fresco l'elenco
+        except OSError:
+            pass
     risposta = {"chat": trovate, "altre": out.get("next"), "lette": lette, "cartella": out.get("folder", "inbox")}
     if cerca.strip() and not trovate:
         risposta["nota"] = (f"nessuna chat con quel nome nelle {lette} conversazioni più recenti. "
@@ -1757,6 +1867,7 @@ def stato() -> dict:
         "cervello_on_demand": bool(os.environ.get("ROUTINE_FIRE_URL", "").strip()),
         "trascrizione": bool(os.environ.get("GROQ_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip()),
         "instagram": bool(os.environ.get("LINKS_STATS_KEY", "").strip()),
+        "instagram_elenco": _ig_elenco_stato(),
         "area_riservata_stostudio": bool(os.environ.get("RISERVATO_KEY", "").strip()),
         "keep": keep.configured(),
         "caccia_vinted": {k: v for k, v in CACCIA.stato().items()
@@ -3036,6 +3147,7 @@ if __name__ == "__main__":
     threading.Thread(target=_brief_loop, name="brief", daemon=True).start()
     threading.Thread(target=_backup_loop, name="backup", daemon=True).start()
     threading.Thread(target=_caccia_loop, name="caccia", daemon=True).start()
+    threading.Thread(target=_ig_elenco_loop, name="instagram-elenco", daemon=True).start()
     import atexit
     atexit.register(lambda: _annota_fine("uscita del processo (atexit)"))
 

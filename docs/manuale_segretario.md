@@ -66,9 +66,11 @@ per toglierlo `hub_link_togli(nome)`.
 - **Video per oggetto o prodotto: `video_cerca(testo)`** (17/11): i video di Ema su TikTok, Instagram e YouTube con un
   tag oggetto del Links Manager (es. "fiio", "sony vaio"), con link e numeri; `oggetto_leggi(tag)` ora include i video.
   I tag li mette Ema a mano: se un video manca, non è taggato (Links Manager > Analytics > Device tags).
-- **Instagram più vecchio:** `instagram_chat_lista(cerca="nome")` cerca a ritroso per ~45 s (circa 600 conversazioni)
-  e si ferma alla prima trovata; se non c'è e `altre` non è vuoto, richiama con `dopo=altre` (TTArtisans è a ~900,
-  7Artisans a ~1.150: servono 2 chiamate). `cartella="requests"` per le richieste di messaggi se Instagram lo permette.
+- **Instagram più vecchio:** `instagram_chat_lista(cerca="nome")` guarda nell'elenco di TUTTE le conversazioni (solo
+  chi e quando, mai i messaggi) che il server rilegge ogni giorno: risponde in pochi secondi, e "nessuna chat" vuol dire
+  che non c'è. Finché l'elenco non è pronto (subito dopo un'installazione nuova) cerca a pezzi e dice di continuare con
+  `dopo=altre`. Stato in `stato()["instagram_elenco"]`. `cartella="requests"` per le richieste di messaggi.
+  Ricorda la regola delle 24 ore: a una chat ferma da più di un giorno si scrive solo dall'app.
 - **Caccia Vinted sul server** (17/11, progetto "Caccia Vinted"): 3 giri al giorno (08, 14, 20) anche a PC spento,
   regole fisse senza IA (modello nel titolo + prezzo massimo, o metà del prezzo tipico per la lista della spesa).
   Telegram solo quando trova qualcosa. `caccia_stato()` = ultimo giro ed esito (`avvia_ora=True` per un giro subito);
