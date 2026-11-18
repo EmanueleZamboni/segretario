@@ -1274,7 +1274,7 @@ def instagram_chat_lista(quante: int = 15, cerca: str = "", dopo: str = "", cart
                                        for p in v.get("with") or [])),
                          key=lambda c: c.get("updated") or "", reverse=True)[:quante]
         st = _ig_elenco_stato()
-        risposta = {"chat": trovate, "altre": None, "lette": st["chat"], "cartella": "inbox",
+        risposta = {"chat": _ig_con_finestra(trovate), "altre": None, "lette": st["chat"], "cartella": "inbox",
                     "da": f"elenco di tutte le chat (riletto il {st['completo']})"}
         if not trovate:
             risposta["nota"] = (f"nessuna chat con quel nome fra tutte le {st['chat']} conversazioni. Prova una parte "
@@ -1303,7 +1303,7 @@ def instagram_chat_lista(quante: int = 15, cerca: str = "", dopo: str = "", cart
             _ig_unisci(trovate)  # tiene fresco l'elenco
         except OSError:
             pass
-    risposta = {"chat": trovate, "altre": out.get("next"), "lette": lette, "cartella": out.get("folder", "inbox")}
+    risposta = {"chat": _ig_con_finestra(trovate), "altre": out.get("next"), "lette": lette, "cartella": out.get("folder", "inbox")}
     if cerca.strip() and not trovate:
         risposta["nota"] = (f"nessuna chat con quel nome nelle {lette} conversazioni più recenti. "
                             + ("Per cercare più indietro richiama con dopo = il valore di 'altre'. " if out.get("next") else "")
@@ -1322,7 +1322,78 @@ def instagram_chat_leggi(conversazione: str, quanti: int = 20) -> dict:
     out = _links_api(f"/ig/messages?conversation={conv}&limit={max(1, min(int(quanti), 50))}")
     msgs = out.get("items", [])
     _ig_trascrivi(msgs)
-    return {"conversazione": conv, "messaggi": msgs}
+    return {"conversazione": conv, "messaggi": msgs, "si_puo_rispondere_da_qui": _ig_finestra_da_msgs(msgs)}
+
+
+# ---------- la regola delle 24 ore (18/11/2026) ----------
+# Instagram lascia scrivere alle app solo entro 24 ore dall'ultimo messaggio DELL'ALTRA persona. Non si aggira con
+# l'API. Prima i tool lo scoprivano solo provando (errore), e le chat promettevano invii impossibili: ora ogni chat
+# porta "si_puo_rispondere_da_qui" e, se no, il link per mandarlo a mano (app sul telefono, o Chrome sul PC).
+IG_FINESTRA_ORE = 24
+
+
+def _ig_data(s) -> datetime | None:
+    try:
+        return datetime.strptime(str(s), "%Y-%m-%dT%H:%M:%S%z")
+    except (TypeError, ValueError):
+        return None
+
+
+def _ig_ore_fa(s) -> float | None:
+    d = _ig_data(s)
+    return None if d is None else (datetime.now(d.tzinfo) - d).total_seconds() / 3600
+
+
+def _ig_link(username) -> str | None:
+    u = re.sub(r"[^A-Za-z0-9._]", "", str(username or ""))[:40]
+    return f"https://www.instagram.com/{u}/" if u else None
+
+
+def _ig_a_mano(username, testo: str = "") -> dict:
+    link = _ig_link(username)
+    passi = [f"Ema apre {link} (sul telefono si apre l'app), tocca Message, incolla il testo e lo manda."
+             if link else "Ema apre la chat nell'app di Instagram, incolla il testo e lo manda.",
+             "Oppure una sessione Claude Code sul suo PC lo manda da Chrome su instagram.com (Claude in Chrome), "
+             "sempre solo dopo il suo sì al testo esatto.",
+             "Quando l'altra persona risponde, per 24 ore si può di nuovo rispondere da qui."]
+    return {"link": link, **({"testo": testo} if testo else {}), "come": passi}
+
+
+def _ig_finestra_da_msgs(msgs: list[dict]) -> dict:
+    loro = [m.get("created") for m in msgs if isinstance(m, dict) and not m.get("from_me") and m.get("created")]
+    ultimo = max(loro) if loro else None
+    ore = _ig_ore_fa(ultimo)
+    aperta = ore is not None and ore < IG_FINESTRA_ORE
+    out = {"aperta": aperta, "ultimo_loro_messaggio": ultimo}
+    if not aperta:
+        chi = next((m.get("from") or {} for m in msgs if not m.get("from_me") and m.get("from")), {})
+        out.update({"perche_no": "Instagram lascia scrivere alle app solo entro 24 ore dall'ultimo messaggio "
+                                 "dell'altra persona" + ("" if ultimo else " (nei messaggi letti non ce n'è uno loro)"),
+                    **_ig_a_mano(chi.get("username"))})
+    return out
+
+
+def _ig_con_finestra(items: list) -> list:
+    """Su ogni chat della lista: link al profilo e se la finestra è di sicuro chiusa (ultima attività > 24 ore)."""
+    for c in items or []:
+        if not isinstance(c, dict):
+            continue
+        ore = _ig_ore_fa(c.get("updated"))
+        persone = [p for p in c.get("with") or [] if isinstance(p, dict)]
+        c["link"] = _ig_link(persone[0].get("username")) if len(persone) == 1 else None
+        c["si_puo_rispondere_da_qui"] = ("no: chat ferma da più di 24 ore, va mandato a mano (vedi link)"
+                                         if ore is None or ore >= IG_FINESTRA_ORE
+                                         else "forse: dipende da quando ha scritto l'altra persona (instagram_chat_leggi)")
+    return items
+
+
+def _ig_conv_di(rid: str) -> tuple[str | None, str | None]:
+    """L'id della conversazione e lo username di una persona, dall'elenco salvato."""
+    for k, v in _ig_elenco()["chat"].items():
+        for p in v.get("with") or []:
+            if str(p.get("id")) == rid and len(v.get("with") or []) == 1:
+                return k, p.get("username")
+    return None, None
 
 
 MAX_AUDIO_BYTES = 25_000_000
@@ -1389,12 +1460,29 @@ def _ig_trascrivi(msgs: list[dict]) -> None:
 def instagram_rispondi(destinatario_id: str, testo: str) -> dict:
     """Manda un DM Instagram di solo testo a una persona (destinatario_id = l'id 'with' della conversazione).
     Prima mostra a Ema destinatario e testo completo e aspetta il suo sì in chat. Funziona solo entro 24 ore
-    dall'ultimo messaggio dell'altra persona (regola di Instagram)."""
+    dall'ultimo messaggio dell'altra persona (regola di Instagram, non si aggira): guarda prima
+    "si_puo_rispondere_da_qui" in instagram_chat_lista / instagram_chat_leggi. Se la finestra è chiusa non manda
+    niente e restituisce inviato=false con il link e i passi per mandarlo a mano: dalli a Ema così come sono."""
     rid = re.sub(r"\D", "", _check(destinatario_id, "destinatario_id", 40))
     if not rid:
         raise ValueError("destinatario_id deve essere l'id numerico della persona")
     text = _check(testo, "testo", 1000)
-    out = _links_api("/ig/reply", {"recipient_id": rid, "text": text})
+    conv, username = _ig_conv_di(rid)
+    if conv:
+        try:
+            fin = _ig_finestra_da_msgs(_links_api(f"/ig/messages?conversation={conv}&limit=20").get("items", []))
+        except RuntimeError:
+            fin = None
+        if fin is not None and not fin["aperta"]:
+            return {"inviato": False, "perche_no": fin["perche_no"], "ultimo_loro_messaggio": fin["ultimo_loro_messaggio"],
+                    **_ig_a_mano(username, text)}
+    try:
+        out = _links_api("/ig/reply", {"recipient_id": rid, "text": text})
+    except RuntimeError as err:
+        if re.search(r"window|finestra|2018278|outside|allowed", str(err), re.I):
+            return {"inviato": False, "perche_no": "Instagram rifiuta: fuori dalla finestra di 24 ore (" + str(err)[:160] + ")",
+                    **_ig_a_mano(username, text)}
+        raise
     t = now()
     with lock:
         (DATA / "instagram.log").open("a", encoding="utf-8").write(f"{t:%Y-%m-%d %H:%M} to={rid} len={len(text)}\n")
