@@ -317,13 +317,23 @@ def affari(ric: dict, trovati: list[dict], escludi: str, visti: set[int], nomina
 
 
 def migliori(trovati: list[dict], n: int = MAX_TROVATI_MSG) -> list[dict]:
-    """I primi n per punteggio (il più sotto al valore solito in cima), un annuncio una volta sola."""
-    visti, out = set(), []
+    """I primi n per punteggio (il più sotto al valore solito in cima), un annuncio una volta sola e UN SOLO annuncio
+    per modello (Ema 18/11: sei link della stessa Minolta DiMAGE 7 in un messaggio)."""
+    visti, modelli, out = set(), set(), []
     for a in sorted(trovati, key=lambda a: (-a.get("punti", 0), a["prezzo"])):
-        if a["id"] not in visti:
+        modello = (a.get("nome") or a.get("titolo", "")).lower()
+        if a["id"] not in visti and modello not in modelli:
             visti.add(a["id"])
+            modelli.add(modello)
             out.append(a)
     return out[:n]
+
+
+def da_segnare(trovati: list[dict], mandati: list[dict]) -> list[dict]:
+    """Quelli da segnare come visti: i mandati e gli altri annunci degli STESSI modelli (se no tornano uno per giro).
+    Gli annunci di modelli rimasti fuori dal messaggio restano liberi per un giro successivo."""
+    modelli = {(a.get("nome") or a.get("titolo", "")).lower() for a in mandati}
+    return [a for a in trovati if (a.get("nome") or a.get("titolo", "")).lower() in modelli]
 
 
 # ------------------------------------------------------------------ stato e giro
@@ -418,8 +428,9 @@ class Caccia:
                     visti.add(a["id"])
             s["prossimo"] = (da + max(cercati - len(sempre), 0)) % len(ric)
             # solo i migliori vanno a Ema e diventano "visti"; gli altri buoni restano liberi per un giro successivo
-            tutti, trovati = len(trovati), migliori(trovati)
-            for a in trovati:
+            tutti, buoni = len(trovati), trovati
+            trovati = migliori(buoni)
+            for a in da_segnare(buoni, trovati):
                 visti_d[str(a["id"])] = t.strftime("%Y-%m-%d")
             if len(visti_d) > 20_000:
                 visti_d = dict(list(visti_d.items())[-20_000:])

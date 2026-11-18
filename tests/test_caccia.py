@@ -115,11 +115,20 @@ def main():
     msg = caccia.messaggio(list(trovati.values()) + out2["lista"])
     ok('href="https://www.vinted.it/items/1001"' in msg and "shopping list" in msg and "€45" in msg
        and "Open on Vinted" in msg, msg)
-    molti = [dict(out2["lista"][0], id=i, prezzo=10 + i, punti=round(50 / (10 + i), 2),
+    molti = [dict(out2["lista"][0], id=i, prezzo=10 + i, punti=round(50 / (10 + i), 2), nome=f"Modello {i}",
                   url=f"https://www.vinted.it/items/{i}") for i in range(9)]
     mm = caccia.messaggio(molti)
     ok("more" not in mm and mm.count("Open on Vinted") == 6 and "items/0\"" in mm and "items/8\"" not in mm
        and mm.index("€10") < mm.index("€11"), mm)
+    # Ema 18/11: sei DiMAGE 7 in un messaggio. Un solo annuncio per modello (il più conveniente); gli altri dello
+    # stesso modello diventano visti con lui, i modelli rimasti fuori dal messaggio no
+    stessi = [dict(out2["lista"][0], id=100 + i, prezzo=10 + i, punti=round(60 / (10 + i), 2), nome="Minolta DiMAGE 7",
+                   url=f"https://www.vinted.it/items/{100 + i}") for i in range(6)]
+    top = caccia.migliori(stessi + molti)
+    ok([a["nome"] for a in top].count("Minolta DiMAGE 7") == 1 and top[0]["id"] == 100 and len(top) == 6,
+       [(a["nome"], a["prezzo"]) for a in top])
+    segna = {a["id"] for a in caccia.da_segnare(stessi + molti, top)}
+    ok({100, 101, 102, 103, 104, 105} <= segna and 8 not in segna, segna)
     ok("<b>" in caccia.messaggio([dict(out2["lista"][0], titolo="a <b> & c")]) and
        "a &lt;b&gt; &amp; c" in caccia.messaggio([dict(out2["lista"][0], titolo="a <b> & c")]), "titolo non escapato")
     # 6b. "vale" + soglia: al prezzo normale non è un affare; la ricerca larga "nominate" usa la regola del modello
