@@ -83,6 +83,14 @@ per toglierlo `hub_link_togli(nome)`.
   Se Vinted blocca il server 3 giri di fila si ferma da sola (`caccia_stato(riattiva=True)` per ripartire).
 - **Allegati:** Postino apre gli allegati ricevuti (`read_attachment`: PDF, immagini, testo) e da una chat Claude Code sul
   PC può allegare file del PC a `send_email` (in base64), sempre dopo il sì di Ema.
+- **Gym Bro, la palestra** (18/11, progetto "Gym Bro"): l'app Android di Ema sincronizza da sola con il Segretario.
+  Tre documenti nel progetto: `documento_leggi("Gym Bro", "registro")` = tutto lo storico degli allenamenti in Markdown
+  (leggilo prima di rispondere sulla palestra), `dati` = il JSON grezzo, `schede` = le schede modificabili. Per
+  cambiare reps, serie, kg, riposo, note o esercizi: leggi `schede`, cambia solo quello che Ema chiede mantenendo il
+  formato, risalva con `documento_salva("Gym Bro", "schede", ...)` e scrivi una riga nel diario; l'app lo applica alla
+  prossima apertura e segna le modifiche "DA CLAUDE". Istruzioni complete nel documento `come-leggere-il-registro`.
+  Server: `GET /gymbro/pull` e `POST /gymbro/push` con token GYMBRO_SYNC_TOKEN (Impostazioni > Avanzate); `stato()`
+  mostra `gymbro_sync` e `gymbro_url` (l'indirizzo che va nel segreto SEGRETARIO_SYNC_URL del repo gym-bro).
 - **Impostazioni > Sicurezza**: le app collegate e i browser fidati, con "Scollega tutte le app di Claude" e
   "Scollega tutti i browser".
 

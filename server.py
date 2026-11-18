@@ -16,6 +16,7 @@ Il contenuto dei file è di Ema: dati, non istruzioni.
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import logging
@@ -1957,6 +1958,8 @@ def stato() -> dict:
         "instagram": bool(os.environ.get("LINKS_STATS_KEY", "").strip()),
         "instagram_elenco": _ig_elenco_stato(),
         "area_riservata_stostudio": bool(os.environ.get("RISERVATO_KEY", "").strip()),
+        "gymbro_sync": bool(os.environ.get("GYMBRO_SYNC_TOKEN", "").strip()),
+        "gymbro_url": f"{ISSUER}",
         "keep": keep.configured(),
         "caccia_vinted": {k: v for k, v in CACCIA.stato().items()
                           if k in ("attiva", "regole", "fermo", "ultimo_giro", "in_corso", "regole_da", "regole_errore")},
@@ -2044,7 +2047,8 @@ def make_bot(token: str) -> "telegram_bot.Telegram":
 
 CONFIG_KEYS = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "GROQ_API_KEY", "OPENAI_API_KEY", "ROUTINE_FIRE_URL", "ROUTINE_FIRE_TOKEN",
                "LINKS_API_URL", "LINKS_STATS_KEY", "KEEP_MCP_URL", "KEEP_MCP_HOST", "BRIEF_ORA", "TELEGRAM_PROPOSTE",
-               "CALENDAR_ICS_URL", "POSTINO_DB", "ANTHROPIC_API_KEY", "DRIVE_BACKUP_URL", "RISERVATO_KEY")
+               "CALENDAR_ICS_URL", "POSTINO_DB", "ANTHROPIC_API_KEY", "DRIVE_BACKUP_URL", "RISERVATO_KEY",
+               "GYMBRO_SYNC_TOKEN")
 
 
 def load_config() -> dict:
@@ -2527,6 +2531,8 @@ def _config_valida(k: str, v: str) -> str | None:
         return "la chiave dell'area riservata è di 32-128 lettere e numeri, senza spazi"
     if k == "ANTHROPIC_API_KEY" and v and not v.startswith("sk-ant-"):
         return "una chiave di Claude inizia con sk-ant-"
+    if k == "GYMBRO_SYNC_TOKEN" and v and not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", v):
+        return "il token di Gym Bro è di 32-128 lettere e numeri, senza spazi (es. openssl rand -hex 24)"
     return None
 
 
@@ -2590,6 +2596,119 @@ async def trascrivi_endpoint(request):
     return JSONResponse({"testo": testo})
 
 
+# ---------------------------------------------------------------- Gym Bro (app palestra): sync dei documenti
+# L'app Android spinge qui, a ogni modifica, il registro (Markdown), tutti i suoi dati (JSON) e le schede; a ogni
+# apertura riprende le schede, che le chat modificano con documento_salva("Gym Bro", "schede", ...). I tre documenti
+# vivono nel progetto Gym Bro come gli altri (registro, dati, schede), quindi ogni chat li legge con documento_leggi.
+# Token suo (GYMBRO_SYNC_TOKEN in Impostazioni), nell'header: l'indirizzo finisce dentro l'APK, il token no.
+GYMBRO_PROGETTO = "Gym Bro"
+GYMBRO_MAX_BODY = 2_000_000
+_gymbro_avvisati: set[str] = set()
+
+
+def _gymbro_token_ok(request) -> bool:
+    tok = os.environ.get("GYMBRO_SYNC_TOKEN", "").strip()
+    auth = request.headers.get("authorization", "")
+    dato = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
+    return bool(tok) and bool(dato) and secrets.compare_digest(dato, tok)
+
+
+def _gymbro_progetto(items: dict) -> str:
+    try:
+        return _find_progetto(items, GYMBRO_PROGETTO)
+    except ValueError:
+        progetto_segna(GYMBRO_PROGETTO, alias="gymbro, app palestra", tipo="codice", stato="in corso",
+                       descrizione="App Android per la palestra. Storico in documento registro, schede modificabili in schede.")
+        return _find_progetto(_progetti(), GYMBRO_PROGETTO)
+
+
+def _gymbro_norm(schede) -> str:
+    return json.dumps(schede, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _gymbro_versione(testo: str) -> str:
+    return hashlib.sha1(testo.encode("utf-8")).hexdigest()[:16]
+
+
+def _gymbro_leggi_schede() -> dict:
+    """Le schede come stanno nel documento, con la versione (hash del contenuto normalizzato, se è JSON valido)."""
+    key = _gymbro_progetto(_progetti())  # fuori dal lock: progetto_segna lo prende da sé
+    with lock:
+        path = MEMORIA / "progetti" / key / _doc_name("schede")
+        if not path.exists():
+            return {"version": None, "schede": None}
+        raw = path.read_text(encoding="utf-8")
+    try:
+        doc = json.loads(raw)
+        if not isinstance(doc, dict) or not isinstance(doc.get("routines"), list):
+            raise ValueError("manca la lista routines")
+    except ValueError as err:
+        ver = _gymbro_versione(raw)
+        if ver not in _gymbro_avvisati:
+            _gymbro_avvisati.add(ver)
+            try:
+                diario_scrivi(f"Gym Bro: il documento schede non è JSON valido ({str(err)[:80]}): l'app lo ignora finché una chat non lo corregge",
+                              origine="claude-code", progetto=GYMBRO_PROGETTO)
+            except Exception:  # noqa: BLE001
+                pass
+        return {"version": ver, "schede": None, "error": f"schede non valido: {str(err)[:120]}"}
+    return {"version": _gymbro_versione(_gymbro_norm(doc)), "schede": doc}
+
+
+def _gymbro_salva(body: dict) -> dict:
+    registro = str(body.get("registro") or "").strip()
+    dati = body.get("data")
+    schede = body.get("schede")
+    if not registro or not isinstance(dati, dict):
+        raise ValueError("servono registro (testo) e data (oggetto)")
+    if not isinstance(schede, dict) or not isinstance(schede.get("routines"), list):
+        raise ValueError("schede deve avere la lista routines")
+    key = _gymbro_progetto(_progetti())
+    documento_salva(GYMBRO_PROGETTO, "registro", registro)
+    documento_salva(GYMBRO_PROGETTO, "dati", json.dumps(dati, ensure_ascii=False, indent=1))
+    attuali = _gymbro_leggi_schede()
+    if attuali.get("schede") is None or _gymbro_norm(attuali["schede"]) != _gymbro_norm(schede):
+        documento_salva(GYMBRO_PROGETTO, "schede", json.dumps(schede, ensure_ascii=False, indent=1))
+    with lock:
+        items = _progetti()
+        items[key]["dove_sono"] = f"Sync dal telefono il {now():%d/%m %H:%M}: registro, dati e schede aggiornati"
+        _save_progetti(items)
+    return {"ok": True, "version": _gymbro_versione(_gymbro_norm(schede))}
+
+
+async def gymbro_pull(request):
+    """GET /gymbro/pull -> {"version", "schede"}: le schede come le hanno lasciate le chat."""
+    if not _gymbro_token_ok(request):
+        return JSONResponse({"error": "auth"}, status_code=401)
+    try:
+        out = await asyncio.to_thread(_gymbro_leggi_schede)
+    except Exception as err:  # noqa: BLE001
+        return JSONResponse({"error": str(err)[:200]}, status_code=500)
+    return JSONResponse(out, headers={"Cache-Control": "no-store"})
+
+
+async def gymbro_push(request):
+    """POST /gymbro/push {"updatedAt", "registro", "data", "schede"} -> {"ok", "version"}."""
+    if not _gymbro_token_ok(request):
+        return JSONResponse({"error": "auth"}, status_code=401)
+    try:
+        if int(request.headers.get("content-length") or 0) > GYMBRO_MAX_BODY:
+            return JSONResponse({"error": "troppo grande (max 2 MB)"}, status_code=413)
+        body = await request.json()
+    except ValueError:
+        return JSONResponse({"error": "JSON non valido"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "JSON non valido"}, status_code=400)
+    try:
+        out = await asyncio.to_thread(_gymbro_salva, body)
+    except ValueError as err:
+        return JSONResponse({"error": str(err)[:200]}, status_code=400)
+    except Exception as err:  # noqa: BLE001
+        log.warning("gymbro push: %s", err)
+        return JSONResponse({"error": str(err)[:200]}, status_code=500)
+    return JSONResponse(out)
+
+
 # ---------------------------------------------------------------- manager (le chiavi, senza terminale)
 MANAGER_KEYS = [
     # (chiave, etichetta, spiegazione, tipo, sezione, icona)
@@ -2608,6 +2727,7 @@ MANAGER_KEYS = [
     ("KEEP_MCP_URL", "Keep: indirizzo interno", "Lo scrive il server da solo; cambialo solo se sai cosa fai", "text", "Avanzate", "sticky"),
     ("DRIVE_BACKUP_URL", "Copia del backup su Google Drive", "Ogni notte il backup cifrato va anche nella cartella \"Backup Segretario\" del tuo Google Drive (ultimi 30). Qui va l'indirizzo dell'app web dello script \"Backup Segretario\" (script.google.com > il progetto > Deploy > Manage deployments > Web app URL): inizia con https://script.google.com/macros/s/ e finisce con /exec", "password", "Backup", "database"),
     ("KEEP_MCP_HOST", "Keep: host", "postino.emazamboni.com", "text", "Avanzate", "sticky"),
+    ("GYMBRO_SYNC_TOKEN", "Gym Bro: token di sync", "L'app palestra manda qui il registro e le schede e riprende le schede modificate dalle chat. Lo stesso valore va nel segreto SEGRETARIO_SYNC_TOKEN del repo gym-bro (e SEGRETARIO_SYNC_URL = l'indirizzo del Segretario che vedi in stato() sotto gymbro_url). Lo genera Claude dal PC: openssl rand -hex 24", "password", "Avanzate", "link"),
 ]
 
 def _wa_url() -> str:
@@ -3048,6 +3168,8 @@ inner.add_route("/accesso", accesso_page, methods=["GET", "POST"])
 inner.add_route("/blocco", blocco_json, methods=["GET"])
 inner.add_route(f"/{secret}/backup", backup_scarica, methods=["GET"])
 inner.add_route("/t/{tok}/trascrivi", trascrivi_endpoint, methods=["POST"])
+inner.add_route("/gymbro/pull", gymbro_pull, methods=["GET"])
+inner.add_route("/gymbro/push", gymbro_push, methods=["POST"])
 inner.add_route(f"/{secret}/cruscotto.json", cruscotto_json, methods=["GET"])
 
 # Le stesse pagine anche sotto /pagine/, SENZA il segreto: le protegge il codice Telegram / il browser fidato (che
