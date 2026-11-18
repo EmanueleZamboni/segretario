@@ -1171,22 +1171,37 @@ def instagram_chat_lista(quante: int = 15, cerca: str = "", dopo: str = "", cart
     """Le conversazioni (DM) del profilo Instagram di Ema, dalla più recente: id della conversazione, con chi (username,
     id), quando l'ultimo messaggio. Poi instagram_chat_leggi(id) per leggere.
     Una pagina arriva indietro solo di circa una settimana. Per una persona o un marchio che ha scritto prima usa
-    `cerca` (nome o username, es. "ttartisan"): guarda fino a 600 conversazioni. Per la pagina dopo passa in `dopo` il
-    valore `altre` della risposta. `cartella`: "requests" per le richieste di messaggi, se Instagram lo permette alle app
+    `cerca` (nome o username, es. "ttartisan"): cerca a ritroso per circa 40 secondi (di solito 500-800 conversazioni) e
+    si ferma alla prima che trova. Se non l'ha trovata e `altre` non è vuoto, richiama con `dopo` = `altre` per
+    continuare da lì. `cartella`: "requests" per le richieste di messaggi, se Instagram lo permette alle app
     (se risponde con un errore, quelle si leggono solo nell'app)."""
     from urllib.parse import quote as _q
-    qs = f"limit={max(1, min(int(quante), 50))}"
+    base = f"limit={max(1, min(int(quante), 50))}"
     if cerca.strip():
-        qs += "&q=" + _q(_check(cerca, "cerca", 60).strip())
-    if dopo.strip():
-        qs += "&after=" + _q(re.sub(r"[^A-Za-z0-9_=-]", "", dopo)[:400])
+        base += "&q=" + _q(_check(cerca, "cerca", 60).strip())
     if cartella.strip():
-        qs += "&folder=" + re.sub(r"[^a-z_]", "", cartella.lower())[:20]
-    out = _links_api(f"/ig/conversations?{qs}")
-    return {"chat": out.get("items", []), "altre": out.get("next"), "lette": out.get("scanned"),
-            "cartella": out.get("folder", "inbox"),
-            **({"nota": "nessuna chat trovata con quel nome nelle conversazioni lette: forse è nelle richieste di "
-                        "messaggi (prova cartella=\"requests\") o è più vecchia"} if cerca.strip() and not out.get("items") else {})}
+        base += "&folder=" + re.sub(r"[^a-z_]", "", cartella.lower())[:20]
+    cursore = re.sub(r"[^A-Za-z0-9_=-]", "", dopo)[:400]
+    # 18/11/2026: la ricerca su 40 pagine durava oltre 2 minuti e andava sempre in timeout. Ora il Worker si ferma
+    # dopo ~15 s e dice da dove continuare: qui si richiama finché trova, finisce o passano IG_CERCA_S secondi.
+    inizio, lette, out = time.monotonic(), 0, {}
+    while True:
+        out = _links_api(f"/ig/conversations?{base}" + (f"&after={_q(cursore)}" if cursore else ""))
+        lette += int(out.get("scanned") or 0)
+        cursore = out.get("next") or ""
+        if not cerca.strip() or out.get("items") or not cursore or lette >= 4000 \
+                or time.monotonic() - inizio > IG_CERCA_S:
+            break
+    trovate = out.get("items", [])
+    risposta = {"chat": trovate, "altre": out.get("next"), "lette": lette, "cartella": out.get("folder", "inbox")}
+    if cerca.strip() and not trovate:
+        risposta["nota"] = (f"nessuna chat con quel nome nelle {lette} conversazioni più recenti. "
+                            + ("Per cercare più indietro richiama con dopo = il valore di 'altre'. " if out.get("next") else "")
+                            + "Può anche essere nelle richieste di messaggi (cartella=\"requests\").")
+    return risposta
+
+
+IG_CERCA_S = 25  # dopo questi secondi non parte un altro giro (ognuno dura al massimo ~17 s): tutto entro ~45 s
 
 
 @mcp.tool()

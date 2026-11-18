@@ -43,6 +43,15 @@ class FakeWorker(BaseHTTPRequestHandler):
             if "q=" not in self.path:
                 return self._send(200, {"tags": {"#fiio-eh11": [v], "#sony-vaio-p": [v, v]}, "notMine": []})
             return self._send(200, {"q": "x", "tags": {"#fiio-eh11": [v]}, "notMine": [], "also": [v]})
+        if self.path.startswith("/ig/conversations") and ("q=lontano" in self.path or "q=nessuno" in self.path):
+            # ricerca a pezzi: il Worker si ferma e dice da dove continuare (next); 'lontano' sta alla terza pagina
+            pag = {"": ("P2", []), "P2": ("P3", []), "P3": (None, [{"id": "c3", "updated": "2025-11-12T10:00:00+0000",
+                                                                  "with": [{"id": "9", "username": "lontano", "name": None}]}])}
+            dopo = self.path.split("after=")[1] if "after=" in self.path else ""
+            nxt, items = pag.get(dopo, (None, []))
+            if "q=nessuno" in self.path:
+                items = []
+            return self._send(200, {"items": items, "next": nxt, "scanned": 50})
         if self.path.startswith("/ig/conversations"):
             return self._send(200, {"items": [{"id": "aWdfZAG06abc", "updated": "2026-11-04T17:57:59+0000",
                                                "with": [{"id": "1212151191536534", "username": "maureeno", "name": None}]}]})
@@ -88,7 +97,18 @@ def main():
     assert lst["chat"][0]["with"][0]["username"] == "maureeno" and CALLS[-1][1] == "/ig/conversations?limit=5"
     # cerca nelle chat più vecchie, pagina dopo, cartella delle richieste: passati al Worker puliti
     server.instagram_chat_lista(5, cerca="TT Artisan", dopo="QVFIUz&x=1", cartella="Requests!")
-    assert CALLS[-1][1] == "/ig/conversations?limit=5&q=TT%20Artisan&after=QVFIUzx%3D1&folder=requests", CALLS[-1][1]
+    assert CALLS[-1][1] == "/ig/conversations?limit=5&q=TT%20Artisan&folder=requests&after=QVFIUzx%3D1", CALLS[-1][1]
+    # la ricerca continua da sola pagina dopo pagina finché trova (qui alla terza chiamata)
+    n0 = len(CALLS)
+    lont = server.instagram_chat_lista(5, cerca="lontano")
+    assert lont["chat"][0]["with"][0]["username"] == "lontano" and lont["lette"] == 150 and len(CALLS) - n0 == 3, lont
+    nes = server.instagram_chat_lista(5, cerca="nessuno")
+    assert not nes["chat"] and nes["altre"] is None and "150" in nes["nota"], nes
+    # con il tempo finito si ferma e restituisce da dove continuare
+    server.IG_CERCA_S, prima = -1, server.IG_CERCA_S
+    meta = server.instagram_chat_lista(5, cerca="nessuno")
+    server.IG_CERCA_S = prima
+    assert meta["altre"] == "P2" and "dopo" in meta["nota"], meta
     # video per oggetto dal Links Manager: tutti i tag (conteggi), ricerca, e la scheda dell'oggetto con i suoi video
     tutti = server.video_cerca()
     assert tutti["tag"] == {"#fiio-eh11": 1, "#sony-vaio-p": 2} and CALLS[-1][1] == "/analytics/tags", (tutti, CALLS[-1])
