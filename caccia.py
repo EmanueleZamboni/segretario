@@ -32,7 +32,8 @@ PAUSA = 6.0          # secondi tra due pagine di ricerca (ognuna ~7 MB): sul PC 
 MAX_PER_GIRO = 20    # tetto duro, qualunque cosa dicano le regole
 MAX_SEMPRE = 8       # ricerche "sempre" (ogni giro) al massimo
 MAX_TROVATI_MSG = 6  # affari per messaggio: solo i migliori (Ema 17/11: "only the top 4 or 8", niente "+N more")
-SOGLIA = 2.0         # con "vale": affare solo se il prezzo è al massimo metà del valore solito (vale / prezzo >= SOGLIA)
+MAX_PUNTI = 10.0      # sotto 1/10 del valore solito è quasi sempre un ricambio, un manuale o una scatola
+SOGLIA = 2.0        # con "vale": affare solo se il prezzo è al massimo metà del valore solito (vale / prezzo >= SOGLIA)
 FERMO_DOPO = 3       # giri bloccati di fila prima di fermarsi da soli
 
 BLOCCO = ("just a moment", "cf-browser-verification", "challenge-platform", "attention required",
@@ -52,7 +53,14 @@ ACCESSORI_RE = re.compile(
     r"pi[eè]ces d[ée]tach|\bparts\b|ersatzteil|repuesto|\bstand\b|supporto|soporte|\bsupport\b|dust ?cover|"
     r"sticker|adesivo|poster|t-?shirt|maglia|maglietta|felpa|hoodie|paraluce|lens hood|treppiede|tripod|"
     r"tr[ée]pied|stativ|memory card|scheda di memoria|catalogo|catalogue|display|schermo|pellicola protettiva|"
-    r"scatola vuota|empty box|solo scatola|\bbox only", re.I)
+    r"scatola vuota|empty box|solo scatola|\bbox only|"
+    # 18/11: ricambi, manuali e carta in DE ES PT FR (un manuale del Nikon D1 a 1,50 € finiva primo)
+    r"handbuch|bedienungs|instruc|instru[çc][õo]es|operation guide|user guide|\bcd ?(de|d.|di|da)\b|cd-?rom|"
+    r"\bsoftware\b|\bdriver\b|\bcaja\b|\bcaixa\b|borracha|altifalante|ecr[ãa]\b|[ée]cran\b|pantalla|carcasa|"
+    r"scocca|keypad|tastier|tastatur|\bantena\b|\bpe[çc]as?\b|\bpi[eè]ces?\b|\bpiezas?\b|pellicola|protector|"
+    r"rivista|magazine|zeitschrift|pubblicit|publicit|werbung|p[áa]gina|gurt\b|\bsupports\b|suportes|soportes|desk insert|\bcd installa|installation cd|\bstrap\b|tracolla|cinghia|"
+    r"dragonne|pare-soleil|sonnenblende|algorithm card|nanoblock|\blego\b|ladekabel|carregador|headset|"
+    r"auricolar|kopfh[öo]rer|[ée]couteur|tragetasche|hoesje|\bmic\b|\bjack\b", re.I)
 DIFETTI_RE = re.compile(r"defekt|difettos|non funzion|for parts|pour pi[eè]ces|para piezas|ricambi|"
                         r"not working|ne fonctionne|no funciona|kaputt|guast|rott[oa]\b|\bhs\b", re.I)
 
@@ -264,6 +272,8 @@ def _affare(a: dict, ric: dict, tetto: float, tipico: float | None, cercato: str
     vale = ric.get("vale") or tipico
     punti = (vale or tetto) / a["prezzo"]
     if ric.get("vale") and punti < soglia:  # Ema 17/11: niente "affari" al prezzo normale
+        return None
+    if vale and punti > MAX_PUNTI:  # 18/11: a meno di 1/10 del valore è un pezzo o un manuale, non l'oggetto
         return None
     m = _deve(ric).search(a["titolo"])
     return {**a, "gruppo": ric.get("gruppo", ""), "cercato": cercato, "tetto": round(tetto, 2),

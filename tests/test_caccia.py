@@ -135,6 +135,15 @@ def main():
     ok(set(got) == {2, 5} and got[2]["nome"] == "Sony CCD-TR918 (Hi8)" and got[2]["tipico"] == 120
        and got[2]["punti"] == 4.0, got)
     ok([a["id"] for a in caccia.migliori(list(got.values()))] == [2, 5], "ordine per punteggio")
+    # 6c. 18/11: manuali, ricambi e carta in altre lingue fuori; sotto 1/10 del valore è un pezzo, non l'oggetto
+    d1 = [{"cerca": "nikon d1", "max": 60, "vale": 120, "nome": "Nikon D1", "deve": r"nikon d1[xh]?\b"}]
+    roba = ["Nikon D1 Benutzerhandbuch", "Nikon D1 Kameragurt", "Ecrã Nikon D1", "Librito instrucciones Nikon D1",
+            "Carcasa Nikon D1", "Peças Nikon D1", "Nikon D1 - Pagina Pubblicitaria", "Pièce de remplacement Nikon D1"]
+    pag = [{"id": 10 + i, "titolo": t, "prezzo": 20.0, "marca": "", "condizione": "Buone"} for i, t in enumerate(roba)]
+    pag += [{"id": 30, "titolo": "Nikon D1 body", "prezzo": 9.0, "marca": "", "condizione": "Buone"},
+            {"id": 31, "titolo": "Nikon D1 body", "prezzo": 40.0, "marca": "", "condizione": "Buone"}]
+    got = [a["id"] for a in caccia.affari({**larga}, pag, "", set(), d1, 2.0)]
+    ok(got == [31], f"solo la D1 vera a 40 €, avuti {got}")
     # 7. blocco Cloudflare: il giro si ferma subito, dopo 3 giri bloccati la caccia si ferma da sola
     MODO["blocca"] = True
     n_prima = len(CHIAMATE)
